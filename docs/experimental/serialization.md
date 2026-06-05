@@ -1,7 +1,7 @@
 # Serialization
 
 !!! warning "Experimental"
-    The custom-serializer surface on this page (`ISerializer<T>`, `IComponentArraySerializer<T>`, `SerializerRegistry`, `ComponentArraySerializerRegistry`) is experimental and may change in future 0.x releases.
+    The custom-serializer surface on this page (`ISerializer<T>`, `IComponentArraySerializer<T>`, `SerializerRegistry`, `ComponentArraySerializerRegistry`, `ICustomWorldStateSection`) is experimental and may change in future 0.x releases.
 
 Components are unmanaged structs, so they round-trip to bytes automatically — the framework treats them as plain memory. The two cases where you write serialization code yourself are:
 
@@ -22,7 +22,7 @@ var world = new WorldBuilder()
 
 // Register one ISerializer<T> per managed type you store on the heap:
 world.SerializerRegistry.RegisterSerializer(new PatrolRouteSerializer());
-world.SerializerRegistry.RegisterSerializer(new QueueSerializer<Vector3>());
+world.SerializerRegistry.RegisterSerializer(new QueueSerializerUnmanaged<Vector3>());
 
 world.Initialize();
 ```
@@ -33,19 +33,19 @@ You can also register them up front on the builder:
 var world = new WorldBuilder()
     .AddTemplate(myTemplate)
     .RegisterSerializer(new PatrolRouteSerializer())
-    .RegisterSerializer(new QueueSerializer<Vector3>())
+    .RegisterSerializer(new QueueSerializerUnmanaged<Vector3>())
     .BuildAndInitialize();
 ```
 
 If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely — register the built-in `BlitSerializer<T>` against the registry directly (`world.SerializerRegistry.RegisterSerializer(new BlitSerializer<T>())`). For enums, register `EnumSerializer<T>` the same way. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
 
-For common managed collections, Trecs ships generic closed-type serializers in `Trecs.Serialization` — `ListSerializer<T>`, `QueueSerializer<T>`, `IterableHashSetSerializer<T>`, `IterableDictionarySerializer<TKey, TValue>`, `ListBlitSerializer<T>` (for blittable element types). Register the closed type once and the registry handles it (e.g. `new ListSerializer<int>()`, `new QueueSerializer<Vector3>()`). Only author your own `ISerializer<T>` when the payload isn't covered by one of these.
+For common collections, Trecs ships generic closed-type serializers in `Trecs.Serialization`. Each comes in two variants: a `*Unmanaged` form for unmanaged element types (serialized as a single blit — always prefer this when it applies) and a `*Managed` form for class element types (serialized per-element via the registered serializer) — `ArraySerializerManaged<T>` / `ArraySerializerUnmanaged<T>`, `ListSerializerManaged<T>` / `ListSerializerUnmanaged<T>`, `QueueSerializerManaged<T>` / `QueueSerializerUnmanaged<T>`, `IterableDictionarySerializerManaged<TKey, TValue>` / `IterableDictionarySerializerUnmanaged<TKey, TValue>`. `IterableHashSetSerializer<T>` (along with `NativeArraySerializer<T>`, `NativeListSerializer<T>`, and `UnsafeListSerializer<T>`) has no suffix because its elements are always unmanaged. Register the closed type once and the registry handles it (e.g. `new ListSerializerUnmanaged<int>()`, `new QueueSerializerUnmanaged<Vector3>()`). Only author your own `ISerializer<T>` when the payload isn't covered by one of these.
 
 ## Authoring a custom serializer
 
 Implement `ISerializer<T>` with paired `Serialize` and `Deserialize` methods. The binary format is purely positional — `Deserialize` must call the same readers in the same order as `Serialize` calls writers.
 
-As a concrete example, take a managed class holding a list of waypoints, allocated via `SharedPtr.Alloc(world, blobId, value)` and stored on a component as `SharedPtr<PatrolRoute>`:
+As a concrete example, take a managed class holding a list of waypoints, allocated via `SharedPtr.Register(world, blobId, value)` + `SharedPtr.Acquire<PatrolRoute>(world, blobId)` and stored on a component as `SharedPtr<PatrolRoute>`:
 
 ```csharp
 public class PatrolRoute
@@ -123,6 +123,9 @@ Every `World` exposes a `ComponentArraySerializerRegistry` for this:
 ```csharp
 world.ComponentArraySerializerRegistry.Register(new MyPhysicsWorldSerializer());
 ```
+
+!!! note "Register before `world.Initialize()`"
+    These registrations change the snapshot wire format, so they are part of the [world schema](#schema-compatibility-for-snapshots-and-recordings) and the registry **seals at `world.Initialize()`** — registering or unregistering after that throws. Register between `Build()` and `Initialize()` as above, or up front via `WorldBuilder.RegisterComponentArraySerializer(...)`. (Allowing mid-session changes would change the wire format mid-session, stranding snapshots taken earlier in the same run — e.g. the editor's rewind keyframes.)
 
 The interface hands you a `NativeList<T>` view of the component values for the partition being serialized — a familiar, Burst-compatible Unity Collections type. The framework owns the entry count (every component array in a partition has the same length, one entry per entity) and writes it for you, so you only deal with per-element data:
 
@@ -275,6 +278,35 @@ public sealed class CollisionGroupSerializer : IComponentArraySerializer<CCollis
 
 The same versioning rules apply as for `ISerializer<T>`: read what you wrote in the same order, branch on `reader.Version` if the layout has changed.
 
+## Custom world-state sections
+
+Everything above customizes how *ECS-owned* data serializes. Some games also have deterministic state that lives entirely outside the ECS — most commonly a scripting VM (Lua, a behavior-tree interpreter, …) whose internal state co-evolves with the simulation. If that state isn't captured alongside the world, every world-state restore silently desyncs it: a rewind scrub restores the entities but not the script state that drives them.
+
+For this, register an `ICustomWorldStateSection`:
+
+```csharp
+public interface ICustomWorldStateSection
+{
+    void Serialize(ISerializationWriter writer);
+    void Deserialize(ISerializationReader reader);
+}
+```
+
+```csharp
+builder.RegisterCustomWorldStateSection("MyVmState", new MyVmStateSection(vm));
+// or between Build() and Initialize():
+world.CustomWorldStateSections.Register("MyVmState", new MyVmStateSection(vm));
+```
+
+Registered sections are appended to the world-state stream after the built-in sections, in registration order. Because the registration lives on the `World` itself, **every** capture path includes the section automatically — snapshots, rewind keyframes, recordings, desync checksums, and the editor's Player-window rewind tooling. You never wrap or replace the framework's serializer.
+
+The framework owns the framing: each section is written inside its own scope, prefixed with a hash of its registration name (so a mismatched section set is reported by name) and followed by a guard byte (so wire drift inside one section is pinned to that section instead of cascading into the next as garbage).
+
+!!! note "Register before `world.Initialize()`"
+    Like component-array serializers, custom sections change the snapshot wire format, so they are part of the [world schema](#schema-compatibility-for-snapshots-and-recordings): the registry seals at `world.Initialize()`, the section names (and their order) are folded into the `WorldSchemaFingerprint`, and a snapshot saved with a different section set fails loudly at load with the diverging aspect named. The registration *name* is the section's stable wire identity — treat a rename like any other wire format change.
+
+`Serialize` and `Deserialize` must consume exactly mirrored data, and the data must be a deterministic function of game state — it participates in desync checksums. Sections are deserialized after all built-in sections, so the ECS world is fully restored by the time your `Deserialize` runs; the world's `DeserializeCompletedEvent` fires after custom sections, so listeners observe a fully consistent world + section state.
+
 ## Explicit type IDs
 
 By default, Trecs derives type identifiers from `BurstRuntime.GetHashCode32(type)` — a hash of the fully qualified type name. Renaming or moving a type to a different namespace changes the hash and silently corrupts saved files that reference the old ID.
@@ -293,9 +325,52 @@ public class PatrolRoute { /* ... */ }
 
 This makes type identity independent of namespaces and class names — refactors never corrupt save files, and any data-shape changes are handled by versioned custom serializers.
 
+## Schema compatibility for snapshots and recordings
+
+A snapshot or recording is a raw binary image of the world, and its wire format depends on the world **schema** matching exactly between save and load:
+
+- the set of templates, their tags, and their components (names, declaration order, and struct sizes),
+- each component's `[VariableUpdateOnly]` status,
+- the registered entity sets,
+- which component types have a custom `IComponentArraySerializer<T>` registered,
+- the registered [custom world-state sections](#custom-world-state-sections) (names, in registration order).
+
+The loaded *system list* is deliberately **not** part of the schema: per-system paused state is saved sparse and by system identity, so adding, removing, or reordering systems keeps old snapshots loadable (a pause for a system that no longer exists is dropped with a warning). Note that changing what your systems *do* still changes replay behavior — recordings surface that at runtime as a desync checksum mismatch, which is the right layer for behavioral drift.
+
+Every snapshot and recording stamps a `WorldSchemaFingerprint` — a compact hash of all of the above — into its metadata at save time. On load, Trecs validates it against the live world **before reading any world state**. A mismatch throws a `SerializationException` that names which aspect of the schema diverged (groups/components, sets, custom serializers, or custom sections) and shows both fingerprints:
+
+```text
+This snapshot was saved with a different world schema and cannot be loaded — ...
+ - Groups/components: a component or tag type was added, removed, or renamed
+   on a template; a component struct's size changed; ...
+Saved:   WorldSchemaFingerprint(Groups:A716E664064B9EE2 ...)
+Current: WorldSchemaFingerprint(Groups:3E27FE46A2A729B6 ...)
+```
+
+There is no in-place migration for schema-stale files — re-save the snapshot (or re-record) from a world built with the current schema. To check compatibility up front without attempting a load, compare `world.SchemaFingerprint` against `SnapshotSerializer.PeekMetadata(...).SchemaFingerprint` or `RecordingBundleSerializer.PeekHeader(...).SchemaFingerprint`.
+
+The fingerprint guards the **world layout**; the *contents* of heap-stored managed types are still your custom serializers' concern — evolve those with [`reader.Version`](#versioning) branching, which the fingerprint deliberately does not cover.
+
+!!! note "Field reorders and renames"
+    The fingerprint hashes each component's type identity, byte size, **and** a compile-time field-layout hash (the source generator emits one on every component). So reordering two `float` fields inside a component — which keeps the size identical but changes where the bytes land — *does* invalidate old snapshots, with a clear "Groups/components" mismatch rather than silent corruption. A pure field **rename** is deliberately allowed (only field types and order are hashed, not names), since it doesn't change the blit layout. Components you hand-write outside the source generator fall back to size-only detection, so treat a same-size edit to those as a schema change and regenerate your snapshots.
+
+## Save games and game patches
+
+World-state snapshots are **same-build artifacts**. Within one build of your game they make excellent saves — quicksaves, autosaves, crash recovery — because a memory image is fast to write, fast to restore, and perfectly faithful. But they are *not* a patch-durable save-game format: the wire is a raw image of your schema, so the first patch that adds a field to a component, adds a component to a template, or renames a tag invalidates every save your players have made. There is no in-place migration, by design — see the [migration trade-off](#schema-compatibility-for-snapshots-and-recordings) above.
+
+If your game needs saves that survive patches, **author a domain-level save format** on top of Trecs rather than persisting world state directly:
+
+- **Save the facts, not the memory.** Serialize the logical state your game needs to reconstruct a session — player position, inventory ids, quest flags, world seed — using your own format, or Trecs' `ISerializer<T>` machinery with [`reader.Version`](#versioning) branching for evolution.
+- **Rebuild, don't restore.** On load, create a fresh world and repopulate it through normal gameplay paths (`AddEntity` + templates + component sets). Schema changes between patches are then absorbed by ordinary game code: new components get their template defaults, removed components simply aren't written, renames don't matter because your save format never stored Trecs type identities.
+- **Version explicitly.** Bump your own save-format version on breaking changes and branch on it at load — the same discipline as any other persistence format.
+
+This is the standard architecture for patch-durable saves in shipped games generally — the engine-level state image is a runtime tool (rollback, replays, scrubbing), and the save system is a deliberately smaller, versioned projection of it that you control.
+
+Trecs still helps at the boundary: stamp your save-format version into `SnapshotMetadata.Version` / `BundleHeader.Version` for any world-state payloads you *do* persist, and use `PeekMetadata` / `PeekHeader` plus `world.SchemaFingerprint` to detect stale files up front and show players a friendly "this save is from an older version" message instead of a load error.
+
 ## See also
 
 - [Pointers](pointers.md) — pointer types and which kinds of data need to live on the heap.
 - [Trecs Player Window](../editor-windows/player.md) — uses the registered serializers to record, scrub, and replay world state.
-- [Sample 10 — Dynamic Collections](../samples/10-dynamic-collections.md) — `UniquePtr<Queue<Vector3>>` plus the built-in `QueueSerializer<Vector3>` registered against the world so the trail round-trips through snapshots / recording.
+- [Sample 10 — Dynamic Collections](../samples/10-dynamic-collections.md) — `UniquePtr<Queue<Vector3>>` plus the built-in `QueueSerializerUnmanaged<Vector3>` registered against the world so the trail round-trips through snapshots / recording.
 - [Sample 14 — Blob Seed Pattern](../samples/14-blob-seed-pattern.md) — `SharedPtr<ColorPalette>` with stable `BlobId`s (the sample itself doesn't take snapshots, but the same `ISerializer<T>` pattern from Sample 10 would apply).

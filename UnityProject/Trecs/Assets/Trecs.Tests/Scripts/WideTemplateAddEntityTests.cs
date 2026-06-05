@@ -571,7 +571,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(0ul, slotHdr->SetMask.Word3);
 
             refs.Dispose();
-            a.Submit();
+            a.World.Submit();
 
             // After drain: every component round-trips with its set value.
             NAssert.AreEqual(1, a.CountEntitiesWithTags(wideTag));

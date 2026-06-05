@@ -2,7 +2,7 @@ using System;
 using NUnit.Framework;
 using Trecs.Internal;
 using Trecs.Serialization;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -10,7 +10,8 @@ namespace Trecs.Tests
     public class EnumSerializationTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
 
         [SetUp]
         public void SetUp()
@@ -22,13 +23,8 @@ namespace Trecs.Tests
             RegisterEnumWithDelta<TestIntEnum>(_serializerRegistry);
             RegisterEnumWithDelta<TestLongEnum>(_serializerRegistry);
             RegisterEnumWithDelta<TestFlagsEnum>(_serializerRegistry);
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         static void RegisterEnumWithDelta<T>(SerializerRegistry registry)
@@ -47,13 +43,17 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<TestByteEnum>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<TestByteEnum>(_data);
 
             // Assert
-            Assert.That(result == original);
+            NAssert.That(result == original);
         }
 
         [Test]
@@ -71,18 +71,17 @@ namespace Trecs.Tests
             foreach (var original in testValues)
             {
                 // Act
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     original,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags
                 );
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<TestIntEnum>();
+                var result = _helper.ReadAll<TestIntEnum>(_data);
 
                 // Assert
-                Assert.That(
+                NAssert.That(
                     result == original,
                     $"Enum value {original} should serialize correctly"
                 );
@@ -97,13 +96,17 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<TestLongEnum>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<TestLongEnum>(_data);
 
             // Assert
-            Assert.That(result == original);
+            NAssert.That(result == original);
         }
 
         [Test]
@@ -114,16 +117,20 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<TestFlagsEnum>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<TestFlagsEnum>(_data);
 
             // Assert
-            Assert.That(result == original);
-            Assert.That(result.HasFlag(TestFlagsEnum.Flag1));
-            Assert.That(result.HasFlag(TestFlagsEnum.Flag3));
-            Assert.That(!result.HasFlag(TestFlagsEnum.Flag2));
+            NAssert.That(result == original);
+            NAssert.That(result.HasFlag(TestFlagsEnum.Flag1));
+            NAssert.That(result.HasFlag(TestFlagsEnum.Flag3));
+            NAssert.That(!result.HasFlag(TestFlagsEnum.Flag2));
         }
 
         [Test]
@@ -134,16 +141,20 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<TestFlagsEnum>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<TestFlagsEnum>(_data);
 
             // Assert
-            Assert.That(result == original);
-            Assert.That(result.HasFlag(TestFlagsEnum.Flag1));
-            Assert.That(result.HasFlag(TestFlagsEnum.Flag2));
-            Assert.That(result.HasFlag(TestFlagsEnum.Flag3));
+            NAssert.That(result == original);
+            NAssert.That(result.HasFlag(TestFlagsEnum.Flag1));
+            NAssert.That(result.HasFlag(TestFlagsEnum.Flag2));
+            NAssert.That(result.HasFlag(TestFlagsEnum.Flag3));
         }
 
         [Test]
@@ -154,14 +165,18 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<TestFlagsEnum>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<TestFlagsEnum>(_data);
 
             // Assert
-            Assert.That(result == original);
-            Assert.That(result == TestFlagsEnum.None);
+            NAssert.That(result == original);
+            NAssert.That(result == TestFlagsEnum.None);
         }
 
         [Test]
@@ -172,14 +187,18 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<TestIntEnum>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<TestIntEnum>(_data);
 
             // Assert
-            Assert.That(result == original);
-            Assert.That((int)result == 0);
+            NAssert.That(result == original);
+            NAssert.That((int)result == 0);
         }
 
         [Test]
@@ -191,18 +210,17 @@ namespace Trecs.Tests
             foreach (TestByteEnum original in testValues)
             {
                 // Act
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     original,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags
                 );
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<TestByteEnum>();
+                var result = _helper.ReadAll<TestByteEnum>(_data);
 
                 // Assert
-                Assert.That(
+                NAssert.That(
                     result == original,
                     $"Byte enum value {original} should serialize correctly"
                 );
@@ -216,18 +234,17 @@ namespace Trecs.Tests
             var baseValue = TestIntEnum.FirstValue;
             var value = TestIntEnum.ThirdValue;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 value,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta(baseValue);
+            var result = _helper.ReadAllDelta(_data, baseValue);
 
-            Assert.That(result == value);
+            NAssert.That(result == value);
         }
 
         [Test]
@@ -237,18 +254,17 @@ namespace Trecs.Tests
             var baseValue = TestIntEnum.SecondValue;
             var value = TestIntEnum.SecondValue;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 value,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta(baseValue);
+            var result = _helper.ReadAllDelta(_data, baseValue);
 
-            Assert.That(result == value);
+            NAssert.That(result == value);
         }
 
         [Test]
@@ -258,18 +274,17 @@ namespace Trecs.Tests
             var baseValue = TestByteEnum.FirstValue;
             var value = TestByteEnum.ThirdValue;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 value,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta(baseValue);
+            var result = _helper.ReadAllDelta(_data, baseValue);
 
-            Assert.That(result == value);
+            NAssert.That(result == value);
         }
 
         [Test]
@@ -279,18 +294,17 @@ namespace Trecs.Tests
             var baseValue = TestLongEnum.SmallValue;
             var value = TestLongEnum.LargeValue;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 value,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta(baseValue);
+            var result = _helper.ReadAllDelta(_data, baseValue);
 
-            Assert.That(result == value);
+            NAssert.That(result == value);
         }
 
         [Test]
@@ -300,18 +314,17 @@ namespace Trecs.Tests
             var baseValue = TestFlagsEnum.Flag1;
             var value = TestFlagsEnum.Flag2 | TestFlagsEnum.Flag3;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 value,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta(baseValue);
+            var result = _helper.ReadAllDelta(_data, baseValue);
 
-            Assert.That(result == value);
+            NAssert.That(result == value);
         }
 
         [Test]
@@ -322,19 +335,19 @@ namespace Trecs.Tests
             var value = TestIntEnum.ThirdValue;
 
             // Delta should use byte index (1 bit + 1 byte) instead of full int (1 bit + 4 bytes)
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 value,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: false,
                 flags
             );
-            var deltaSize = _cacheHelper.MemoryStream.Position;
+            var deltaSize = _data.ContiguousSize;
 
             // With compact encoding, the data portion should be small
             // Type check header + version + 1 bit change flag + 1 byte index
-            Assert.That(
+            NAssert.That(
                 deltaSize < 32,
                 $"Delta size ({deltaSize}) should be compact due to byte index encoding"
             );

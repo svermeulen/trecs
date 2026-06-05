@@ -7,6 +7,7 @@ using Trecs;
 using Trecs.Internal;
 using Trecs.Collections;
 using Trecs.Serialization;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -15,6 +16,7 @@ namespace Trecs.Tests
     {
         SerializerRegistry _serializerRegistry;
         BinarySerializationWriter _writer;
+        SerializationData _data;
         MemoryStream _memoryStream;
 
         [SetUp]
@@ -23,11 +25,15 @@ namespace Trecs.Tests
             _serializerRegistry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
 
-            // Register test-specific serializers
-            _serializerRegistry.RegisterSerializer(new ListSerializer<int>());
-            _serializerRegistry.RegisterSerializer(new IterableDictionarySerializer<int, float>());
+            // Register test-specific serializers. (int/float are unmanaged,
+            // so the *Managed variants' class constraint rejects them.)
+            _serializerRegistry.RegisterSerializer(new ListSerializerUnmanaged<int>());
+            _serializerRegistry.RegisterSerializer(
+                new IterableDictionarySerializerUnmanaged<int, float>()
+            );
 
             _writer = new BinarySerializationWriter(_serializerRegistry);
+            _data = new SerializationData();
             _memoryStream = new MemoryStream();
         }
 
@@ -42,6 +48,7 @@ namespace Trecs.Tests
         {
             // Reset the writer
             _writer.Start(
+                _data,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags: 0L,
@@ -67,7 +74,8 @@ namespace Trecs.Tests
             _writer.Write("PlayerStats", stats);
 
             // Finalize the write
-            _writer.Complete(_memoryStream);
+            _writer.Complete();
+            _data.WriteContiguousTo(_memoryStream);
 
             // Get the memory report
             var report = _writer.GetMemoryReport();
@@ -76,38 +84,37 @@ namespace Trecs.Tests
             Debug.Log(report);
 
             // Verify the report contains expected sections
-            NUnit.Framework.Assert.That(
-                report,
-                Does.Contain("=== Serialization Memory Breakdown ===")
-            );
-            NUnit.Framework.Assert.That(report, Does.Contain("Total:"));
-            NUnit.Framework.Assert.That(report, Does.Contain("Header & Metadata:"));
-            NUnit.Framework.Assert.That(report, Does.Contain("Serialized Data:"));
+            NAssert.That(report, Does.Contain("=== Serialization Memory Breakdown ==="));
+            NAssert.That(report, Does.Contain("Total:"));
+            NAssert.That(report, Does.Contain("Header & Metadata:"));
+            NAssert.That(report, Does.Contain("Serialized Data:"));
 
-            NUnit.Framework.Assert.That(report, Does.Contain("Type IDs:"));
+            NAssert.That(report, Does.Contain("Type IDs:"));
 
             // Verify specific fields are tracked
-            NUnit.Framework.Assert.That(report, Does.Contain("playerPosition"));
-            NUnit.Framework.Assert.That(report, Does.Contain("playerHealth"));
-            NUnit.Framework.Assert.That(report, Does.Contain("playerName"));
-            NUnit.Framework.Assert.That(report, Does.Contain("inventory"));
-            NUnit.Framework.Assert.That(report, Does.Contain("playerStats"));
+            NAssert.That(report, Does.Contain("playerPosition"));
+            NAssert.That(report, Does.Contain("playerHealth"));
+            NAssert.That(report, Does.Contain("playerName"));
+            NAssert.That(report, Does.Contain("inventory"));
+            NAssert.That(report, Does.Contain("playerStats"));
         }
 
         [Test]
         public void TestMemoryTrackingDisabled()
         {
             _writer.Start(
+                _data,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags: 0L,
                 enableMemoryTracking: false
             );
             _writer.Write("Test", 42);
-            _writer.Complete(_memoryStream);
+            _writer.Complete();
+            _data.WriteContiguousTo(_memoryStream);
 
             var report = _writer.GetMemoryReport();
-            NUnit.Framework.Assert.That(report, Is.EqualTo("Memory tracking is disabled"));
+            NAssert.That(report, Is.EqualTo("Memory tracking is disabled"));
         }
 
         [Test]
@@ -116,6 +123,7 @@ namespace Trecs.Tests
             // Enable memory tracking
             // Reset the writer
             _writer.Start(
+                _data,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags: 0L,
@@ -132,17 +140,18 @@ namespace Trecs.Tests
             _writer.WriteDelta("Rotation", Vector3.zero, Vector3.zero);
 
             // Finalize
-            _writer.Complete(_memoryStream);
+            _writer.Complete();
+            _data.WriteContiguousTo(_memoryStream);
 
             // Get report
             var report = _writer.GetMemoryReport();
             Debug.Log(report);
 
             // Verify delta fields are tracked
-            NUnit.Framework.Assert.That(report, Does.Contain("position"));
+            NAssert.That(report, Does.Contain("position"));
 
             // Zero-byte entries (like unchanged rotation) should be filtered out
-            NUnit.Framework.Assert.That(report, Does.Not.Contain("rotation"));
+            NAssert.That(report, Does.Not.Contain("rotation"));
         }
 
         [Test]
@@ -150,6 +159,7 @@ namespace Trecs.Tests
         {
             // Reset the writer
             _writer.Start(
+                _data,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags: 0L,
@@ -164,15 +174,16 @@ namespace Trecs.Tests
             _writer.Write("NormalField", 42);
 
             // Finalize
-            _writer.Complete(_memoryStream);
+            _writer.Complete();
+            _data.WriteContiguousTo(_memoryStream);
 
             // Get report
             var report = _writer.GetMemoryReport();
             Debug.Log(report);
 
             // Zero-byte entries should be filtered out
-            NUnit.Framework.Assert.That(report, Does.Not.Contain("unchangedField"));
-            NUnit.Framework.Assert.That(report, Does.Contain("normalField"));
+            NAssert.That(report, Does.Not.Contain("unchangedField"));
+            NAssert.That(report, Does.Contain("normalField"));
         }
     }
 }

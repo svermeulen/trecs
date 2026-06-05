@@ -55,38 +55,7 @@ internal static class GeneratorTestHarness
     public static GeneratorRun Run(IIncrementalGenerator[] generators, string userSource)
     {
         var compilation = BuildInputCompilation(userSource);
-
-        // Match the parse options used for the input compilation so generated trees
-        // (which the driver re-parses) don't trip "Inconsistent language versions"
-        // when the input trees opt into Preview for generic attributes.
-        var driverParseOptions = new CSharpParseOptions(LanguageVersion.Preview);
-        var driver = CSharpGeneratorDriver.Create(
-            generators: generators.Select(GeneratorExtensions.AsSourceGenerator).ToImmutableArray(),
-            additionalTexts: ImmutableArray<AdditionalText>.Empty,
-            parseOptions: driverParseOptions,
-            optionsProvider: null
-        );
-        driver = (CSharpGeneratorDriver)
-            driver.RunGeneratorsAndUpdateCompilation(
-                compilation,
-                out var outputCompilation,
-                out var generationDiagnostics
-            );
-
-        var runResult = driver.GetRunResult();
-        var generatedTrees = runResult
-            .Results.SelectMany(r => r.GeneratedSources)
-            .Select(s => s.SyntaxTree)
-            .ToImmutableArray();
-
-        var compileDiagnostics = outputCompilation.GetDiagnostics();
-
-        return new GeneratorRun(
-            GenDiagnostics: runResult.Diagnostics,
-            CompileDiagnostics: compileDiagnostics,
-            GenerationDiagnostics: generationDiagnostics,
-            GeneratedTrees: generatedTrees
-        );
+        return RunDriver(generators, compilation);
     }
 
     /// <summary>
@@ -126,21 +95,84 @@ internal static class GeneratorTestHarness
     }
 
     /// <summary>
+    /// Like <see cref="Run(IIncrementalGenerator[], string)"/>, but compiles only the supplied
+    /// source — it does NOT prepend <see cref="TrecsStubs.Source"/>. Used by tests that need to
+    /// control the exact set of Trecs types visible to the generator, e.g. to omit
+    /// <c>TrecsTags.Globals</c> so the <c>[FromGlobalEntity]</c> resolution failure path (TRECS119)
+    /// can be exercised — the default stubs always define <c>TrecsTags.Globals</c>, which would
+    /// make that path unreachable.
+    /// </summary>
+    public static GeneratorRun RunWithoutDefaultStubs(
+        IIncrementalGenerator[] generators,
+        string fullSource
+    )
+    {
+        var compilation = BuildCompilation(new[] { fullSource });
+        return RunDriver(generators, compilation);
+    }
+
+    private static GeneratorRun RunDriver(
+        IIncrementalGenerator[] generators,
+        CSharpCompilation compilation
+    )
+    {
+        // Match the parse options used for the input compilation so generated trees
+        // (which the driver re-parses) don't trip "Inconsistent language versions"
+        // when the input trees opt into Preview for generic attributes.
+        var driverParseOptions = new CSharpParseOptions(LanguageVersion.Preview);
+        var driver = CSharpGeneratorDriver.Create(
+            generators: generators.Select(GeneratorExtensions.AsSourceGenerator).ToImmutableArray(),
+            additionalTexts: ImmutableArray<AdditionalText>.Empty,
+            parseOptions: driverParseOptions,
+            optionsProvider: null
+        );
+        driver = (CSharpGeneratorDriver)
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var outputCompilation,
+                out var generationDiagnostics
+            );
+
+        var runResult = driver.GetRunResult();
+        var generatedTrees = runResult
+            .Results.SelectMany(r => r.GeneratedSources)
+            .Select(s => s.SyntaxTree)
+            .ToImmutableArray();
+
+        var compileDiagnostics = outputCompilation.GetDiagnostics();
+
+        return new GeneratorRun(
+            GenDiagnostics: runResult.Diagnostics,
+            CompileDiagnostics: compileDiagnostics,
+            GenerationDiagnostics: generationDiagnostics,
+            GeneratedTrees: generatedTrees
+        );
+    }
+
+    /// <summary>
     /// Builds a compilation containing the Trecs stubs + the user's source, ready for the
     /// generator driver to run against. Assembly name is "Trecs" so the source-gen project's
     /// AssemblyFilterHelper.CreateTrecsReferenceCheck doesn't filter out the user types.
     /// </summary>
     private static CSharpCompilation BuildInputCompilation(string userSource)
     {
+        return BuildCompilation(new[] { TrecsStubs.Source, userSource });
+    }
+
+    /// <summary>
+    /// Builds a "Trecs"-named compilation from the supplied sources verbatim — no stubs are
+    /// prepended. Callers that want the default stubs must include them explicitly (e.g. via
+    /// <see cref="BuildInputCompilation"/>).
+    /// </summary>
+    private static CSharpCompilation BuildCompilation(string[] sources)
+    {
         // The stubs and user sources use C# 11 generic attributes. The pinned
         // Microsoft.CodeAnalysis.CSharp 4.3.0 still treats them as a preview feature,
         // so use LanguageVersion.Preview rather than Latest.
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
-        var syntaxTrees = new[]
-        {
-            CSharpSyntaxTree.ParseText(TrecsStubs.Source, parseOptions),
-            CSharpSyntaxTree.ParseText(userSource, parseOptions),
-        };
+        var syntaxTrees = sources
+            .Select(s => CSharpSyntaxTree.ParseText(s, parseOptions))
+            .ToArray();
 
         // Reference assemblies provided by the test SDK. Without these, even `object` won't
         // resolve. Loading every loaded assembly is overkill but cheap and covers anything

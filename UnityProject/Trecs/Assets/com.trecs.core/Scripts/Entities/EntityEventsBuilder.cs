@@ -217,7 +217,7 @@ namespace Trecs
             _systemRunner.FixedIsPausedChangedEvent.Subscribe(cb, priority);
 
         /// <summary>
-        /// Fires during <see cref="World.Dispose"/>, after <see cref="World.RemoveAllEntities"/>
+        /// Fires during <see cref="World.Dispose"/>, after the final remove-all pass
         /// and system <c>OnShutdown</c> hooks have run but before infrastructure teardown.
         /// Use this to dispose event subscriptions from non-system code at the right point in
         /// the shutdown sequence.

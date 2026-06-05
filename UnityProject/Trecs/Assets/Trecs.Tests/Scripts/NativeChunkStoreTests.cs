@@ -590,18 +590,19 @@ namespace Trecs.Tests
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
-            using var buf1 = new SerializationBuffer(registry);
-            using var buf2 = new SerializationBuffer(registry);
+            var helper = new SerializationHelper(registry);
+            var data1 = new SerializationData();
+            var data2 = new SerializationData();
 
-            buf1.StartWrite(version: 1, includeTypeChecks: true);
-            store.Serialize(buf1.Writer);
-            buf1.EndWrite();
-            var bytes1 = buf1.MemoryStream.ToArray();
+            helper.Writer.Start(data1, version: 1, includeTypeChecks: true);
+            store.Serialize(helper.Writer);
+            helper.Writer.Complete();
+            var bytes1 = data1.ToContiguousBytes();
 
-            buf2.StartWrite(version: 1, includeTypeChecks: true);
-            store.Serialize(buf2.Writer);
-            buf2.EndWrite();
-            var bytes2 = buf2.MemoryStream.ToArray();
+            helper.Writer.Start(data2, version: 1, includeTypeChecks: true);
+            store.Serialize(helper.Writer);
+            helper.Writer.Complete();
+            var bytes2 = data2.ToContiguousBytes();
 
             CollectionAssert.AreEqual(
                 bytes1,
@@ -730,10 +731,11 @@ namespace Trecs.Tests
             // Serialize src for restoring later.
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
-            using var buf = new SerializationBuffer(registry);
-            buf.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buf.Writer);
-            buf.EndWrite();
+            var helper = new SerializationHelper(registry);
+            var data = new SerializationData();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
 
             // Build a DIFFERENT chunk store (different shape, different size) then free
             // everything so it ends up at _liveCount=0 but with residual pages and
@@ -748,10 +750,9 @@ namespace Trecs.Tests
             NAssert.Greater(dst.NumPages, 0, "Pre-Deserialize dst should have residual pages");
 
             // Deserialize over it.
-            buf.MemoryStream.Position = 0;
-            buf.StartRead();
-            dst.Deserialize(buf.Reader);
-            buf.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(src.NumLiveAllocations, dst.NumLiveAllocations);
             NAssert.AreEqual(src.NumPages, dst.NumPages);
@@ -925,15 +926,15 @@ namespace Trecs.Tests
         {
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
-            using var buf = new SerializationBuffer(registry);
-            buf.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buf.Writer);
-            buf.EndWrite();
-            buf.MemoryStream.Position = 0;
-            buf.StartRead();
+            var helper = new SerializationHelper(registry);
+            var data = new SerializationData();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
+            helper.Reader.Start(data);
             var dst = new NativeHeap(TrecsLog.Default);
-            dst.Deserialize(buf.Reader);
-            buf.StopRead(verifySentinel: false);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
             return dst;
         }
 

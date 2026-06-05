@@ -59,15 +59,6 @@ namespace Trecs
         public bool ShowCount;
     }
 
-    struct AccessorRowSpec
-    {
-        public int AccessorId;
-        public string DisplayName;
-        public int SystemIndex; // -1 for manual accessors
-        public int? ExecutionPriority;
-        public bool SystemEffectivelyEnabled;
-    }
-
     // Icons for hierarchy tree rows. Lazy-cached on first access; not
     // invalidated on theme switch (icons stay until domain reload).
     static class TrecsRowIcons

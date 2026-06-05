@@ -2,7 +2,7 @@
 
 The **Trecs Player** is the editor's transport for a running world: record a session, scrub back, replay forward, fork the timeline, pin labelled snapshots, and load saved recordings — all without leaving Play mode. Use it to diagnose transient bugs ("what was the state two seconds before that crash?") and to capture reproducible repro fixtures.
 
-**To open it:** `Window > Trecs > Player`. Worlds appear in the dropdown automatically. Most settings (auto-record, anchor cadence, scrub-cache caps) are EditorPrefs-backed — tune them outside Play mode and they apply the next time a world starts.
+**To open it:** `Window > Trecs > Player`. Worlds appear in the dropdown automatically. Most settings (auto-record, keyframe cadence, scrub-cache caps) are EditorPrefs-backed — tune them outside Play mode and they apply the next time a world starts.
 
 <figure markdown>
   ![The Trecs Player window mid-recording with markers visible on the timeline](../images/player-overview.png){ width="500" }
@@ -18,7 +18,7 @@ The window stacks four rows top-to-bottom:
 | **World dropdown** | One row per registered `World`. Hidden when only one world exists. |
 | **Recording header** | Current recording name (or `(unsaved)`), state badge, speed dropdown, Actions ▾ menu. |
 | **Transport** | Record, ⏮ ◂ ▶ ▸ ⏭, Loop, Snapshot (★). |
-| **Timeline** | Slider with adaptive time ruler and per-anchor / per-snapshot markers. |
+| **Timeline** | Slider with adaptive time ruler and per-keyframe / per-snapshot markers. |
 
 A capacity banner appears under the slider when the recorder is paused against its memory cap — see [Settings](#settings).
 
@@ -38,7 +38,7 @@ REC switches to PLAY when you scrub back or load a saved recording. To return fr
 | Button | Shortcut | Behaviour |
 |---|---|---|
 | **● Record** | `R` | Context-sensitive. LIVE → start capturing. REC → stop and discard the buffer. PLAY → **fork** at the current scrub frame: commit snapshots up to here as the new live edge, drop everything after, and resume capture. |
-| **⏮ ◂ ▶ ▸ ⏭** | `Home` `←` `Space` `→` `End` | Standard transport. ◂/▸ step one frame; ⏮/⏭ jump to buffer start / live edge. `Shift+←/→` jump to the previous / next anchor. |
+| **⏮ ◂ ▶ ▸ ⏭** | `Home` `←` `Space` `→` `End` | Standard transport. ◂/▸ step one frame; ⏮/⏭ jump to buffer start / live edge. `Shift+←/→` jump to the previous / next keyframe. |
 | **↻ Loop** | `L` | PLAY only. Rewinds to the first frame at the end of the recording instead of pausing. Session-local, not an EditorPref. |
 | **★ Snapshot** | `B` | REC only. Prompts for a label and pins a snapshot at the current frame. Snapshots appear as bright timeline markers. Click to jump; right-click to remove. Saved with the recording. |
 
@@ -50,7 +50,7 @@ The slider commits a `JumpToFrame` on pointer release; while dragging, a throttl
 
 Two marker kinds ride above the slider:
 
-- **Anchors** — faint ticks at the recorder's anchor cadence. Recovery points: scrubs and desync recoveries land on the nearest one. Tuned to be unobtrusive even in long recordings.
+- **Keyframes** — faint ticks at the recorder's keyframe cadence. Recovery points: scrubs and desync recoveries land on the nearest one. Tuned to be unobtrusive even in long recordings.
 - **Snapshots** — taller, brighter pins at frames labelled with the ★ button. Tooltip shows the label. Left-click jumps; right-click removes.
 
 ## Speed dropdown
@@ -93,9 +93,9 @@ The full library — rename, multi-select, reveal-in-Finder — lives in the [Sa
 | Field | What it controls |
 |---|---|
 | **Auto-Record** | Whether the recorder starts capturing the moment a Trecs world appears in Play mode (the Player window must be open). Off → press **Record** to capture on demand. |
-| **Anchor interval (s)** | Simulated seconds between persisted-anchor captures. Anchors survive Save/Load and bound how far back a desync recovery or cold scrub can jump. Larger = smaller files; smaller = faster recovery. |
+| **Keyframe interval (s)** | Simulated seconds between persisted-keyframe captures. Keyframes survive Save/Load and bound how far back a desync recovery or cold scrub can jump. Larger = smaller files; smaller = faster recovery. |
 | **Scrub-cache interval (s)** | Simulated seconds between transient (in-memory only) scrub-cache captures. Smaller = snappier scrubbing of recent frames. |
-| **Max anchor count** | `0` = unbounded. Drop-oldest when the cap is hit. |
+| **Max keyframe count** | `0` = unbounded. Drop-oldest when the cap is hit. |
 | **Max scrub-cache (MB)** | `0` = unbounded. Drop-oldest when the cap is hit. The capacity banner under the slider appears when the recorder pauses against this cap. |
 
 **Save** writes the values to EditorPrefs and pushes them onto every currently-running recorder, not just the next play-mode entry. **Reset to defaults** refills the form with the POCO defaults — Cancel still backs out without committing.
@@ -109,7 +109,7 @@ When the window has focus:
 | `Space` | Play / Pause |
 | `Home` / `End` | Jump to buffer start / live edge |
 | `←` / `→` | Step back / forward one frame |
-| `Shift+←` / `Shift+→` | Jump to previous / next anchor |
+| `Shift+←` / `Shift+→` | Jump to previous / next keyframe |
 | `R` | Record (context-sensitive: start / stop / fork) |
 | `L` | Loop (PLAY only) |
 | `B` | Snapshot the current frame (REC only) |

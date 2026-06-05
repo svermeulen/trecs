@@ -24,7 +24,7 @@ namespace Trecs.Internal
         static readonly TrecsLog _log = TrecsLog.Default;
 
         /// <summary>File extension for full <see cref="RecordingBundle"/> files
-        /// (input timeline + periodic auto-anchors + user snapshots). Distinct from the
+        /// (input timeline + periodic auto-keyframes + user snapshots). Distinct from the
         /// snapshot extension so a shared "Saves" directory listing tells the
         /// two file kinds apart at a glance.</summary>
         public const string RecordingExtension = ".trec";
@@ -262,24 +262,24 @@ namespace Trecs.Internal
             return ok;
         }
 
-        public bool JumpToPreviousAnchor()
+        public bool JumpToPreviousKeyframe()
         {
             if (!_autoRecorder.IsRecording)
             {
                 return false;
             }
-            var ok = _autoRecorder.JumpToPreviousAnchor();
+            var ok = _autoRecorder.JumpToPreviousKeyframe();
             PollModeChanged();
             return ok;
         }
 
-        public bool JumpToNextAnchor()
+        public bool JumpToNextKeyframe()
         {
             if (!_autoRecorder.IsRecording)
             {
                 return false;
             }
-            var ok = _autoRecorder.JumpToNextAnchor();
+            var ok = _autoRecorder.JumpToNextKeyframe();
             PollModeChanged();
             return ok;
         }
@@ -371,6 +371,7 @@ namespace Trecs.Internal
             // about the new name without waiting for the next fixed tick.
             PollModeChanged();
             NotifySavesChanged();
+            TrecsBlobStoreGc.Sweep(_autoRecorder.SnapshotSerializer, _world.SerializerRegistry);
             return true;
         }
 
@@ -419,6 +420,7 @@ namespace Trecs.Internal
             PollModeChanged();
             _log.Info("Deleted recording '{0}'", name);
             NotifySavesChanged();
+            TrecsBlobStoreGc.Sweep(_autoRecorder.SnapshotSerializer, _world.SerializerRegistry);
             return true;
         }
 

@@ -50,24 +50,24 @@ namespace Trecs.Internal
             runner.StepFixedFrame();
         }
 
-        [Shortcut(ShortcutCategory + "/Jump To Previous Anchor")]
-        public static void JumpToPreviousAnchor()
+        [Shortcut(ShortcutCategory + "/Jump To Previous Keyframe")]
+        public static void JumpToPreviousKeyframe()
         {
             if (!TryGetUniqueController(out var controller))
             {
                 return;
             }
-            controller.JumpToPreviousAnchor();
+            controller.JumpToPreviousKeyframe();
         }
 
-        [Shortcut(ShortcutCategory + "/Jump To Next Anchor")]
-        public static void JumpToNextAnchor()
+        [Shortcut(ShortcutCategory + "/Jump To Next Keyframe")]
+        public static void JumpToNextKeyframe()
         {
             if (!TryGetUniqueController(out var controller))
             {
                 return;
             }
-            controller.JumpToNextAnchor();
+            controller.JumpToNextKeyframe();
         }
 
         [Shortcut(ShortcutCategory + "/Reset Auto Recording")]

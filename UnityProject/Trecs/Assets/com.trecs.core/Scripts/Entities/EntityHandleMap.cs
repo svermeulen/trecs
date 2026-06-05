@@ -11,16 +11,29 @@ namespace Trecs
     // Bidirectional map between stable EntityHandles and transient EntityIndex values.
     // EntityHandle ids are reused via a free list; the Version field distinguishes
     // generations so stale handles are detected.
-    internal struct EntityHandleMap : IDisposable
+    //
+    // This is a managed class — the single canonical instance is owned by
+    // EntityQuerier and mutated only on the main thread. Burst jobs that need
+    // handle resolution embed the read-only <see cref="EntityHandleMapView"/>
+    // (obtained via <see cref="View"/>) instead, which aliases the same native
+    // containers but exposes none of the mutating API.
+    internal sealed unsafe class EntityHandleMap : IDisposable
     {
-        internal int _nextFreeIndex;
+        // Free-list head. Lives in native memory (rather than a plain int field)
+        // so that FullGroupFreeHandlesJob can write it through a stable pointer
+        // (see BatchFreeWholeGroupHandles).
+        NativeReference<int> _nextFreeIndex;
 
-        [NativeDisableContainerSafetyRestriction]
-        internal NativeList<EntityHandleMapElement> _entityHandleMap;
+        // Cached raw pointer into _nextFreeIndex's allocation, valid for the
+        // map's whole lifetime (the NativeReference is allocated once in the
+        // constructor and disposed in Dispose). ClaimId and FreeHandleAtTailSlot
+        // run per entity per frame; going through NativeReference.Value there
+        // would pay a collections safety-check on every access in the editor
+        // (~30% on the bench's add/remove spans), so all internal accesses
+        // dereference this instead.
+        readonly int* _nextFreeIndexPtr;
 
-        bool _configurationFrozen;
-
-        internal bool ConfigurationFrozen => _configurationFrozen;
+        NativeList<EntityHandleMapElement> _entityHandleMap;
 
         // Reverse map: per-group list of forward-map unique IDs (1-based),
         // indexed by GroupIndex.Index. Allocated once at world init with length
@@ -35,8 +48,33 @@ namespace Trecs
         // Inner is UnsafeList<int> (not NativeList) so that the overall type is a
         // NativeContainer holding a non-NativeContainer — legal inside jobs, unlike the
         // nested NativeArray<NativeList<int>> which Unity's safety system rejects.
-        [NativeDisableContainerSafetyRestriction]
-        internal NativeList<UnsafeList<int>> _entityIndexToReferenceMap;
+        NativeList<UnsafeList<int>> _entityIndexToReferenceMap;
+
+        readonly EntityHandleMapView _view;
+
+        internal EntityHandleMapView View => _view;
+
+        internal EntityHandleMap(int groupCount)
+        {
+            _nextFreeIndex = new NativeReference<int>(0, Allocator.Persistent);
+            _nextFreeIndexPtr = _nextFreeIndex.GetUnsafePtr();
+            _entityHandleMap = new NativeList<EntityHandleMapElement>(0, Allocator.Persistent);
+            _entityIndexToReferenceMap = new NativeList<UnsafeList<int>>(
+                groupCount,
+                Allocator.Persistent
+            );
+            _entityIndexToReferenceMap.Resize(groupCount, NativeArrayOptions.UninitializedMemory);
+            for (int i = 0; i < groupCount; i++)
+            {
+                _entityIndexToReferenceMap[i] = new UnsafeList<int>(0, Allocator.Persistent);
+            }
+
+            // Safe to capture once: the NativeList handles are never reassigned
+            // after construction — resizes (including deserialization, which
+            // reuses the already-created lists) mutate the underlying buffers
+            // through these same handles.
+            _view = new EntityHandleMapView(_entityHandleMap, _entityIndexToReferenceMap);
+        }
 
         // Free-list note: unused slots in _entityHandleMap form a linked list
         // rooted at _nextFreeIndex, where each free element's Index field
@@ -63,7 +101,7 @@ namespace Trecs
             // Phase 1: drain free list (recycle slots)
             while (filled < count)
             {
-                int tempFreeIndex = _nextFreeIndex;
+                int tempFreeIndex = *_nextFreeIndexPtr;
 
                 if (tempFreeIndex >= _entityHandleMap.Length)
                 {
@@ -73,7 +111,7 @@ namespace Trecs
                 ref var element = ref _entityHandleMap.ElementAt(tempFreeIndex);
                 int newFreeIndex = element.Index;
                 int version = element.Version;
-                _nextFreeIndex = newFreeIndex;
+                *_nextFreeIndexPtr = newFreeIndex;
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 _entityHandleMap[tempFreeIndex] = new EntityHandleMapElement(
@@ -89,8 +127,8 @@ namespace Trecs
             if (filled < count)
             {
                 int remaining = count - filled;
-                int baseIndex = _nextFreeIndex;
-                _nextFreeIndex = baseIndex + remaining;
+                int baseIndex = *_nextFreeIndexPtr;
+                *_nextFreeIndexPtr = baseIndex + remaining;
                 for (int i = 0; i < remaining; i++)
                 {
                     refs[filled + i] = new EntityHandle(baseIndex + i + 1, 0);
@@ -102,7 +140,7 @@ namespace Trecs
 
         internal EntityHandle ClaimId()
         {
-            int tempFreeIndex = _nextFreeIndex;
+            int tempFreeIndex = *_nextFreeIndexPtr;
             int newFreeIndex;
             int version;
             if (tempFreeIndex >= _entityHandleMap.Length)
@@ -118,7 +156,7 @@ namespace Trecs
                 newFreeIndex = element.Index;
                 version = element.Version;
             }
-            _nextFreeIndex = newFreeIndex;
+            *_nextFreeIndexPtr = newFreeIndex;
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
             if (tempFreeIndex < _entityHandleMap.Length)
@@ -174,73 +212,10 @@ namespace Trecs
             groupList[entityIndex.Index] = reference.Id;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void UpdateEntityHandle(EntityIndex from, EntityIndex to)
-        {
-            ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(from.GroupIndex.Index);
-            var id = fromGroupList[from.Index];
-            fromGroupList[from.Index] = 0;
-
-            ref var element = ref _entityHandleMap.ElementAt(id - 1);
-            element.Index = to.Index;
-            element.GroupIndex = to.GroupIndex;
-
-            ref var toGroupList = ref GetGroupList(to.GroupIndex);
-            EnsureGroupListSize(ref toGroupList, to.Index + 1);
-            toGroupList[to.Index] = id;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void UpdateIndexAfterSwapBack(GroupIndex group, int oldIndex, int newIndex)
-        {
-            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Index);
-
-            var id = groupList[oldIndex];
-
-            // The entity at oldIndex may have been moved/removed already
-            // (e.g., it was itself a moved entity whose reference was already handled).
-            // In that case, skip the update.
-            if (id == 0)
-            {
-                return;
-            }
-
-            groupList[oldIndex] = 0;
-            EnsureGroupListSize(ref groupList, newIndex + 1);
-            groupList[newIndex] = id;
-
-            ref var element = ref _entityHandleMap.ElementAt(id - 1);
-            element.Index = newIndex;
-            element.GroupIndex = group;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void RemoveEntityHandle(EntityIndex entityIndex)
-        {
-            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(
-                entityIndex.GroupIndex.Index
-            );
-            var id = groupList[entityIndex.Index];
-            TrecsDebugAssert.That(
-                id != 0,
-                "RemoveEntityHandle: null handle at index {0}",
-                entityIndex
-            );
-            groupList[entityIndex.Index] = 0;
-
-            // Invalidate by bumping version and linking the slot into the free list.
-            ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(id - 1);
-            entityHandleMapElement.Index = _nextFreeIndex; // free-list link
-            entityHandleMapElement.GroupIndex = default;
-            entityHandleMapElement.BumpVersion();
-
-            _nextFreeIndex = id - 1;
-        }
-
         /// <summary>
         /// Batch update entity references for a set of entities moving between groups.
-        /// Burst-compiled: the inner loop operates entirely on native data
-        /// (UnsafeList, NativeList) so it runs through AOT codegen via .Run().
+        /// The per-entity update loop runs in a Burst job via .Run(); only the
+        /// list-sizing prep here stays managed.
         /// </summary>
         internal void BatchUpdateEntityHandles(
             NativeList<MoveInfoEntry> entitiesToMove,
@@ -351,10 +326,46 @@ namespace Trecs
             groupList[tailSlot] = 0;
 
             ref var element = ref _entityHandleMap.ElementAt(id - 1);
-            element.Index = _nextFreeIndex;
+            element.Index = *_nextFreeIndexPtr;
             element.GroupIndex = default;
             element.BumpVersion();
-            _nextFreeIndex = id - 1;
+            *_nextFreeIndexPtr = id - 1;
+        }
+
+        /// <summary>
+        /// Frees every handle of a whole-group removal in one Burst pass. The group's
+        /// reverse-map slots <c>[0, count)</c> still hold their (untouched) ids — a
+        /// whole-group removal has no swap-back, so unlike the per-entity path there's
+        /// nothing to capture or relocate. This walks them in ascending slot order,
+        /// bumping each forward-map version and linking the freed id into the free
+        /// list. Sequential ordering matches the per-entity path's free-list push
+        /// order, so the determinism checksum is unchanged. Caller trims the group
+        /// list to 0 afterward.
+        /// </summary>
+        internal void BatchFreeWholeGroupHandles(GroupIndex group, int count)
+        {
+            if (count == 0)
+            {
+                return;
+            }
+
+            unsafe
+            {
+                // NextFreeIndexPtr points at the NativeReference's native
+                // allocation — stable memory, safe for the job to write through.
+                // Run with .Run() (not .Schedule()) because callers read the
+                // free-list head immediately afterward.
+                // count never exceeds GroupList.Length: the reverse-map list always
+                // covers at least the live entity count (Preallocate may make it
+                // longer, never shorter), so the [0, count) walk stays in bounds.
+                new FullGroupFreeHandlesJob
+                {
+                    GroupList = _entityIndexToReferenceMap.ElementAt(group.Index),
+                    EntityHandleMap = _entityHandleMap,
+                    NextFreeIndexPtr = (long)_nextFreeIndexPtr,
+                    Count = count,
+                }.Run();
+            }
         }
 
         /// <summary>
@@ -428,7 +439,220 @@ namespace Trecs
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly EntityHandle GetEntityHandle(EntityIndex entityIndex)
+        public EntityHandle GetEntityHandle(EntityIndex entityIndex)
+        {
+            return _view.GetEntityHandle(entityIndex);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetEntityIndex(EntityHandle reference, out EntityIndex entityIndex)
+        {
+            return _view.TryGetEntityIndex(reference, out entityIndex);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityIndex GetEntityIndex(EntityHandle reference)
+        {
+            return _view.GetEntityIndex(reference);
+        }
+
+        /// <summary>
+        /// Builds the job-visible handle buffer for a group: the group's
+        /// reverse-map slice plus the forward map. Returns default when the
+        /// group's reverse map hasn't been created yet.
+        /// <para>
+        /// The buffer captures raw pointers and lengths at call time, so it is
+        /// only valid until the next structural change (which can resize either
+        /// list) — i.e. for the job batch being scheduled now, matching
+        /// <see cref="NativeBuffer{T}"/>'s documented lifetime contract.
+        /// </para>
+        /// </summary>
+        internal NativeEntityHandleBuffer GetHandleBufferForJobScheduling(GroupIndex group)
+        {
+            var groupList = _entityIndexToReferenceMap[group.Index];
+            if (!groupList.IsCreated)
+                return default;
+            return new NativeEntityHandleBuffer(
+                new NativeBuffer<int>(groupList.Ptr, groupList.Length),
+                NativeBuffer<EntityHandleMapElement>.FromNativeList(_entityHandleMap)
+            );
+        }
+
+        internal void PreallocateIdMaps(GroupIndex groupId, int size)
+        {
+            // Lazy by default; the per-group list starts at capacity 0 from
+            // the constructor and grows on first insert. This entry point
+            // exists for callers (e.g. WorldAccessor.Warmup) that want to
+            // pre-size buffers ahead of a burst of adds. Safe post-freeze.
+
+            ref var groupList = ref GetGroupList(groupId);
+            EnsureGroupListSize(ref groupList, size);
+
+            if (size > _entityHandleMap.Capacity)
+            {
+                _entityHandleMap.Capacity = size;
+            }
+        }
+
+        /// <summary>
+        /// Writes the full handle-map state (forward map, per-group reverse
+        /// maps, free-list head) to the snapshot stream. The wire format lives
+        /// here, next to the storage it mirrors; <see cref="WorldStateSerializer"/>
+        /// only owns section ordering.
+        /// </summary>
+        internal void Serialize(ISerializationWriter writer, WorldInfo worldInfo)
+        {
+            writer.Write("EntityIdMap", in _entityHandleMap);
+
+            writer.PushScope("ReferenceMap");
+            WriteEntityIndexToReferenceMap(writer, worldInfo);
+            writer.PopScope();
+
+            int nextFreeIndex = _nextFreeIndex.Value;
+            writer.Write("NextFreeIndex", nextFreeIndex);
+        }
+
+        internal void Deserialize(ISerializationReader reader, WorldInfo worldInfo)
+        {
+            var listHandleBefore = _entityHandleMap.GetUnsafeList();
+            reader.Read("EntityIdMap", ref _entityHandleMap);
+            // The serializer must fill the existing list in place (it does, as
+            // long as the list is created — which the constructor guarantees).
+            // If it ever swapped in a fresh NativeList, _view and every
+            // NativeWorldAccessor's captured EntityHandleMapView would silently
+            // dangle, so fail loudly here instead.
+            TrecsDebugAssert.That(
+                listHandleBefore == _entityHandleMap.GetUnsafeList(),
+                "EntityHandleMap.Deserialize reassigned the forward-map NativeList handle; "
+                    + "all captured views are now stale. The deserializer must fill in place."
+            );
+            ReadEntityIndexToReferenceMap(reader, worldInfo);
+
+            var nextFreeIndex = reader.Read<int>("NextFreeIndex");
+            TrecsDebugAssert.That(nextFreeIndex >= 0);
+
+            _nextFreeIndex.Value = nextFreeIndex;
+        }
+
+        // Reverse-map groups are keyed by TagSet on the wire (not raw
+        // GroupIndex) so snapshots stay valid across group-index reassignment
+        // between world builds.
+        void WriteEntityIndexToReferenceMap(ISerializationWriter writer, WorldInfo worldInfo)
+        {
+            var count = _entityIndexToReferenceMap.Length;
+
+            writer.Write("Count", count);
+
+            for (int i = 0; i < count; i++)
+            {
+                writer.PushScope("Ref{0}", i);
+                var tagSet = worldInfo.ToTagSet(GroupIndex.FromIndex(i));
+                writer.Write("Group", tagSet);
+
+                writer.Write("Refs", _entityIndexToReferenceMap[i]);
+                writer.PopScope();
+            }
+        }
+
+        void ReadEntityIndexToReferenceMap(ISerializationReader reader, WorldInfo worldInfo)
+        {
+            var count = reader.Read<int>("Count");
+            TrecsDebugAssert.That(count >= 0);
+
+            TrecsDebugAssert.IsEqual(count, _entityIndexToReferenceMap.Length);
+
+            for (int i = 0; i < count; i++)
+            {
+                var tagSet = reader.Read<TagSet>("Group");
+                var group = worldInfo.ToGroupIndex(tagSet);
+
+                ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Index);
+                reader.Read("Refs", ref groupList);
+            }
+        }
+
+        public void Dispose()
+        {
+            _nextFreeIndex.Dispose();
+            _entityHandleMap.Dispose();
+
+            for (int i = 0; i < _entityIndexToReferenceMap.Length; i++)
+            {
+                ref var list = ref _entityIndexToReferenceMap.ElementAt(i);
+                if (list.IsCreated)
+                {
+                    list.Dispose();
+                }
+            }
+
+            _entityIndexToReferenceMap.Dispose();
+        }
+
+        /// <summary>
+        /// Shrinks a group's reverse-map list to <paramref name="newLength"/>. Called after
+        /// structural changes (removals, moves) that reduce a group's live entity count so
+        /// that the list length always matches the live count — callers can then rely on
+        /// every index in [0, Length) being a live entity.
+        /// <para>
+        /// Safe to call unconditionally: trailing entries past the new count are guaranteed
+        /// to be 0-sentinels by the swap-back protocol (removed slots are zeroed, and the
+        /// tail entries from which entities were swapped back are zeroed too).
+        /// </para>
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void TrimGroupList(GroupIndex group, int newLength)
+        {
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Index);
+            if (groupList.Length > newLength)
+            {
+                groupList.Resize(newLength, NativeArrayOptions.UninitializedMemory);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        ref UnsafeList<int> GetGroupList(GroupIndex group)
+        {
+            return ref _entityIndexToReferenceMap.ElementAt(group.Index);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void EnsureGroupListSize(ref UnsafeList<int> groupList, int requiredSize)
+        {
+            if (groupList.Length < requiredSize)
+            {
+                groupList.Resize(requiredSize, NativeArrayOptions.ClearMemory);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Read-only, Burst-compatible view over <see cref="EntityHandleMap"/>'s native
+    /// containers, for embedding in job-visible structs (e.g.
+    /// <see cref="NativeWorldAccessor"/>). Exposes only handle resolution — claiming
+    /// and freeing ids stays on the managed class, so job code structurally cannot
+    /// mutate free-list state through a copied view.
+    /// </summary>
+    internal readonly struct EntityHandleMapView
+    {
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<EntityHandleMapElement> _entityHandleMap;
+
+        // See the field of the same name on EntityHandleMap for the full
+        // reverse-map design notes.
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<UnsafeList<int>> _entityIndexToReferenceMap;
+
+        internal EntityHandleMapView(
+            NativeList<EntityHandleMapElement> entityHandleMap,
+            NativeList<UnsafeList<int>> entityIndexToReferenceMap
+        )
+        {
+            _entityHandleMap = entityHandleMap;
+            _entityIndexToReferenceMap = entityIndexToReferenceMap;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityHandle GetEntityHandle(EntityIndex entityIndex)
         {
             TrecsDebugAssert.That(!entityIndex.IsNull);
 
@@ -493,94 +717,6 @@ namespace Trecs
                 "Attempting to get EntityIndex from an EntityHandle that has been invalidated"
             );
             return entityHandleMapElement.EntityIndex;
-        }
-
-        internal void PreallocateIdMaps(GroupIndex groupId, int size)
-        {
-            // Lazy by default; the per-group list starts at capacity 0 from
-            // InitEntityHandleMap and grows on first insert. This entry point
-            // exists for callers (e.g. WorldAccessor.Warmup) that want to
-            // pre-size buffers ahead of a burst of adds. Safe post-freeze.
-
-            ref var groupList = ref GetGroupList(groupId);
-            EnsureGroupListSize(ref groupList, size);
-
-            if (size > _entityHandleMap.Capacity)
-            {
-                _entityHandleMap.Capacity = size;
-            }
-        }
-
-        internal void InitEntityHandleMap(int groupCount)
-        {
-            _nextFreeIndex = 0;
-            _entityHandleMap = new NativeList<EntityHandleMapElement>(0, Allocator.Persistent);
-            _entityIndexToReferenceMap = new NativeList<UnsafeList<int>>(
-                groupCount,
-                Allocator.Persistent
-            );
-            _entityIndexToReferenceMap.Resize(groupCount, NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < groupCount; i++)
-            {
-                _entityIndexToReferenceMap[i] = new UnsafeList<int>(0, Allocator.Persistent);
-            }
-        }
-
-        internal void FreezeConfiguration()
-        {
-            _configurationFrozen = true;
-        }
-
-        public void Dispose()
-        {
-            _entityHandleMap.Dispose();
-
-            for (int i = 0; i < _entityIndexToReferenceMap.Length; i++)
-            {
-                ref var list = ref _entityIndexToReferenceMap.ElementAt(i);
-                if (list.IsCreated)
-                {
-                    list.Dispose();
-                }
-            }
-
-            _entityIndexToReferenceMap.Dispose();
-        }
-
-        /// <summary>
-        /// Shrinks a group's reverse-map list to <paramref name="newLength"/>. Called after
-        /// structural changes (removals, moves) that reduce a group's live entity count so
-        /// that the list length always matches the live count — callers can then rely on
-        /// every index in [0, Length) being a live entity.
-        /// <para>
-        /// Safe to call unconditionally: trailing entries past the new count are guaranteed
-        /// to be 0-sentinels by the swap-back protocol (removed slots are zeroed, and the
-        /// tail entries from which entities were swapped back are zeroed too).
-        /// </para>
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void TrimGroupList(GroupIndex group, int newLength)
-        {
-            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Index);
-            if (groupList.Length > newLength)
-            {
-                groupList.Resize(newLength, NativeArrayOptions.UninitializedMemory);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ref UnsafeList<int> GetGroupList(GroupIndex group)
-        {
-            return ref _entityIndexToReferenceMap.ElementAt(group.Index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void EnsureGroupListSize(ref UnsafeList<int> groupList, int requiredSize)
-        {
-            if (groupList.Length < requiredSize)
-            {
-                groupList.Resize(requiredSize, NativeArrayOptions.ClearMemory);
-            }
         }
     }
 

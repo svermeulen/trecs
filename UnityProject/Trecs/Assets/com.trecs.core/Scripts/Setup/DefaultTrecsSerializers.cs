@@ -4,7 +4,13 @@ using UnityEngine;
 
 namespace Trecs.Internal
 {
-    internal static class DefaultTrecsSerializers
+    /// <summary>
+    /// Registers the serializers for the common trecs core types (ids, math types, collections, …)
+    /// into a <see cref="SerializerRegistry"/>. Public so external tooling — e.g. an editor bake
+    /// pipeline — can stand up a registry able to (de)serialize core types without constructing a
+    /// full world.
+    /// </summary>
+    public static class DefaultTrecsSerializers
     {
         public static void RegisterCommonTrecsSerializers(SerializerRegistry registry)
         {
@@ -41,20 +47,19 @@ namespace Trecs.Internal
         {
             RegisterBlit<TypeId>(registry);
 
+            // Stamped into snapshot metadata + bundle headers; validated on load.
+            RegisterBlit<WorldSchemaFingerprint>(registry);
+
             // Heap serializers
-            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<PtrHandle, BlobId>>();
+            registry.RegisterSerializer<IterableDictionarySerializerUnmanaged<PtrHandle, BlobId>>();
             RegisterBlit<PtrHandle>(registry);
 
             registry.RegisterSerializer<
-                IterableDictionaryUnmanagedSerializer<BlobId, SharedHeap.BlobInfo>
+                IterableDictionarySerializerUnmanaged<BlobId, SharedHeap.BlobInfo>
             >();
             RegisterBlit<SharedHeap.BlobInfo>(registry);
 
-            registry.RegisterSerializer<ListSerializer<object>>();
-            registry.RegisterSerializer(new BlobManifest.Serializer());
-            registry.RegisterSerializer<
-                IterableDictionaryUnmanagedSerializer<BlobId, BlobMetadata>
-            >();
+            registry.RegisterSerializer<ListSerializerManaged<object>>();
             RegisterBlit<BlobId>(registry);
 
             // Entity serializers
@@ -62,8 +67,7 @@ namespace Trecs.Internal
             RegisterBlit<EntityHandle>(registry);
             RegisterBlit<TagSet>(registry);
             // SetId and the per-set entity-id-to-dense-index dictionary
-            // are written by WorldStateSerializer.WriteSets /
-            // WriteSetRoutingIndex unconditionally.
+            // are written by SetStore.Serialize unconditionally.
             RegisterBlit<SetId>(registry);
             registry.RegisterSerializer<NativeIterableDictionarySerializer<int, int>>();
 

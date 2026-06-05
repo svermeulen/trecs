@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests.PlayMode
@@ -64,11 +63,11 @@ namespace Trecs.Tests.PlayMode
                         .Set(new BurstTagReadback { Value = -1 })
                         .AssertComplete();
                 }
-                a.Submit();
+                a.World.Submit();
 
                 // One fixed tick → Execute() schedules the Burst job, which writes
                 // Tag<BurstTagMarker>.Value.Value into every entity's component.
-                StepFixedFrames(world, 1);
+                world.StepFixedFrames(1);
 
                 int expected = Tag<BurstTagMarker>.Value.Value;
                 var group = a.WorldInfo.GetSingleGroupWithTags(Tag<BurstTagMarker>.Value);
@@ -89,24 +88,6 @@ namespace Trecs.Tests.PlayMode
             finally
             {
                 world.Dispose();
-            }
-        }
-
-        // Mirrors EcsTestHelper.TestEnvironment.StepFixedFrames (that helper lives in
-        // the Editor-only Trecs.Tests assembly, so it can't be reused from here).
-        static void StepFixedFrames(World world, int frames)
-        {
-            var runner = world.GetSystemRunner();
-            runner.FixedIsPaused = true;
-
-            world.Tick();
-            world.LateTick();
-
-            for (int i = 0; i < frames; i++)
-            {
-                runner.StepFixedFrame();
-                world.Tick();
-                world.LateTick();
             }
         }
     }

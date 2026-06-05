@@ -26,7 +26,7 @@ namespace Trecs.Samples.BlobSeedPattern
                 new ISystem[] { new PaletteCycleSystem(), new SwatchPresenter(goManager) }
             );
 
-            var seeder = new PaletteSeeder(world.BlobCache);
+            var seeder = new PaletteSeeder(world);
             var sceneInitializer = new SceneInitializer(world, goManager);
 
             // Order matters: world.Initialize first, then seed the heap, then

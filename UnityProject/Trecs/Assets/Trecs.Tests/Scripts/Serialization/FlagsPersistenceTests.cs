@@ -8,7 +8,8 @@ namespace Trecs.Tests
     public class FlagsPersistenceTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _buffer;
+        private SerializationHelper _helper;
+        private SerializationData _data;
 
         const long TestFlagA = 1L << 4;
         const long TestFlagB = 1L << 5;
@@ -18,13 +19,8 @@ namespace Trecs.Tests
         {
             _serializerRegistry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
-            _buffer = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _buffer?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
@@ -32,20 +28,19 @@ namespace Trecs.Tests
         {
             const long writtenFlags = TestFlagA | TestFlagB;
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<int>(
+            _helper.WriteAll<int>(
+                _data,
                 42,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags: writtenFlags
             );
-            _buffer.ResetMemoryPosition();
 
-            _buffer.StartRead();
-            TrecsDebugAssert.IsEqual(_buffer.Reader.Flags, writtenFlags);
-            TrecsDebugAssert.That(_buffer.HasFlag(TestFlagA));
-            TrecsDebugAssert.That(_buffer.HasFlag(TestFlagB));
-            _buffer.StopRead(verifySentinel: false);
+            _helper.Reader.Start(_data);
+            TrecsDebugAssert.IsEqual(_helper.Reader.Flags, writtenFlags);
+            TrecsDebugAssert.That(_helper.Reader.HasFlag(TestFlagA));
+            TrecsDebugAssert.That(_helper.Reader.HasFlag(TestFlagB));
+            _helper.Reader.CompletePartial();
         }
 
         [Test]
@@ -54,36 +49,32 @@ namespace Trecs.Tests
             const long writtenFlags = TestFlagA;
             const int writtenVersion = 7;
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<int>(
+            _helper.WriteAll<int>(
+                _data,
                 123,
                 writtenVersion,
                 includeTypeChecks: false,
                 flags: writtenFlags
             );
-            _buffer.ResetMemoryPosition();
 
-            var header = _buffer.PeekHeader();
-            TrecsDebugAssert.IsEqual(header.Version, writtenVersion);
-            TrecsDebugAssert.IsEqual(header.Flags, writtenFlags);
-            TrecsDebugAssert.That(header.HasFlag(TestFlagA));
-            TrecsDebugAssert.That(!header.HasFlag(TestFlagB));
+            // The header fields are recoverable from the payload without consuming it.
+            TrecsDebugAssert.IsEqual(_data.Version, writtenVersion);
+            TrecsDebugAssert.IsEqual(_data.Flags, writtenFlags);
+            TrecsDebugAssert.That(_data.HasFlag(TestFlagA));
+            TrecsDebugAssert.That(!_data.HasFlag(TestFlagB));
 
-            // Stream position is unchanged — we can still perform a full read.
-            var value = _buffer.ReadAll<int>();
+            // Reading the header did not consume anything — a full read still works.
+            var value = _helper.ReadAll<int>(_data);
             TrecsDebugAssert.IsEqual(value, 123);
         }
 
         [Test]
         public void ZeroFlags_RoundTripCleanly()
         {
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<int>(0, TestConstants.Version, includeTypeChecks: true);
-            _buffer.ResetMemoryPosition();
+            _helper.WriteAll<int>(_data, 0, TestConstants.Version, includeTypeChecks: true);
 
-            var header = _buffer.PeekHeader();
-            TrecsDebugAssert.IsEqual(header.Flags, 0L);
-            TrecsDebugAssert.That(!header.HasFlag(TestFlagA));
+            TrecsDebugAssert.IsEqual(_data.Flags, 0L);
+            TrecsDebugAssert.That(!_data.HasFlag(TestFlagA));
         }
 
         [Test]
@@ -92,9 +83,9 @@ namespace Trecs.Tests
             // Bit 2 is reserved for future Trecs use and must not be used by app code.
             const long reservedBit = 1L << 2;
 
-            _buffer.ClearMemoryStream();
             var ex = Assert.Throws<TrecsException>(() =>
-                _buffer.WriteAll<int>(
+                _helper.WriteAll<int>(
+                    _data,
                     0,
                     TestConstants.Version,
                     includeTypeChecks: true,

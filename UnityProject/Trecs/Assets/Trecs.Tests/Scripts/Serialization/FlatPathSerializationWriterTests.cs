@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using NUnit.Framework;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -81,8 +81,8 @@ namespace Trecs.Tests
             _writer.Complete();
 
             var output = Output();
-            Assert.That(output, Does.Contain("Version = 7\n"));
-            Assert.That(output, Does.Contain("Flags = 0\n"));
+            NAssert.That(output, Does.Contain("Version = 7\n"));
+            NAssert.That(output, Does.Contain("Flags = 0\n"));
         }
 
         [Test]
@@ -92,7 +92,7 @@ namespace Trecs.Tests
             _writer.Write("Health", 42);
             _writer.Complete();
 
-            Assert.That(Output(), Does.Contain("Health = 42\n"));
+            NAssert.That(Output(), Does.Contain("Health = 42\n"));
         }
 
         [Test]
@@ -105,8 +105,8 @@ namespace Trecs.Tests
             _writer.Complete();
 
             var output = Output();
-            Assert.That(output, Does.Contain("Pos.X = 3\n"));
-            Assert.That(output, Does.Contain("Pos.Y = 2.5\n"));
+            NAssert.That(output, Does.Contain("Pos.X = 3\n"));
+            NAssert.That(output, Does.Contain("Pos.Y = 2.5\n"));
         }
 
         [Test]
@@ -123,10 +123,10 @@ namespace Trecs.Tests
             _writer.Complete();
 
             var output = Output();
-            Assert.That(output, Does.Contain("Items[0].X = 1\n"));
-            Assert.That(output, Does.Contain("Items[0].Y = 1.5\n"));
-            Assert.That(output, Does.Contain("Items[1].X = 9\n"));
-            Assert.That(output, Does.Contain("Items[1].Y = -2\n"));
+            NAssert.That(output, Does.Contain("Items[0].X = 1\n"));
+            NAssert.That(output, Does.Contain("Items[0].Y = 1.5\n"));
+            NAssert.That(output, Does.Contain("Items[1].X = 9\n"));
+            NAssert.That(output, Does.Contain("Items[1].Y = -2\n"));
         }
 
         [Test]
@@ -136,7 +136,7 @@ namespace Trecs.Tests
             _writer.WriteString("Greeting", "Hello\nWorld");
             _writer.Complete();
 
-            Assert.That(Output(), Does.Contain("Greeting = \"Hello\\nWorld\"\n"));
+            NAssert.That(Output(), Does.Contain("Greeting = \"Hello\\nWorld\"\n"));
         }
 
         [Test]
@@ -146,7 +146,7 @@ namespace Trecs.Tests
             _writer.WriteString("Greeting", null);
             _writer.Complete();
 
-            Assert.That(Output(), Does.Contain("Greeting = null\n"));
+            NAssert.That(Output(), Does.Contain("Greeting = null\n"));
         }
 
         [Test]
@@ -159,7 +159,7 @@ namespace Trecs.Tests
             _writer.Complete();
 
             var output = Output();
-            Assert.That(output, Does.Contain("Data = bytes(len=4, sha256="));
+            NAssert.That(output, Does.Contain("Data = bytes(len=4, sha256="));
         }
 
         [Test]
@@ -177,7 +177,7 @@ namespace Trecs.Tests
             var output = Output();
             var lineA = ExtractLine(output, "A = ");
             var lineB = ExtractLine(output, "B = ");
-            Assert.That(lineA.Substring(2), Is.EqualTo(lineB.Substring(2)));
+            NAssert.That(lineA.Substring(2), Is.EqualTo(lineB.Substring(2)));
         }
 
         static string ExtractLine(string output, string prefix)
@@ -199,7 +199,7 @@ namespace Trecs.Tests
             _writer.WriteBytes("Data", new byte[0], offset: 0, count: 0);
             _writer.Complete();
 
-            Assert.That(Output(), Does.Contain("Data = bytes(len=0)\n"));
+            NAssert.That(Output(), Does.Contain("Data = bytes(len=0)\n"));
         }
 
         [Test]
@@ -212,9 +212,9 @@ namespace Trecs.Tests
             _writer.Complete();
 
             var output = Output();
-            Assert.That(output, Does.Contain("_b0 = true\n"));
-            Assert.That(output, Does.Contain("_b1 = false\n"));
-            Assert.That(output, Does.Contain("_b2 = true\n"));
+            NAssert.That(output, Does.Contain("_b0 = true\n"));
+            NAssert.That(output, Does.Contain("_b1 = false\n"));
+            NAssert.That(output, Does.Contain("_b2 = true\n"));
         }
 
         // Exercises serializer recursion: Write<Outer> dispatches
@@ -240,9 +240,9 @@ namespace Trecs.Tests
             _writer.Complete();
 
             var output = Output();
-            Assert.That(output, Does.Contain("Root.A = 7\n"));
-            Assert.That(output, Does.Contain("Root.B.Name = \"alice\"\n"));
-            Assert.That(output, Does.Contain("Root.B.Value = 1.5\n"));
+            NAssert.That(output, Does.Contain("Root.A = 7\n"));
+            NAssert.That(output, Does.Contain("Root.B.Name = \"alice\"\n"));
+            NAssert.That(output, Does.Contain("Root.B.Value = 1.5\n"));
         }
     }
 }

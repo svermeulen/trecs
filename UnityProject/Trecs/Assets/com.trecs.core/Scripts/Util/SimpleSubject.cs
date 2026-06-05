@@ -46,7 +46,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(Action handler, int priority, string debugName)
         {
-            TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
@@ -73,7 +73,7 @@ namespace Trecs.Internal
             string debugName
         )
         {
-            TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action bufferedHandler = () => buffer.AddAction(handler);
             int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
@@ -116,6 +116,10 @@ namespace Trecs.Internal
 
         public void Invoke()
         {
+            TrecsAssert.That(
+                !_isInvoking,
+                "Cannot Invoke a SimpleSubject that is already being invoked — reentrant Invoke on the same subject is not supported."
+            );
             _isInvoking = true;
             try
             {
@@ -197,7 +201,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(Action<T1> handler, int priority, string debugName)
         {
-            TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
@@ -224,7 +228,7 @@ namespace Trecs.Internal
             string debugName
         )
         {
-            TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action<T1> bufferedHandler = arg1 => buffer.AddAction(() => handler(arg1));
             int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
@@ -267,6 +271,10 @@ namespace Trecs.Internal
 
         public void Invoke(T1 arg1)
         {
+            TrecsAssert.That(
+                !_isInvoking,
+                "Cannot Invoke a SimpleSubject that is already being invoked — reentrant Invoke on the same subject is not supported."
+            );
             _isInvoking = true;
             try
             {
@@ -348,7 +356,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(Action<T1, T2> handler, int priority, string debugName)
         {
-            TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
@@ -379,7 +387,7 @@ namespace Trecs.Internal
             string debugName
         )
         {
-            TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action<T1, T2> bufferedHandler = (arg1, arg2) =>
                 buffer.AddAction(() => handler(arg1, arg2));
             int subscriptionId = _nextSubscriptionId++;
@@ -423,6 +431,10 @@ namespace Trecs.Internal
 
         public void Invoke(T1 arg1, T2 arg2)
         {
+            TrecsAssert.That(
+                !_isInvoking,
+                "Cannot Invoke a SimpleSubject that is already being invoked — reentrant Invoke on the same subject is not supported."
+            );
             _isInvoking = true;
             try
             {

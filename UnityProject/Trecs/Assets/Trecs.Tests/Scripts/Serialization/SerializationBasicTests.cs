@@ -9,20 +9,18 @@ namespace Trecs.Tests
     public class SerializationBasicTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
+        private SerializationReadBuffer _readBuffer;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
+            _readBuffer = new SerializationReadBuffer();
         }
 
         [Test]
@@ -33,15 +31,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Serialize and Deserialize using cache helper
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalVector,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedVector = _cacheHelper.ReadAll<Vector3>();
+            var deserializedVector = _helper.ReadAll<Vector3>(_data);
 
             // Assert
             TrecsDebugAssert.That(
@@ -66,15 +63,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedValue = _cacheHelper.ReadAll<int>();
+            var deserializedValue = _helper.ReadAll<int>(_data);
 
             // Assert
             TrecsDebugAssert.That(deserializedValue == originalValue);
@@ -88,15 +84,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 originalValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedValue = (string)_cacheHelper.ReadAllObject();
+            var deserializedValue = (string)_helper.ReadAllObject(_data);
 
             // Assert
             TrecsDebugAssert.That(deserializedValue == originalValue);
@@ -110,15 +105,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 originalValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedValue = (string)_cacheHelper.ReadAllObject();
+            var deserializedValue = (string)_helper.ReadAllObject(_data);
 
             // Assert
             TrecsDebugAssert.That(deserializedValue == originalValue);
@@ -130,15 +124,14 @@ namespace Trecs.Tests
             string originalValue = "hello éè 世界 🚀";
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 originalValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedValue = (string)_cacheHelper.ReadAllObject();
+            var deserializedValue = (string)_helper.ReadAllObject(_data);
 
             TrecsDebugAssert.That(deserializedValue == originalValue);
         }
@@ -151,15 +144,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalValue,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedValue = _cacheHelper.ReadAll<float>();
+            var deserializedValue = _helper.ReadAll<float>(_data);
 
             // Assert
             TrecsDebugAssert.That(
@@ -174,17 +166,13 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Test true
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(true, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedTrue = _cacheHelper.ReadAll<bool>();
+            _helper.WriteAll(_data, true, TestConstants.Version, includeTypeChecks: true, flags);
+            var deserializedTrue = _helper.ReadAll<bool>(_data);
             TrecsDebugAssert.That(deserializedTrue);
 
             // Test false
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(false, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedFalse = _cacheHelper.ReadAll<bool>();
+            _helper.WriteAll(_data, false, TestConstants.Version, includeTypeChecks: true, flags);
+            var deserializedFalse = _helper.ReadAll<bool>(_data);
             TrecsDebugAssert.That(!deserializedFalse);
         }
 
@@ -198,21 +186,25 @@ namespace Trecs.Tests
             var strVal = "test";
 
             // Act - Write multiple values
-            _cacheHelper.StartWrite(TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.Write("Vec", vec);
-            _cacheHelper.Write("Int", intVal);
-            _cacheHelper.WriteString("Str", strVal);
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(
+                _data,
+                version: TestConstants.Version,
+                includeTypeChecks: true,
+                flags: flags
+            );
+            _helper.Writer.Write("Vec", vec);
+            _helper.Writer.Write("Int", intVal);
+            _helper.Writer.WriteString("Str", strVal);
+            _helper.Writer.Complete();
 
             // Reset position for reading
-            _cacheHelper.ResetMemoryPosition();
 
             // Read back
-            _cacheHelper.StartRead();
-            var readVec = _cacheHelper.Read<Vector3>("Vec");
-            var readInt = _cacheHelper.Read<int>("Int");
-            var readStr = _cacheHelper.ReadString("Str");
-            _cacheHelper.StopRead(verifySentinel: true);
+            _helper.Reader.Start(_data);
+            var readVec = _helper.Reader.Read<Vector3>("Vec");
+            var readInt = _helper.Reader.Read<int>("Int");
+            var readStr = _helper.Reader.ReadString("Str");
+            _helper.Reader.Complete();
 
             // Assert
             TrecsDebugAssert.That(TestUtil.Approximately(vec.x, readVec.x, 0.0001f));
@@ -233,8 +225,8 @@ namespace Trecs.Tests
             try
             {
                 // Write to memory
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     originalValue,
                     TestConstants.Version,
                     includeTypeChecks: true,
@@ -242,16 +234,17 @@ namespace Trecs.Tests
                 );
 
                 // Save to file
-                _cacheHelper.ResetMemoryPosition();
-                _cacheHelper.SaveMemoryToFile(tempPath);
+                using (var fileStream = File.Create(tempPath))
+                {
+                    _data.WriteContiguousTo(fileStream);
+                }
 
-                // Clear and load from file
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.LoadMemoryFromFile(tempPath);
-                _cacheHelper.ResetMemoryPosition();
-
-                // Read back
-                var loadedValue = _cacheHelper.ReadAll<Vector3>();
+                // Load from file and read back
+                Vector3 loadedValue;
+                using (var fileStream = File.OpenRead(tempPath))
+                {
+                    loadedValue = _helper.ReadAll<Vector3>(_readBuffer.Load(fileStream));
+                }
 
                 // Assert
                 TrecsDebugAssert.That(

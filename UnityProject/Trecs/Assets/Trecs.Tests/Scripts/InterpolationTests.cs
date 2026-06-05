@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
@@ -16,39 +15,14 @@ namespace Trecs.Tests
     public class InterpolationTests
     {
         static Template InterpolatedIntTemplate =>
-            new Template(
-                debugName: "InterpolatedIntTemplate",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestInt)
-                    ),
-                    new ComponentDeclaration<Interpolated<TestInt>>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(Interpolated<TestInt>)
-                    ),
-                    new ComponentDeclaration<InterpolatedPrevious<TestInt>>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(InterpolatedPrevious<TestInt>)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Alpha }
-            );
+            TestTemplate
+                .Named("InterpolatedIntTemplate")
+                .WithTags(TestTags.Alpha)
+                .WithComponent<TestInt>(default(TestInt))
+                .WithComponent<Interpolated<TestInt>>(default(Interpolated<TestInt>))
+                .WithComponent<InterpolatedPrevious<TestInt>>(
+                    default(InterpolatedPrevious<TestInt>)
+                );
 
         // ─── SetInterpolated extension ─────────────────────────────────────────
 
@@ -61,7 +35,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha)
                 .SetInterpolated(new TestInt { Value = 42 })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
 
@@ -80,7 +54,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).SetInterpolated(new TestInt { Value = 7 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
             var current = entity.Component<TestInt>(a).Read.Value;
@@ -105,7 +79,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).SetInterpolated(new TestInt { Value = 1 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             // Mutate current to simulate a fixed tick advancing state.
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();

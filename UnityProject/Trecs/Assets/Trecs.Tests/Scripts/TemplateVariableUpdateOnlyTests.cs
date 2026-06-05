@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using NUnit.Framework;
 using Trecs.Internal;
@@ -127,29 +126,13 @@ namespace Trecs.Tests
         // through AssertCan{Read,Write}Component without per-field opt-in.
         static Template MakeVuoTemplate()
         {
-            return new Template(
-                debugName: "VuoTestTemplate",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: new TagSet[]
-                {
-                    TagSet.Null,
-                    TagSet.FromTags(Tag<VuoPartitionTag>.Value),
-                },
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<VuoTemplateRenderComp>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(VuoTemplateRenderComp)
-                    ),
-                },
-                localTags: new Tag[] { Tag<VuoTemplateTag>.Value },
-                localVariableUpdateOnly: true,
-                dimensions: new TagSet[] { TagSet.FromTags(Tag<VuoPartitionTag>.Value) }
-            );
+            return TestTemplate
+                .Named("VuoTestTemplate")
+                .WithTags(Tag<VuoTemplateTag>.Value)
+                .VariableUpdateOnly()
+                .WithPartitions(TagSet.Null, TagSet.FromTags(Tag<VuoPartitionTag>.Value))
+                .WithDimensions(TagSet.FromTags(Tag<VuoPartitionTag>.Value))
+                .WithComponent<VuoTemplateRenderComp>(default(VuoTemplateRenderComp));
         }
 
         // Base template marked [VariableUpdateOnly]; carries one tag so it
@@ -158,14 +141,10 @@ namespace Trecs.Tests
         // Template.LocalBaseTemplates via WorldInfo.ResolveTemplate.
         static Template MakeVuoBaseTemplate()
         {
-            return new Template(
-                debugName: "VuoTestBase",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
-                localTags: new Tag[] { Tag<VuoBaseTag>.Value },
-                localVariableUpdateOnly: true
-            );
+            return TestTemplate
+                .Named("VuoTestBase")
+                .WithTags(Tag<VuoBaseTag>.Value)
+                .VariableUpdateOnly();
         }
 
         // Child template that inherits VUO from the base above. The child
@@ -173,44 +152,25 @@ namespace Trecs.Tests
         // propagate via inheritance only.
         static Template MakeChildOfVuoBase(Template baseTemplate)
         {
-            return new Template(
-                debugName: "VuoTestChild",
-                localBaseTemplates: new[] { baseTemplate },
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<VuoTemplateRenderComp>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(VuoTemplateRenderComp)
-                    ),
-                },
-                localTags: new Tag[] { Tag<VuoChildTag>.Value },
-                localVariableUpdateOnly: false
-            );
+            return TestTemplate
+                .Named("VuoTestChild")
+                .Extending(baseTemplate)
+                .WithTags(Tag<VuoChildTag>.Value)
+                .WithComponent<VuoTemplateRenderComp>(default(VuoTemplateRenderComp));
         }
 
         TestEnvironment CreateEnvWithSystem(ISystem system)
         {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeVuoTemplate())
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
-
-            var world = builder.Build();
-            world.AddSystem(system);
-            world.Initialize();
+            var env = EcsTestHelper.CreateEnvironment(
+                configure: b => b.AddSystem(system),
+                MakeVuoTemplate()
+            );
 
             // Pre-populate one VUO entity via a Bypass accessor so reads
             // and queries have something to chew on. Bypass is the
             // documented setup hatch.
-            var env = new TestEnvironment(world);
             env.Accessor.AddEntity<VuoTemplateTag>().AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
             return env;
         }
 
@@ -259,8 +219,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeVuoTemplate())
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(MakeVuoTemplate());
 
             return builder.BuildAndInitialize();
         }
@@ -385,8 +344,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(childTemplate)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(childTemplate);
 
             var world = builder.Build();
             world.AddSystem(new VuoFixedChildQueryReader());
@@ -405,8 +363,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeVuoTemplate())
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(MakeVuoTemplate());
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
 
@@ -415,7 +372,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity<VuoTemplateTag>()
                 .Set(new VuoTemplateRenderComp { Value = 7 })
                 .AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var entityIdx = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleIndex();
 
@@ -429,11 +386,13 @@ namespace Trecs.Tests
             byte[] snapshotBytes;
             {
                 var writer = new BinarySerializationWriter(registry);
-                writer.Start(version: 1, includeTypeChecks: false);
+                var serData = new SerializationData();
+                writer.Start(serData, version: 1, includeTypeChecks: false);
                 serializer.SerializeFullState(writer);
 
                 using var outputStream = new MemoryStream();
-                writer.Complete(outputStream);
+                writer.Complete();
+                serData.WriteContiguousTo(outputStream);
                 snapshotBytes = outputStream.ToArray();
             }
 
@@ -442,7 +401,7 @@ namespace Trecs.Tests
 
             {
                 var reader = new BinarySerializationReader(registry);
-                reader.Start(snapshotBytes);
+                reader.Start(new ContiguousSerializationData(snapshotBytes));
                 serializer.DeserializeState(reader);
             }
 
@@ -464,8 +423,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeVuoTemplate())
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(MakeVuoTemplate());
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
 
@@ -476,18 +434,20 @@ namespace Trecs.Tests
             byte[] snapshotBytes;
             {
                 var writer = new BinarySerializationWriter(registry);
-                writer.Start(version: 1, includeTypeChecks: false, flags: 0);
+                var serData = new SerializationData();
+                writer.Start(serData, version: 1, includeTypeChecks: false, flags: 0);
                 serializer.SerializeFullState(writer);
 
                 using var outputStream = new MemoryStream();
-                writer.Complete(outputStream);
+                writer.Complete();
+                serData.WriteContiguousTo(outputStream);
                 snapshotBytes = outputStream.ToArray();
             }
 
             NAssert.DoesNotThrow(() =>
             {
                 var reader = new BinarySerializationReader(registry);
-                reader.Start(snapshotBytes);
+                reader.Start(new ContiguousSerializationData(snapshotBytes));
                 serializer.DeserializeState(reader);
             });
         }
@@ -502,8 +462,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeVuoTemplate())
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(MakeVuoTemplate());
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
 
@@ -515,7 +474,7 @@ namespace Trecs.Tests
                     .Set(new VuoTemplateRenderComp { Value = i })
                     .AssertComplete();
             }
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
@@ -537,11 +496,13 @@ namespace Trecs.Tests
         static int WriteAndMeasure(WorldStateSerializer serializer, SerializerRegistry registry)
         {
             var writer = new BinarySerializationWriter(registry);
-            writer.Start(version: 1, includeTypeChecks: false, flags: 0);
+            var serData = new SerializationData();
+            writer.Start(serData, version: 1, includeTypeChecks: false, flags: 0);
             serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
-            writer.Complete(outputStream);
+            writer.Complete();
+            serData.WriteContiguousTo(outputStream);
             return (int)outputStream.Length;
         }
     }

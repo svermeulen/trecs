@@ -14,6 +14,11 @@ namespace Trecs
     /// Main entry point for the Trecs ECS world. Manages the simulation lifecycle
     /// (Tick/LateTick), entity submission, system execution, and accessor creation.
     /// <para>
+    /// The public surface here is deliberately limited to host lifecycle + setup
+    /// (see <c>docs/maintainers/maintainer-docs/api-design-conventions.md</c>);
+    /// <see cref="WorldAccessor"/> is the primary API for everything at runtime.
+    /// </para>
+    /// <para>
     /// Note for maintainers: to avoid circular deps, this class should not be
     /// used by other classes within the library. Should only be used on application side.
     /// </para>
@@ -35,6 +40,7 @@ namespace Trecs
         readonly WorldAccessorRegistry _accessorRegistry;
         readonly SerializerRegistry _serializerRegistry;
         readonly ComponentArraySerializerRegistry _componentArraySerializerRegistry;
+        readonly CustomWorldStateSectionRegistry _customWorldStateSections;
         IAccessRecorder _accessRecorder;
         readonly WorldSettings _settings;
         readonly Rng _fixedRng;
@@ -45,6 +51,7 @@ namespace Trecs
         readonly EcsHeapAllocator _heapAllocator;
         readonly EcsStructuralOps _structuralOps;
         readonly BlobCache _blobCache;
+        readonly BlobFactory _blobFactory;
         readonly NativeBlobBoxPool _nativeBlobBoxPool;
         readonly InterpolatedPreviousSaverManager _interpolatedPreviousSaverManager;
         readonly ComponentStore _componentStore;
@@ -52,14 +59,24 @@ namespace Trecs
         readonly SystemEnableState _systemEnableState = new();
         readonly List<ISystem> _systems;
 
-        bool _hasRemovedAllEntities;
         bool _initializeCompleted;
         bool _systemAddLocked;
+
+        // Unrestricted-role accessor created during Initialize. Shared by the input
+        // queue and used by RemoveAllEntities (which spans every template, so it
+        // needs the Unrestricted role).
+        WorldAccessor _unrestrictedAccessor;
         int _accessorIdCounter = 1; // Start at 1 because zero can be like null
         EntityHandle? _globalEntityHandle;
         bool _isDisposed;
         bool _hasInitialized;
+        bool _hasStarted;
         readonly SetStore _setStore;
+
+        // Computed once at the end of Initialize(), after the component-array
+        // serializer registry seals — every schema input is immutable from
+        // that point, so this is a plain field, not a lazy cache.
+        WorldSchemaFingerprint _schemaFingerprint;
 
         internal World(
             TrecsLog log,
@@ -82,12 +99,14 @@ namespace Trecs
             SharedHeap sharedHeap,
             WorldSettings settings,
             BlobCache blobCache,
+            BlobFactory blobFactory,
             NativeBlobBoxPool nativeBlobBoxPool,
             InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
             ComponentStore componentStore,
             List<ISystem> systems,
             SerializerRegistry serializerRegistry,
-            ComponentArraySerializerRegistry componentArraySerializerRegistry
+            ComponentArraySerializerRegistry componentArraySerializerRegistry,
+            CustomWorldStateSectionRegistry customWorldStateSections
         )
         {
             _log = log;
@@ -124,19 +143,22 @@ namespace Trecs
                 inputUniqueHeap
             );
 
-            _structuralOps = new EcsStructuralOps(
-                log,
-                entitySubmitter,
-                worldInfo,
-                entitiesDb.GetSets(),
-                setStore
-            );
+            _structuralOps = new EcsStructuralOps(log, entitySubmitter, worldInfo, setStore);
 
             TrecsDebugAssert.IsNotNull(serializerRegistry);
             _serializerRegistry = serializerRegistry;
 
             TrecsDebugAssert.IsNotNull(componentArraySerializerRegistry);
             _componentArraySerializerRegistry = componentArraySerializerRegistry;
+
+            TrecsDebugAssert.IsNotNull(customWorldStateSections);
+            _customWorldStateSections = customWorldStateSections;
+
+            // Created in WorldBuilder (before the input heaps, which need it to re-register
+            // descriptor sources on replay); owned + disposed here. Sits on top of the BlobCache:
+            // hashes descriptors to ids and runs the per-type builders.
+            TrecsDebugAssert.IsNotNull(blobFactory);
+            _blobFactory = blobFactory;
         }
 
         /// <summary>
@@ -165,6 +187,49 @@ namespace Trecs
         public ComponentArraySerializerRegistry ComponentArraySerializerRegistry =>
             _componentArraySerializerRegistry;
 
+        /// <summary>
+        /// The <see cref="CustomWorldStateSectionRegistry"/> for this world.
+        /// Register <see cref="ICustomWorldStateSection"/> implementations
+        /// here to append game-defined sections (e.g. a scripting VM's state)
+        /// to the full world-state stream, so snapshots, rewind keyframes,
+        /// recordings, and desync checksums cover that data too. Empty by
+        /// default; seals at <see cref="Initialize"/> because registrations
+        /// are part of the snapshot wire format.
+        /// </summary>
+        public CustomWorldStateSectionRegistry CustomWorldStateSections =>
+            _customWorldStateSections;
+
+        /// <summary>
+        /// Fingerprint of every schema invariant the binary snapshot/recording
+        /// wire format depends on (groups, components, sets, and custom
+        /// component-array serializers — deliberately not the system list;
+        /// see <see cref="WorldSchemaFingerprint"/>). Stamped into snapshot
+        /// metadata and recording-bundle headers at save time and validated
+        /// on load, so a file saved against a different schema fails with an
+        /// explanation instead of a misaligned binary read. Compare against
+        /// <c>SnapshotMetadata.SchemaFingerprint</c> /
+        /// <c>BundleHeader.SchemaFingerprint</c> (via the Peek APIs) to test
+        /// compatibility without loading.
+        /// <para>
+        /// Available after <see cref="Initialize"/>, which computes it once —
+        /// every schema input (templates, sets, component-array serializer
+        /// registrations) is sealed by then, so the fingerprint is immutable
+        /// for the world's lifetime. Reads are a field copy.
+        /// </para>
+        /// </summary>
+        public WorldSchemaFingerprint SchemaFingerprint
+        {
+            get
+            {
+                TrecsDebugAssert.That(!_isDisposed);
+                TrecsAssert.That(
+                    _initializeCompleted,
+                    "World.SchemaFingerprint accessed before Initialize() completed"
+                );
+                return _schemaFingerprint;
+            }
+        }
+
         public bool IsDisposed
         {
             get { return _isDisposed; }
@@ -179,14 +244,20 @@ namespace Trecs
 
         /// <summary>
         /// The single <see cref="TrecsLog"/> instance shared by this world and every
-        /// framework class it owns. User systems should obtain it via
-        /// <see cref="WorldAccessor.Log"/> rather than this property.
+        /// framework class it owns. Framework-internal — user code should use its
+        /// own logging; non-friend framework assemblies go through
+        /// <c>Trecs.Internal.WorldExtensions.GetLog</c>.
         /// </summary>
-        public TrecsLog Log => _log;
+        internal TrecsLog Log => _log;
 
-        public BlobCache BlobCache
+        internal BlobCache BlobCache
         {
             get { return _blobCache; }
+        }
+
+        internal BlobFactory BlobFactory
+        {
+            get { return _blobFactory; }
         }
 
         internal EntityInputQueue EntityInputQueue
@@ -212,7 +283,9 @@ namespace Trecs
         internal ReadOnlyIterableDictionary<int, WorldAccessor> AccessorsById =>
             _accessorRegistry.AccessorsById;
 
-        public WorldInfo WorldInfo
+        // Internal: end-user code reads this via WorldAccessor.WorldInfo; non-friend
+        // framework assemblies go through Trecs.Internal.WorldExtensions.GetWorldInfo.
+        internal WorldInfo WorldInfo
         {
             get { return _worldInfo; }
         }
@@ -244,9 +317,11 @@ namespace Trecs
         /// <see cref="WorldAccessor.SetSystemEnabled"/> /
         /// <see cref="WorldAccessor.SetSystemPaused"/>. Use this to build custom
         /// groupings (e.g. "all systems matching some game tag") that drive enable /
-        /// pause calls.
+        /// pause calls. Internal: end-user code uses <see cref="WorldAccessor.GetSystems"/>;
+        /// debug tooling without an accessor goes through
+        /// <c>Trecs.Internal.WorldExtensions.GetSystems</c>.
         /// </summary>
-        public IReadOnlyList<SystemEntry> GetSystems()
+        internal IReadOnlyList<SystemEntry> GetSystems()
         {
             TrecsDebugAssert.That(!_isDisposed);
             return _systemRunner.Systems;
@@ -257,8 +332,11 @@ namespace Trecs
         /// <see cref="EnableChannel"/> has it disabled and it is not paused via
         /// <see cref="WorldAccessor.SetSystemPaused"/>. Convenience for debug UIs and
         /// tests that want a single "is this system actually live" query.
+        /// Internal: end-user code uses <see cref="WorldAccessor.IsSystemEffectivelyEnabled"/>;
+        /// debug tooling without an accessor goes through
+        /// <c>Trecs.Internal.WorldExtensions.IsSystemEffectivelyEnabled</c>.
         /// </summary>
-        public bool IsSystemEffectivelyEnabled(int systemIndex)
+        internal bool IsSystemEffectivelyEnabled(int systemIndex)
         {
             TrecsDebugAssert.That(!_isDisposed);
             return _systemEnableState.IsSystemEffectivelyEnabled(systemIndex);
@@ -372,6 +450,24 @@ namespace Trecs
             }
         }
 
+        internal InputSharedHeap InputSharedHeap
+        {
+            get
+            {
+                TrecsDebugAssert.That(!_isDisposed);
+                return _heapAllocator.InputSharedHeap;
+            }
+        }
+
+        internal InputNativeSharedHeap InputNativeSharedHeap
+        {
+            get
+            {
+                TrecsDebugAssert.That(!_isDisposed);
+                return _heapAllocator.InputNativeSharedHeap;
+            }
+        }
+
         internal NativeHeap NativeUniqueChunkStore
         {
             get
@@ -432,80 +528,34 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Fires reactive <c>OnRemoved</c> observers for every non-global entity and zeros
-        /// out the per-group entity counts so subsequent queries see an empty world.
-        /// The backing component storage is not freed — the heap allocator tears it down
-        /// during <see cref="Dispose"/>; this method only flips the logical view.
+        /// Removes every non-global entity in the world. Routes through the normal
+        /// deferred removal pipeline (the whole-group fast path) and immediately
+        /// submits, so by the time this returns every removed entity has fired
+        /// <c>OnRemoved</c> under the same contract as runtime removal: component data
+        /// readable and <c>Exists()</c> false inside the callback, gone from queries
+        /// and sets afterwards.
         /// <para>
-        /// The global singleton entity is intentionally untouched: its lifecycle is
-        /// co-terminus with the <see cref="World"/>, not with normal entity removal, so
-        /// firing <c>OnRemoved</c> for it would lie to subscribers, and zeroing its
-        /// count would break the user contract that the global entity remains queryable
-        /// and mutable from <c>OnShutdown</c>.
+        /// The global singleton entity is never removed: its lifecycle is co-terminus
+        /// with the <see cref="World"/>, so it stays queryable and mutable from
+        /// <c>OnShutdown</c>. Idempotent — a second call finds every group already
+        /// empty and is a no-op.
         /// </para>
         /// <para>
         /// Called automatically from <see cref="Dispose"/> before system
-        /// <c>OnShutdown</c> hooks run. Can also be called manually earlier if you
-        /// need cleanup callbacks to fire at a specific point while accessors are
-        /// still valid — calling it twice is guarded by an assertion.
+        /// <c>OnShutdown</c> hooks run. Internal: end-user code that needs early
+        /// cleanup uses <see cref="WorldAccessor.RemoveAllEntities"/> followed by
+        /// <see cref="Submit"/>.
         /// </para>
         /// </summary>
-        public void RemoveAllEntities()
+        internal void RemoveAllEntities()
         {
-            if (_hasRemovedAllEntities)
-            {
-                return;
-            }
-            _hasRemovedAllEntities = true;
-
             TrecsDebugAssert.That(
-                !_worldInfo.GlobalGroup.IsNull
-                    && _worldInfo.GlobalGroup.Index < _componentStore.GroupEntityComponentsDB.Length
+                _initializeCompleted,
+                "RemoveAllEntities called before Initialize completed"
             );
 
-            var globalGroup = _worldInfo.GlobalGroup;
-
-            // Pass 1: fire OnRemoved for every observed non-global group.
-            foreach (var (group, groupRemovedSubject) in _eventsManager.ReactiveOnRemovedObservers)
-            {
-                if (group == globalGroup)
-                {
-                    continue;
-                }
-
-                var count = _querier.CountEntitiesInGroup(group);
-
-                if (count > 0)
-                {
-                    groupRemovedSubject.Invoke(new EntityRange(0, count));
-                }
-            }
-
-            // Pass 2: zero out per-component-array counts on every non-global group, so any
-            // Query() / Count() / [ForEachEntity] call from a later OnShutdown hook sees an
-            // empty world. Component storage is left allocated; the heap allocator frees it
-            // during the rest of Dispose. We must iterate ALL groups here (not just observed
-            // ones) — a group with zero OnRemoved observers still needs its count zeroed so
-            // non-reactive queries return empty too.
-            var groupComponentsDB = _componentStore.GroupEntityComponentsDB;
-            var globalGroupIndex = globalGroup.Index;
-            for (int g = 0; g < groupComponentsDB.Length; g++)
-            {
-                if (g == globalGroupIndex)
-                {
-                    continue;
-                }
-
-                foreach (var (_, componentArray) in groupComponentsDB[g])
-                {
-                    componentArray.SetCount(0);
-                }
-            }
-
-            _log.Debug(
-                "Removed all non-global entities for all {0} groups",
-                _worldInfo.AllGroups.Count
-            );
+            _unrestrictedAccessor.RemoveAllEntities();
+            _entitySubmitter.Submit();
         }
 
         public void Dispose()
@@ -523,6 +573,21 @@ namespace Trecs
 
             if (_initializeCompleted)
             {
+                // RemoveAllEntities submits, and a submit requires no outstanding
+                // jobs (it flushes deferred ops). Mirror the per-frame structural
+                // sync point: complete in-flight jobs and flush their set writes
+                // first, so a world disposed mid-flight (e.g. with a job still
+                // scheduled) tears down cleanly instead of tripping the
+                // "jobs still outstanding" assert.
+                _systemRunner.JobScheduler.CompleteAllOutstanding();
+                _entitySubmitter.FlushAllSetJobWrites();
+
+                // Enter the shutdown guard before the final removal pass: adds from
+                // OnRemoved / OnShutdown callbacks are rejected (they could never
+                // receive a matching OnRemoved) and redundant per-entity removes are
+                // ignored. RemoveAllEntities itself queues whole-group markers, which
+                // the guard deliberately does not block.
+                _entitySubmitter.MarkShutdownInProgress();
                 RemoveAllEntities();
             }
 
@@ -550,6 +615,7 @@ namespace Trecs
 
             _structuralOps.MarkDisposed();
 
+            _blobFactory.Dispose();
             _blobCache.Dispose();
 
             // Pool is disposed last — heaps and blob stores both return boxes to it
@@ -613,12 +679,22 @@ namespace Trecs
 
             using (TrecsProfiling.Start("EntitySubmitter.FreezeConfiguration"))
             {
-                _entitySubmitter.FreezeConfiguration();
+                // The unrestricted accessor (created earlier in Initialize) is
+                // what the submitter uses to run [CascadeRemove]/[DisposeOnRemove]
+                // handlers inside the removal window.
+                _entitySubmitter.FreezeConfiguration(_unrestrictedAccessor);
             }
         }
 
-        // Prefer letting SystemRunner call Submit() automatically between system phases.
-        // Manual calls are only needed for pre-Initialize entity setup or test harnesses.
+        /// <summary>
+        /// Forces immediate processing of all deferred structural changes (adds,
+        /// removes, moves). Submission normally happens automatically between system
+        /// phases — manual calls are only needed for host-side setup (entities that
+        /// must exist before the first <see cref="Tick"/>) or test harnesses. Lives
+        /// on <see cref="World"/> rather than <see cref="WorldAccessor"/> on purpose:
+        /// submitting is a host concern and is asserted against during system
+        /// execution, so the accessor deliberately doesn't offer it.
+        /// </summary>
         public void Submit()
         {
             TrecsDebugAssert.That(!_isDisposed);
@@ -761,10 +837,8 @@ namespace Trecs
             TrecsDebugAssert.That(!_hasInitialized);
             _hasInitialized = true;
 
-            _entityInputQueue.Accessor = CreateAccessor(
-                AccessorRole.Unrestricted,
-                "EntityInputQueue"
-            );
+            _unrestrictedAccessor = CreateAccessor(AccessorRole.Unrestricted, "EntityInputQueue");
+            _entityInputQueue.Accessor = _unrestrictedAccessor;
 
             _systemRunner.SetEventSubjects(_eventsManager);
 
@@ -776,7 +850,7 @@ namespace Trecs
 
             var loadInfo = _systemLoader.LoadSystems(this, _systems);
 
-            _systemEnableState.Initialize(loadInfo.Systems.Count);
+            _systemEnableState.Initialize(loadInfo.Systems, _log);
 
             using (TrecsProfiling.Start("SystemRunner.Initialize"))
             {
@@ -802,6 +876,14 @@ namespace Trecs
 
             CallSystemReadyHooks(loadInfo);
 
+            // Seal the registries, then fingerprint the schema — last setup
+            // step, so system-ready hooks were still free to register. From
+            // here on every schema input is immutable, so the fingerprint is
+            // computed exactly once for the world's lifetime.
+            _componentArraySerializerRegistry.Seal();
+            _customWorldStateSections.Seal();
+            _schemaFingerprint = WorldSchemaFingerprintCalculator.Compute(this);
+
             _initializeCompleted = true;
 
             // Register only after Initialize completes so editor-tool listeners
@@ -821,11 +903,18 @@ namespace Trecs
         public void Tick()
         {
             TrecsDebugAssert.That(!_isDisposed);
+            // Once the simulation starts ticking, blob registration is sealed: sources/builders
+            // are fixed setup state (see WorldExtensions.IsBlobRegistrationSealed). Descriptor
+            // interning and snapshot journal-restore create per-id sources at runtime through
+            // internal paths and are unaffected.
+            _hasStarted = true;
             using (TrecsProfiling.Start("SystemRunner.Tick"))
             {
                 _systemRunner.Tick();
             }
         }
+
+        internal bool IsBlobRegistrationSealed => _hasStarted;
 
         /// <summary>
         /// Runs late-variable-update systems. Call after <see cref="Tick"/> each rendered frame.
@@ -956,9 +1045,10 @@ namespace Trecs
         /// <see cref="IAccessRecorder"/> that the world hands to every
         /// accessor — current and future. Intended for editor / debug tooling
         /// that wants per-system read/write and add/remove/move maps. Pass
-        /// <c>null</c> to detach.
+        /// <c>null</c> to detach. Internal: end-user code uses
+        /// <see cref="WorldAccessor.SetAccessRecorder"/>.
         /// </summary>
-        public void SetAccessRecorder(IAccessRecorder recorder)
+        internal void SetAccessRecorder(IAccessRecorder recorder)
         {
             _accessRecorder = recorder;
             foreach (var kvp in _accessorRegistry.AccessorsById)
@@ -982,7 +1072,37 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntitySubmitter GetEntitySubmitter(this World world)
+        public static TrecsLog GetLog(this World world)
+        {
+            return world.Log;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static WorldInfo GetWorldInfo(this World world)
+        {
+            return world.WorldInfo;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IReadOnlyList<SystemEntry> GetSystems(this World world)
+        {
+            return world.GetSystems();
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static bool IsSystemEffectivelyEnabled(this World world, int systemIndex)
+        {
+            return world.IsSystemEffectivelyEnabled(systemIndex);
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static void SetAccessRecorder(this World world, IAccessRecorder recorder)
+        {
+            world.SetAccessRecorder(recorder);
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        internal static EntitySubmitter GetEntitySubmitter(this World world)
         {
             return world.EntitySubmitter;
         }
@@ -994,7 +1114,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EventsManager GetEventsManager(this World world)
+        internal static EventsManager GetEventsManager(this World world)
         {
             return world.EventsManager;
         }
@@ -1006,21 +1126,56 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static UniqueHeap GetUniqueHeap(this World world)
+        internal static UniqueHeap GetUniqueHeap(this World world)
         {
             return world.UniqueHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static SharedHeap GetSharedHeap(this World world)
+        internal static SharedHeap GetSharedHeap(this World world)
         {
             return world.SharedHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static NativeSharedHeap GetNativeSharedHeap(this World world)
+        internal static BlobCache GetBlobCache(this World world)
+        {
+            return world.BlobCache;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        internal static NativeSharedHeap GetNativeSharedHeap(this World world)
         {
             return world.NativeSharedHeap;
+        }
+
+        // The opaque/shared BlobIds referenced by the *serialized world state* — the union of the two
+        // persistent shared heaps' references. This is the correct source for a snapshot's blob set,
+        // unlike BlobCache.GetAllActiveBlobIds, which returns every blob with any live cache handle:
+        // that set also includes non-ECS pins (e.g. the rewind buffer's snapshot keyframes) and
+        // frame-scoped input-heap blobs, so it is neither limited to serialized state nor stable
+        // against external pinning — both of which corrupt the deterministic snapshot wire form.
+        // Adds without clearing; callers clear their buffer first (mirrors GetAllActiveBlobIds).
+        internal static void AddSerializedStateBlobIds(
+            this World world,
+            IterableHashSet<BlobId> output
+        )
+        {
+            world.GetSharedHeap().AddReferencedBlobIds(output);
+            world.GetNativeSharedHeap().AddReferencedBlobIds(output);
+        }
+
+        // The BlobIds retained by the live input-stream window (both input shared heaps). Together
+        // with AddSerializedStateBlobIds this forms a saved recording's blob root set: the sim
+        // heaps cover the live world's references, the input heaps cover the retained input
+        // frames' payloads. Deliberately NOT GetAllActiveBlobIds — the cache's global active set
+        // also counts unrelated ambient pins (rendering anchors, seeder warm-ups), which would
+        // bloat the saved file's blob store and root junk in its GC set, with contents that vary
+        // by what ambient code happened to pin at save time. Adds without clearing.
+        internal static void AddInputStreamBlobIds(this World world, IterableHashSet<BlobId> output)
+        {
+            world.InputSharedHeap.AddReferencedBlobIds(output);
+            world.InputNativeSharedHeap.AddReferencedBlobIds(output);
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -1056,13 +1211,13 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ComponentStore GetComponentStore(this World world)
+        internal static ComponentStore GetComponentStore(this World world)
         {
             return world.ComponentStore;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static SetStore GetSetStore(this World world)
+        internal static SetStore GetSetStore(this World world)
         {
             return world.SetStore;
         }

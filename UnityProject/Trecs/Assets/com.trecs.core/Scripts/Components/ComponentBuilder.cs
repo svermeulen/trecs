@@ -20,7 +20,7 @@ namespace Trecs.Internal
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class ComponentBuilder<T> : IComponentBuilder
+    internal sealed class ComponentBuilder<T> : IComponentBuilder
         where T : unmanaged, IEntityComponent
     {
         static readonly Type _componentType;
@@ -30,8 +30,6 @@ namespace Trecs.Internal
             _componentType = typeof(T);
             // Important: serves as warm up for TypeMeta<T>
             _ = TypeMeta<T>.IsUnmanaged;
-            if (TypeMeta<T>.IsUnmanaged)
-                EntityComponentIdMap.Register<T>(new Filler<T>());
             TypeId<T>.Warmup();
         }
 

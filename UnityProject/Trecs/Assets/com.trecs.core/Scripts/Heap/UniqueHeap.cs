@@ -9,7 +9,7 @@ namespace Trecs.Internal
     // Uses TypeId (serialization-stable) instead of Burst/CLR type hashes
     // because the value must be persistent across application runs.
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class UniqueHeap
+    internal sealed class UniqueHeap
     {
         readonly TrecsLog _log;
 
@@ -229,7 +229,13 @@ namespace Trecs.Internal
                 writer.PushScope("{0}_{1}", entry.Type.Name, address);
                 writer.Write<uint>("Address", address);
 
-                TrecsDebugAssert.That(entry.Type == entry.Value.GetType());
+                TrecsDebugAssert.That(
+                    entry.Type == entry.Value.GetType(),
+                    "UniqueHeap entry type drift at address {0}: entry says {1} but value is {2}",
+                    address,
+                    entry.Type,
+                    entry.Value.GetType()
+                );
                 writer.WriteObject("Obj", entry.Value);
                 writer.PopScope();
             }

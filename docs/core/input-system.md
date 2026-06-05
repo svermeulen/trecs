@@ -86,6 +86,12 @@ public partial class SnakeInputSystem : ISystem
 
 Call `handle.AddInput<T>(World, value)` on any `EntityHandle` or `EntityIndex` to target a specific entity.
 
+### Target-entity lifetime
+
+A queued input is applied to its target entity at the start of the upcoming fixed step. Because input systems run in the same fixed-step iteration as the apply — with no entity submit in between — an entity that exists when you call `AddInput` is still alive when its input is applied. Removing the target in an Input-phase system only takes effect *after* the apply, so the input still lands that step.
+
+If the target entity nonetheless doesn't exist at apply time, that indicates a framework-level ordering bug rather than expected best-effort delivery. The queued input trips a debug assert in debug/editor builds; in release builds the assert is stripped and the input is silently dropped so a live build never crashes on it. The drop decision depends only on deterministic world state (entity liveness at the fixed-step boundary), so record/replay reproduces it identically.
+
 ## Reading input
 
 Input components read like any other component during fixed update:

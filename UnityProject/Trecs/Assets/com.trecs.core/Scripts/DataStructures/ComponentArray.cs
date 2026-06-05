@@ -7,7 +7,7 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class ComponentArray<TValue> : IComponentArray<TValue>
+    internal sealed class ComponentArray<TValue> : IComponentArray<TValue>
         where TValue : unmanaged, IEntityComponent
     {
         NativeList<TValue> _values;
@@ -38,6 +38,18 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref TValue GetValueAtIndexByRef(int index)
         {
+            // Bounds vs _count (not _values.Length): callers index entries that
+            // were Add()'d to this transient buffer. A stale EntityInitializer
+            // used after Submit (buffer cleared, _count reset) fails this too,
+            // instead of silently corrupting the next frame's adds.
+            TrecsDebugAssert.That(
+                (uint)index < (uint)_count,
+                "ComponentArray.GetValueAtIndexByRef: index {0} out of range [0, {1}). "
+                    + "If this initializer was kept across Submit, it is stale.",
+                index,
+                _count
+            );
+
             unsafe
             {
                 return ref UnsafeUtility.ArrayElementAsRef<TValue>(_values.GetUnsafePtr(), index);

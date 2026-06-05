@@ -3,7 +3,7 @@ using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -11,19 +11,15 @@ namespace Trecs.Tests
     public class UnsafeListSerializationTests
     {
         SerializerRegistry _serializerRegistry;
-        SerializationBuffer _cacheHelper;
+        SerializationHelper _helper;
+        SerializationData _data;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
@@ -35,8 +31,8 @@ namespace Trecs.Tests
                 var deserialized = RoundTrip(original);
                 try
                 {
-                    Assert.That(deserialized.IsCreated);
-                    Assert.That(deserialized.Length == 0);
+                    NAssert.That(deserialized.IsCreated);
+                    NAssert.That(deserialized.Length == 0);
                 }
                 finally
                 {
@@ -66,11 +62,11 @@ namespace Trecs.Tests
                 var deserialized = RoundTrip(original);
                 try
                 {
-                    Assert.That(deserialized.IsCreated);
-                    Assert.That(deserialized.Length == original.Length);
+                    NAssert.That(deserialized.IsCreated);
+                    NAssert.That(deserialized.Length == original.Length);
                     for (int i = 0; i < original.Length; i++)
                     {
-                        Assert.That(deserialized[i] == original[i], $"Element {i} mismatch");
+                        NAssert.That(deserialized[i] == original[i], $"Element {i} mismatch");
                     }
                 }
                 finally
@@ -100,10 +96,10 @@ namespace Trecs.Tests
                 var deserialized = RoundTrip(original);
                 try
                 {
-                    Assert.That(deserialized.Length == original.Length);
+                    NAssert.That(deserialized.Length == original.Length);
                     for (int i = 0; i < original.Length; i++)
                     {
-                        Assert.That(deserialized[i] == original[i], $"Element {i} mismatch");
+                        NAssert.That(deserialized[i] == original[i], $"Element {i} mismatch");
                     }
                 }
                 finally
@@ -131,10 +127,10 @@ namespace Trecs.Tests
                 var deserialized = RoundTrip(original);
                 try
                 {
-                    Assert.That(deserialized.Length == original.Length);
+                    NAssert.That(deserialized.Length == original.Length);
                     for (int i = 0; i < original.Length; i++)
                     {
-                        Assert.That(deserialized[i] == original[i], $"Element {i} mismatch");
+                        NAssert.That(deserialized[i] == original[i], $"Element {i} mismatch");
                     }
                 }
                 finally
@@ -163,10 +159,10 @@ namespace Trecs.Tests
                 var deserialized = RoundTrip(original);
                 try
                 {
-                    Assert.That(deserialized.Length == count);
+                    NAssert.That(deserialized.Length == count);
                     for (int i = 0; i < count; i++)
                     {
-                        Assert.That(deserialized[i] == original[i], $"Element {i} mismatch");
+                        NAssert.That(deserialized[i] == original[i], $"Element {i} mismatch");
                     }
                 }
                 finally
@@ -191,27 +187,26 @@ namespace Trecs.Tests
             var target = new UnsafeList<int>(0, Allocator.Persistent);
             try
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     original,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags: 0L
                 );
-                _cacheHelper.ResetMemoryPosition();
 
                 // Capture IsCreated state up front — confirms the serializer
                 // doesn't replace the live container with a fresh allocation
                 // when one already exists.
-                Assert.That(target.IsCreated);
+                NAssert.That(target.IsCreated);
 
-                _cacheHelper.ReadAll(ref target);
+                _helper.ReadAll(_data, ref target);
 
-                Assert.That(target.IsCreated);
-                Assert.That(target.Length == original.Length);
+                NAssert.That(target.IsCreated);
+                NAssert.That(target.Length == original.Length);
                 for (int i = 0; i < original.Length; i++)
                 {
-                    Assert.That(target[i] == original[i], $"Element {i} mismatch");
+                    NAssert.That(target[i] == original[i], $"Element {i} mismatch");
                 }
             }
             finally
@@ -224,10 +219,14 @@ namespace Trecs.Tests
         UnsafeList<T> RoundTrip<T>(in UnsafeList<T> value)
             where T : unmanaged
         {
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(value, TestConstants.Version, includeTypeChecks: true, flags: 0L);
-            _cacheHelper.ResetMemoryPosition();
-            return _cacheHelper.ReadAll<UnsafeList<T>>();
+            _helper.WriteAll(
+                _data,
+                value,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags: 0L
+            );
+            return _helper.ReadAll<UnsafeList<T>>(_data);
         }
     }
 }

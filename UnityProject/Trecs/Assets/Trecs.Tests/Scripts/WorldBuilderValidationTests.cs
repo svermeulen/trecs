@@ -25,7 +25,6 @@ namespace Trecs.Tests
                     .AddTemplate(TrecsTemplates.Globals.Template)
                     .AddTemplate(template)
                     .AddTemplate(template)
-                    .AddBlobStore(EcsTestHelper.CreateBlobStore())
                     .BuildAndInitialize()
                     .Dispose();
             });
@@ -40,8 +39,7 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(TrecsTemplates.Globals.Template);
 
             using var world = builder.BuildAndInitialize();
 
@@ -102,8 +100,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(TestTemplates.SimpleAlpha)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(TestTemplates.SimpleAlpha);
 
             var world = builder.Build();
             world.AddSystem(new WBVDummySystem());

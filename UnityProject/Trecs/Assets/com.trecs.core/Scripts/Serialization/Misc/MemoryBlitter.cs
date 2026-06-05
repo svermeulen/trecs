@@ -33,6 +33,14 @@ namespace Trecs.Internal
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
+            // Reading zero bytes is a no-op and must not touch the span: with an exact-length data
+            // section, offset can legitimately sit at data.Length here (e.g. an empty trailing
+            // array), and &data[offset] would be out of bounds even though we copy nothing.
+            if (numBytes == 0)
+            {
+                return;
+            }
+
             if (offset + numBytes > data.Length)
             {
                 throw new SerializationException(

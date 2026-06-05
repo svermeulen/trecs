@@ -20,18 +20,18 @@ namespace Trecs.Tests
 
             // Add
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Remove
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, group));
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Add again
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 2 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
 
             var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
@@ -46,14 +46,14 @@ namespace Trecs.Tests
 
             var init1 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var ref1 = init1.Handle;
-            a.Submit();
+            a.World.Submit();
 
             a.RemoveEntity(ref1);
-            a.Submit();
+            a.World.Submit();
 
             var init2 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var ref2 = init2.Handle;
-            a.Submit();
+            a.World.Submit();
 
             NAssert.IsFalse(ref1.Exists(a));
             NAssert.IsTrue(ref2.Exists(a));
@@ -75,17 +75,17 @@ namespace Trecs.Tests
                 .Set(new TestVec { X = 1.0f, Y = 2.0f })
                 .AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             // Move A -> B
             a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
 
             // Move B -> A
             a.SetTag<TestPartitionA>(entityHandle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
 
@@ -106,13 +106,13 @@ namespace Trecs.Tests
                 var init = a.AddEntity(PartitionA).Set(new TestInt { Value = i }).AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Move entities 0, 2, 4 to PartitionB
             a.SetTag<TestPartitionB>(refs[0].ToIndex(a));
             a.SetTag<TestPartitionB>(refs[2].ToIndex(a));
             a.SetTag<TestPartitionB>(refs[4].ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(3, a.CountEntitiesWithTags(PartitionB));
@@ -143,13 +143,13 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // In one submission: remove entity 1, add 2 new entities
             a.RemoveEntity(refs[1]);
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 400 }).AssertComplete();
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 500 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(4, a.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.IsFalse(refs[1].Exists(a));
@@ -165,12 +165,12 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             // In one submission: move existing entity + add new one
             a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.AddEntity(PartitionA).Set(new TestInt { Value = 20 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -190,12 +190,12 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove entity 0, move entity 2 to PartitionB
             a.RemoveEntity(refs[0]);
             a.SetTag<TestPartitionB>(refs[2].ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -225,7 +225,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // In one submission: remove entity 0, add a new entity
             a.RemoveEntity(refs[0]);
@@ -233,7 +233,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 999 })
                 .AssertComplete();
             var newRef = newInit.Handle;
-            a.Submit();
+            a.World.Submit();
 
             // The new entity's ref should resolve correctly
             NAssert.IsTrue(newRef.Exists(a));
@@ -266,14 +266,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove every other entity
             for (int i = 0; i < count; i += 2)
             {
                 a.RemoveEntity(refs[i]);
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(count / 2, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -309,14 +309,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Move all to PartitionB
             for (int i = 0; i < count; i++)
             {
                 a.SetTag<TestPartitionB>(refs[i].ToIndex(a));
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(count, a.CountEntitiesWithTags(PartitionB));
@@ -326,7 +326,7 @@ namespace Trecs.Tests
             {
                 a.SetTag<TestPartitionA>(refs[i].ToIndex(a));
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -355,7 +355,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(PartitionA).AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             int addedCallCount = 0;
             var sub = a
@@ -368,7 +368,7 @@ namespace Trecs.Tests
                 );
 
             a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, addedCallCount, "OnAdded should NOT fire for moved entities");
             sub.Dispose();
@@ -383,7 +383,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(PartitionA).AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             int removedCallCount = 0;
             var sub = a
@@ -396,7 +396,7 @@ namespace Trecs.Tests
                 );
 
             a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, removedCallCount, "OnRemoved should NOT fire for moved entities");
             sub.Dispose();
@@ -410,7 +410,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(PartitionA).AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             int movedCallCount = 0;
             GroupIndex observedFrom = default;
@@ -430,7 +430,7 @@ namespace Trecs.Tests
             var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(PartitionB);
 
             a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, movedCallCount, "OnMoved should fire exactly once");
             NAssert.AreEqual(expectedGroupA, observedFrom);
@@ -456,15 +456,15 @@ namespace Trecs.Tests
 
             // Multiple submissions, each should trigger the callback
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, callCount);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(2, callCount);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(3, callCount);
 
             sub.Dispose();
@@ -484,7 +484,7 @@ namespace Trecs.Tests
             using var refs = a.ReserveEntityHandles(1, Allocator.Temp);
             var init = nativeEcs.AddEntity(TestTags.Alpha, sortKey: 0, refs[0]);
             init.Set(new TestInt { Value = 99 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -502,7 +502,7 @@ namespace Trecs.Tests
                 var init = nativeEcs.AddEntity(TestTags.Alpha, sortKey: (uint)i, refs[i]);
                 init.Set(new TestInt { Value = i * 10 });
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -523,7 +523,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 3 }).AssertComplete();
 
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -539,11 +539,11 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             nativeEcs.RemoveEntity(new EntityIndex(1, group));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -556,11 +556,11 @@ namespace Trecs.Tests
             var nativeEcs = a.ToNative();
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             nativeEcs.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -575,7 +575,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             // Native accessor should be able to resolve the entity ref
             bool found = entityHandle.TryToIndex(nativeEcs, out var entityIndex);
@@ -595,7 +595,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.Catch(() => a.Query().WithTags(TestTags.Alpha).SingleHandle());
         }
@@ -617,7 +617,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.IsFalse(a.Query().WithTags(TestTags.Alpha).TrySingleHandle(out _));
         }
@@ -636,7 +636,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionB).AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Count with just the Gamma tag should match both groups
             var gammaCount = a.Query().WithTags(TestTags.Gamma).Count();
@@ -655,13 +655,13 @@ namespace Trecs.Tests
                 var init = a.AddEntity(PartitionA).AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove 2, move 1 to PartitionB
             a.RemoveEntity(refs[0]);
             a.RemoveEntity(refs[1]);
             a.SetTag<TestPartitionB>(refs[2].ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.Query().WithTags(PartitionA).Count());
             NAssert.AreEqual(1, a.Query().WithTags(PartitionB).Count());
@@ -682,7 +682,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionB).Set(new TestInt { Value = 10 + i }).AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             int totalEntities = 0;
             int groupCount = 0;
@@ -714,7 +714,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove entities 0, 3, 5, 7, 9
             a.RemoveEntity(refs[0]);
@@ -722,7 +722,7 @@ namespace Trecs.Tests
             a.RemoveEntity(refs[5]);
             a.RemoveEntity(refs[7]);
             a.RemoveEntity(refs[9]);
-            a.Submit();
+            a.World.Submit();
 
             // Removed refs should be invalid
             NAssert.IsFalse(refs[0].Exists(a));
@@ -755,7 +755,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Entity 0: remove
             // Entity 1: move to PartitionB
@@ -767,7 +767,7 @@ namespace Trecs.Tests
             a.SetTag<TestPartitionB>(refs[1].ToIndex(a));
             a.RemoveEntity(refs[3]);
             a.SetTag<TestPartitionB>(refs[4].ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.IsFalse(refs[0].Exists(a));
             NAssert.IsTrue(refs[1].Exists(a));
@@ -807,14 +807,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove every 3rd entity
             for (int i = 0; i < count; i += 3)
             {
                 a.RemoveEntity(refs[i]);
             }
-            a.Submit();
+            a.World.Submit();
 
             // Verify surviving entities have consistent data across both components
             for (int i = 0; i < count; i++)
@@ -847,12 +847,12 @@ namespace Trecs.Tests
                 .Set(new TestVec { X = 3.0f, Y = 4.0f })
                 .AssertComplete();
             var entityHandle = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             // Move via native path
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             nativeEcs.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -877,7 +877,7 @@ namespace Trecs.Tests
             // Setup: add 1 entity
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             var existingRef = init.Handle;
-            a.Submit();
+            a.World.Submit();
 
             int addedCount = 0;
             int removedCount = 0;
@@ -901,7 +901,7 @@ namespace Trecs.Tests
             // In one submission: remove existing, add new
             a.RemoveEntity(existingRef);
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 2 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1u, addedCount, "OnAdded should fire for the new entity");
             NAssert.AreEqual(1u, removedCount, "OnRemoved should fire for the removed entity");

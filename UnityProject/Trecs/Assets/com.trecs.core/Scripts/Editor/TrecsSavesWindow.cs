@@ -42,13 +42,6 @@ namespace Trecs.Internal
         IVisualElementScheduledItem _statusClearer;
         const int StatusClearDelayMs = 4000;
 
-        // Once the user opts out via the confirm dialog's "Don't ask again"
-        // button, suppress the load-during-recording prompt forever. Stored
-        // in EditorPrefs so the choice persists across editor sessions.
-        // Same key used by TrecsPlayerWindow's snapshot loader so the
-        // setting carries between both surfaces.
-        const string SuppressLoadConfirmKey = "Trecs.Snapshots.SuppressLoadConfirm";
-
         string _searchQuery = string.Empty;
 
         // Selection state. Identity is (name, isRecording) so the same name
@@ -275,90 +268,36 @@ namespace Trecs.Internal
 
         // ── Capture ──
 
-        void OnCaptureClicked()
+        // Routes the result of a shared TrecsRecordingActions flow to this
+        // window's surfaces: transient status text, plus a list rebuild so
+        // row decorations (e.g. the loaded-in-Player marker) stay current.
+        void ApplyActionResult(in TrecsRecordingActions.Result result)
         {
-            var controller = GetController();
-            if (controller == null)
-            {
-                SetStatus("No active controller for the selected world.");
-                return;
-            }
-            var name = TrecsTextPromptWindow.Prompt(
-                "Capture snapshot",
-                "Snapshot name:",
-                SuggestSnapshotName(),
-                this
-            );
-            if (string.IsNullOrWhiteSpace(name))
+            if (!result.Acted)
             {
                 return;
             }
-            if (File.Exists(TrecsSnapshotLibrary.GetSnapshotPath(name)))
+            SetStatus(result.Status);
+            if (result.Succeeded)
             {
-                if (
-                    !EditorUtility.DisplayDialog(
-                        "Overwrite snapshot?",
-                        $"A snapshot named '{name}' already exists. Overwrite?",
-                        "Overwrite",
-                        "Cancel"
-                    )
-                )
-                {
-                    return;
-                }
-            }
-            var library = GetSnapshotLibrary();
-            if (library != null && library.SaveSnapshot(name))
-            {
-                SetStatus($"Captured '{name}'.");
                 RebuildSavesList();
             }
-            else
-            {
-                SetStatus($"Capture failed for '{name}'.");
-            }
+        }
+
+        void OnCaptureClicked()
+        {
+            ApplyActionResult(
+                TrecsRecordingActions.SaveSnapshotPrompted(GetSnapshotLibrary(), this)
+            );
         }
 
         // ── Per-row actions: Snapshots ──
 
         void OnLoadSnapshotClicked(string name)
         {
-            var controller = GetController();
-            var library = GetSnapshotLibrary();
-            if (controller == null || library == null)
-            {
-                SetStatus("No active controller for the selected world.");
-                return;
-            }
-            if (
-                controller.AutoRecorder.IsRecording
-                && !EditorPrefs.GetBool(SuppressLoadConfirmKey, false)
-            )
-            {
-                // DisplayDialogComplex returns 0=ok, 1=cancel, 2=alt.
-                var choice = EditorUtility.DisplayDialogComplex(
-                    "Load snapshot?",
-                    "Loading a snapshot will discard the current in-memory "
-                        + "recording buffer (saved files on disk are not "
-                        + "affected) and start a fresh recording from the "
-                        + "snapshot's frame.",
-                    "Load",
-                    "Cancel",
-                    "Load and don't ask again"
-                );
-                if (choice == 1)
-                    return;
-                if (choice == 2)
-                    EditorPrefs.SetBool(SuppressLoadConfirmKey, true);
-            }
-            if (library.LoadSnapshot(name))
-            {
-                SetStatus($"Loaded snapshot '{name}'.");
-            }
-            else
-            {
-                SetStatus($"Load failed for '{name}'.");
-            }
+            ApplyActionResult(
+                TrecsRecordingActions.LoadSnapshot(GetController(), GetSnapshotLibrary(), name)
+            );
         }
 
         void OnRenameSnapshotClicked(string oldName)
@@ -406,7 +345,9 @@ namespace Trecs.Internal
             var ok =
                 library != null
                     ? library.DeleteSnapshot(name)
-                    : DeleteFile(TrecsSnapshotLibrary.GetSnapshotPath(name));
+                    : TrecsRecordingActions.DeleteSavedFile(
+                        TrecsSnapshotLibrary.GetSnapshotPath(name)
+                    );
             if (ok)
             {
                 SetStatus($"Deleted snapshot '{name}'.");
@@ -422,20 +363,7 @@ namespace Trecs.Internal
 
         void OnLoadRecordingClicked(string name)
         {
-            var controller = GetController();
-            if (controller == null)
-            {
-                SetStatus("No active controller for the selected world.");
-                return;
-            }
-            if (controller.LoadNamedRecording(name))
-            {
-                SetStatus($"Loaded recording '{name}'.");
-            }
-            else
-            {
-                SetStatus($"Load failed for '{name}'.");
-            }
+            ApplyActionResult(TrecsRecordingActions.LoadRecording(GetController(), name));
         }
 
         void OnRenameRecordingClicked(string oldName)
@@ -463,44 +391,7 @@ namespace Trecs.Internal
 
         void OnDeleteRecordingClicked(string name)
         {
-            if (
-                !EditorUtility.DisplayDialog(
-                    "Delete recording?",
-                    $"Delete recording '{name}'? This removes the file from disk.",
-                    "Delete",
-                    "Cancel"
-                )
-            )
-            {
-                return;
-            }
-            var controller = GetController();
-            var ok =
-                controller != null
-                    ? controller.DeleteNamedRecording(name)
-                    : DeleteFile(TrecsRecordingSession.GetRecordingPath(name));
-            if (ok)
-            {
-                SetStatus($"Deleted recording '{name}'.");
-                RebuildSavesList();
-            }
-            else
-            {
-                SetStatus($"Delete failed for '{name}'.");
-            }
-        }
-
-        static bool DeleteFile(string path)
-        {
-            if (!File.Exists(path))
-            {
-                return false;
-            }
-            File.Delete(path);
-            // Fallback path bypasses the controller, so notify the library
-            // event manually so other observers refresh.
-            TrecsRecordingSession.NotifySavesChanged();
-            return true;
+            ApplyActionResult(TrecsRecordingActions.DeleteRecording(GetController(), name));
         }
 
         // ── List rendering ──
@@ -1163,7 +1054,7 @@ namespace Trecs.Internal
         bool HasRecordingBuffer()
         {
             var recorder = GetController()?.AutoRecorder;
-            return recorder != null && recorder.IsRecording && recorder.Anchors.Count > 0;
+            return recorder != null && recorder.IsRecording && recorder.Keyframes.Count > 0;
         }
 
         // Trailing "Save as new" row, rendered as a flat full-width button
@@ -1290,7 +1181,9 @@ namespace Trecs.Internal
                     ok =
                         controller != null
                             ? controller.DeleteNamedRecording(item.name)
-                            : DeleteFile(TrecsRecordingSession.GetRecordingPath(item.name));
+                            : TrecsRecordingActions.DeleteSavedFile(
+                                TrecsRecordingSession.GetRecordingPath(item.name)
+                            );
                 }
                 else
                 {
@@ -1298,7 +1191,9 @@ namespace Trecs.Internal
                     ok =
                         library != null
                             ? library.DeleteSnapshot(item.name)
-                            : DeleteFile(TrecsSnapshotLibrary.GetSnapshotPath(item.name));
+                            : TrecsRecordingActions.DeleteSavedFile(
+                                TrecsSnapshotLibrary.GetSnapshotPath(item.name)
+                            );
                 }
                 if (ok)
                     deleted++;
@@ -1328,44 +1223,21 @@ namespace Trecs.Internal
                 SetStatus("No active controller for the selected world.");
                 return;
             }
+            // Pre-prompt guard so the user isn't asked to name a recording
+            // that can't be saved (the shared flow would surface the failure
+            // only after the prompt).
             if (!HasRecordingBuffer())
             {
                 SetStatus("Nothing to save — recorder has no in-memory buffer.");
                 return;
             }
-            var name = TrecsTextPromptWindow.Prompt(
-                "Save recording as new",
-                "Recording name:",
-                $"recording-{DateTime.Now:yyyyMMdd-HHmmss}",
-                this
-            );
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return;
-            }
-            name = name.Trim();
-            if (File.Exists(TrecsRecordingSession.GetRecordingPath(name)))
-            {
-                if (
-                    !EditorUtility.DisplayDialog(
-                        "Overwrite recording?",
-                        $"A recording named '{name}' already exists. Overwrite?",
-                        "Overwrite",
-                        "Cancel"
-                    )
+            ApplyActionResult(
+                TrecsRecordingActions.SaveRecordingPrompted(
+                    controller,
+                    this,
+                    TrecsRecordingActions.SuggestRecordingName()
                 )
-                {
-                    return;
-                }
-            }
-            if (controller.SaveNamedRecording(name))
-            {
-                SetStatus($"Saved recording '{name}'.");
-            }
-            else
-            {
-                SetStatus($"Save failed for '{name}'.");
-            }
+            );
         }
 
         // ── Per-row overwrite (Save-into-this-slot) handlers ──
@@ -1526,8 +1398,6 @@ namespace Trecs.Internal
                 return $"{(int)ago.TotalDays}d ago";
             return when.ToString("MMM d");
         }
-
-        static string SuggestSnapshotName() => $"snapshot-{DateTime.Now:yyyyMMdd-HHmmss}";
 
         void SetStatus(string text)
         {

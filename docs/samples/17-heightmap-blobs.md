@@ -16,9 +16,9 @@ The `Flavor` field on `SampleSettings` (or `FlavorOverride` from tests) selects 
 
 - **`ManagedSharedPtr`** — `HeightmapData` is a managed class holding a `float[]`, lives on the world's shared heap behind a 12-byte `SharedPtr<HeightmapData>` component. The class is marked `[Immutable]` and structurally audited by TRECS126 (class adoption path). `ManagedHeightmapFollower` runs on the main thread and dereferences via `heightmap.Value.Get(World)`.
 
-- **`NativeSharedPtrInline`** — `NativeHeightmapData` is an unmanaged struct with the height grid inline (`FixedArray256<float>`), behind a `NativeSharedPtr<NativeHeightmapData>` component. `NativeHeightmapFollower` is a `[WrapAsJob]` Burst job that resolves the pointer via `NativeWorldAccessor.SharedPtrResolver` and reads the heights inline. Simplest seed path: `NativeSharedPtr.Alloc(in value)` does a memcpy of the built blob into the heap slot. Capped at 256 cells by the inline storage.
+- **`NativeSharedPtrInline`** — `NativeHeightmapData` is an unmanaged struct with the height grid inline (`FixedArray256<float>`), behind a `NativeSharedPtr<NativeHeightmapData>` component. `NativeHeightmapFollower` is a `[WrapAsJob]` Burst job that resolves the pointer via `NativeWorldAccessor.SharedPtrResolver` and reads the heights inline. Simplest seed path: the registered descriptor builder returns the struct by value, and on a cache miss it's memcpy'd into a fresh heap slot. Capped at 256 cells by the inline storage.
 
-- **`NativeSharedPtrTakingOwnership`** — `NativeHeightmapDataLarge` is a small header struct (descriptor) with a `BlobArray<float> Heights` field whose data lives in the same allocation via relative offsets. Seeded via [`BlobBuilder`](../experimental/blob-builder.md) + `NativeSharedPtr.AllocTakingOwnership`: the builder reserves space for the root and heights together, fills the heights into its working buffer, then memcpys the buffer into a single persistent heap allocation that the heap takes ownership of. Saves the stack-to-field copy the inline flavor pays, and has no inline cap; same Burst-job read path as the inline variant.
+- **`NativeSharedPtrTakingOwnership`** — `NativeHeightmapDataLarge` is a small header struct (descriptor) with a `BlobArray<float> Heights` field whose data lives in the same allocation via relative offsets. The registered builder returns a [`BlobBuilder`](../experimental/blob-builder.md)-laid-out `NativeBlobAllocation` the heap takes ownership of: it reserves space for the root and heights together, fills the heights into its working buffer, then hands over a single persistent allocation. Saves the stack-to-field copy the inline flavor pays, and has no inline cap; same Burst-job read path as the inline variant.
 
 - **`ManagedSharedPtrInterface`** — `MutableHeightmapData` is a mutable managed class (public fields, populated via an object initializer rather than a constructor), exposed to entity-side callers through the `[Immutable]` `IReadOnlyHeightmapData` interface. The `SharedPtr<IReadOnlyHeightmapData>` handle is the same 12-byte shape as `ManagedSharedPtr`; only the type parameter differs. `InterfaceHeightmapFollower` reads through the interface on the main thread — the underlying concrete's mutable surface is unreachable from there without an explicit downcast. See [Shared Heap Data](../experimental/shared-heap-data.md) for when to pick the class route vs the interface route.
 
@@ -30,7 +30,7 @@ In all four flavors, every character entity holds its own small handle (12 bytes
 |---|---|---|
 | **Size cap** | ≤ 256 cells (`FixedArray256<float>`) | unbounded |
 | **Seed copies** | one stack-to-field copy into the local blob, then one memcpy into the heap | one memcpy from builder chunks into the heap (the stack-to-field hop is gone) |
-| **Seed-site code** | `BuildNativeHeightsInline(...)` + `Alloc(in blob)` | `using (var builder = new BlobBuilder(...))` → `Allocate(in root.Heights, cells)` → `Build<T>(world, blobId)` |
+| **Seed-site code** | builder returns the struct: `d => BuildNativeHeightsInline(d)` | builder returns a `NativeBlobAllocation`: `BlobBuilder` → `Allocate(in root.Heights, cells)` → `BuildNativeBlobAllocation()` |
 | **Read site** | identical (Burst job over `NativeSharedPtr<T>`) | identical (Burst job over `NativeSharedPtr<T>`) |
 
 Pick `Inline` when the blob comfortably fits in `FixedArray256<T>` and the simpler seed code wins. Pick `TakingOwnership` when the blob exceeds that cap, or when the one-time seed-side copy is genuinely on a hot path (rare — the seed runs once per unique descriptor, since the `BlobId` cache absorbs repeat builds).
@@ -51,7 +51,7 @@ For rollback netcode, replay recording, or any system that snapshots state, the 
 
 Snapshot cost per pointer is **constant regardless of payload size**. A 1 MB heightmap referenced by 1000 entities costs 1000 `BlobId`s in each snapshot — not 1000 × 1 MB. Inline storage of the same blob would scale rollback memory with `payload_size × entity_count × ring_buffer_depth`, which gets prohibitive once payloads grow.
 
-On restore, the heap must already contain a blob under the captured `BlobId`. The seeder pattern handles this: a long-lived holder (here, `SceneInitializer`) keeps the blob alive across the rollback window so entity-side handles always resolve. See [Shared Heap Data](../experimental/shared-heap-data.md#the-seeder).
+On restore, the heap must already contain a blob under the captured `BlobId`. The seeder pattern handles this: a long-lived holder (here, `SceneInitializer`) keeps the blob alive across the rollback window so entity-side handles always resolve. See [Shared Heap Data](../experimental/shared-heap-data.md#seeding).
 
 ## The content-recipe pattern
 
@@ -68,62 +68,67 @@ public readonly partial struct HeightmapDescriptor
 }
 ```
 
-Register a `BlitSerializer<HeightmapDescriptor>` so `UniqueHashGenerator` can serialize the descriptor to bytes:
+Register a `BlitSerializer<HeightmapDescriptor>` so the descriptor can be hashed to a content-derived `BlobId`:
 
 ```csharp
 var worldBuilder = new WorldBuilder()
     .RegisterSerializer(new BlitSerializer<HeightmapDescriptor>());
 ```
 
-At init time, hash the descriptor → `BlobId`, then probe the cache before doing the expensive build:
+Then **register a builder once per descriptor type and acquire straight from a descriptor value**. `Acquire<TDesc, T>` hashes the descriptor, deduplicates against the cache, and runs the builder only on a miss — same recipe ⇒ same hash ⇒ same `BlobId` ⇒ same cached blob. The builder must rebuild the same data purely from its descriptor, because the cache may evict the blob and re-run it later:
 
 ```csharp
-var blobId = new BlobId(_hashGenerator.Generate(descriptor));
-
-_managedAnchor = SharedPtr.GetOrAlloc(
+// Setup — one builder per descriptor type.
+SharedAnchor.Register<HeightmapDescriptor, HeightmapData>(
     world,
-    blobId,
-    () => new HeightmapData(
-        descriptor,
-        HeightmapBuilder.BuildManagedHeights(descriptor)));
+    d => new HeightmapData(d, HeightmapBuilder.BuildManagedHeights(d)));
+
+// Pin by descriptor through an anchor — builds on a miss, dedups on a hit.
+_managedAnchor = SharedAnchor.Acquire<HeightmapDescriptor, HeightmapData>(world, descriptor);
 ```
 
-`SharedPtr.GetOrAlloc` runs the factory only when the cache misses — same recipe ⇒ same hash ⇒ same `BlobId` ⇒ same cached blob.
-
-The inline native flavor follows the same shape with `NativeSharedPtr.TryGet` then `NativeSharedPtr.Alloc`:
+The inline native flavor is the same shape — register a builder that returns the unmanaged struct by value, acquire by descriptor. On a miss the returned struct is copied into a fresh heap slot:
 
 ```csharp
-if (!NativeSharedPtr.TryGet(world, blobId, out _nativeAnchor))
-{
-    var blob = HeightmapBuilder.BuildNativeHeightsInline(descriptor);
-    _nativeAnchor = NativeSharedPtr.Alloc(world, blobId, in blob);
-}
+NativeSharedAnchor.Register<HeightmapDescriptor, NativeHeightmapData>(
+    world,
+    d => HeightmapBuilder.BuildNativeHeightsInline(d));
+
+_nativeAnchor = NativeSharedAnchor.Acquire<HeightmapDescriptor, NativeHeightmapData>(world, descriptor);
 ```
 
-The taking-ownership flavor uses [`BlobBuilder`](../experimental/blob-builder.md) to lay out the root struct and heights as a single contiguous allocation, with `Heights`'s `BlobArray<float>` offset patched at finalize time:
+The taking-ownership flavor registers a builder that returns a `NativeBlobAllocation` — laid out by [`BlobBuilder`](../experimental/blob-builder.md) as a single contiguous allocation the heap takes ownership of — for blobs larger than the inline cap:
 
 ```csharp
-if (!NativeSharedPtr.TryGet(world, blobId, out _nativeLargeAnchor))
+NativeSharedAnchor.Register<HeightmapDescriptor, NativeHeightmapDataLarge>(
+    world,
+    BuildLargeHeightmapAllocation);
+
+_nativeLargeAnchor =
+    NativeSharedAnchor.Acquire<HeightmapDescriptor, NativeHeightmapDataLarge>(world, descriptor);
+
+static NativeBlobAllocation BuildLargeHeightmapAllocation(HeightmapDescriptor descriptor)
 {
     var cells = descriptor.Resolution * descriptor.Resolution;
-    using (var builder = new BlobBuilder(Allocator.Temp))
-    {
-        ref var root = ref builder.ConstructRoot<NativeHeightmapDataLarge>();
-        root.Descriptor = descriptor;
 
-        var heights = builder.Allocate(in root.Heights, cells);
-        // Fill the heights directly into the builder's reserved region
-        for (int z = 0; z < descriptor.Resolution; z++)
-            for (int x = 0; x < descriptor.Resolution; x++)
-                heights[z * descriptor.Resolution + x] =
-                    HeightmapBuilder.SampleNoise(x, z, descriptor);
+    using var builder = new BlobBuilder(Allocator.Temp);
+    ref var root = ref builder.ConstructRoot<NativeHeightmapDataLarge>();
+    root.Descriptor = descriptor;
 
-        _nativeLargeAnchor = builder.Build<NativeHeightmapDataLarge>(world, blobId);
-    }
+    var heights = builder.Allocate(in root.Heights, cells);
+    // Fill the heights directly into the builder's reserved region.
+    for (int z = 0; z < descriptor.Resolution; z++)
+        for (int x = 0; x < descriptor.Resolution; x++)
+            heights[z * descriptor.Resolution + x] =
+                HeightmapBuilder.SampleNoise(x, z, descriptor);
+
+    return builder.BuildNativeBlobAllocation();
 }
 ```
 
-`BlobBuilder.Build` allocates a fresh `Allocator.Persistent` buffer, copies the working chunks into it with the `Heights` offset resolved, and hands it to `NativeSharedPtr.AllocTakingOwnership`. The heap frees the buffer through `AllocatorManager.Free` when the refcount hits zero. See [BlobBuilder](../experimental/blob-builder.md) for the full story on the relative-offset layout and what makes the blob relocatable.
+The seeder holds these `SharedAnchor` / `NativeSharedAnchor` handles for the scene's lifetime to keep the blob resident; each character entity then acquires its own ECS-refcounted handle to the same blob by the anchor's id — `SharedPtr.Acquire<T>(world, anchor.BlobId)` (or the `NativeSharedPtr` equivalent).
+
+Routing every flavor through a *registered descriptor builder* — rather than an eager one-shot allocation — is what lets the blob re-derive from its descriptor after an eviction, automatically and identically across all four flavors. See [BlobBuilder](../experimental/blob-builder.md) for the relative-offset layout that makes the large blob relocatable.
 
 ## Sampling in a Burst job
 
@@ -155,13 +160,13 @@ For "I know up front this is `Warm` and that one is `Cool`", use hand-authored `
 
 ## Cleanup discipline
 
-Same as Sample 14: the scene initializer holds the seeder anchor (`SharedPtr` / `NativeSharedPtr`) as a member and disposes it explicitly. Entity-owned handles aren't disposed in this sample because no entities are removed during play; if you adapt the pattern to entities that come and go, register an `OnRemoved` observer to dispose each entity's handle as in [Sample 10](10-dynamic-collections.md).
+Same as Sample 14: the scene initializer holds the seeder anchor (`SharedAnchor` / `NativeSharedAnchor`) as a member and disposes it explicitly. Entity-owned handles aren't disposed in this sample because no entities are removed during play; if you adapt the pattern to entities that come and go, register an `OnRemoved` observer to dispose each entity's handle as in [Sample 10](10-dynamic-collections.md).
 
 ## Concepts introduced
 
-- **Content-derived `BlobId`** — hash the inputs that determine the blob's content via `UniqueHashGenerator.Generate(descriptor)` and feed the result into `new BlobId(hash)`
-- **`SharedPtr.GetOrAlloc(world, id, factory)`** — cache-miss-only factory invocation; same recipe ⇒ skip the rebuild
+- **Content-derived `BlobId`** — `Acquire<TDesc, T>(world, descriptor)` hashes the descriptor to the id internally; you never pick it by hand
+- **`Register<TDesc, T>` + `Acquire<TDesc, T>`** — register a per-descriptor builder once, then acquire by descriptor; the build runs only on a cache miss and re-runs identically after an eviction
 - **`NativeSharedPtr` + `[WrapAsJob]`** — Burst-job sampling of an unmanaged shared blob via `NativeWorldAccessor`
-- **`BlobBuilder` + `BlobArray<T>`** — relocatable single-allocation blob layout via relative offsets; seed-site `using` block with no `unsafe` code. See [BlobBuilder](../experimental/blob-builder.md).
-- **`BlitSerializer<T>` + `UniqueHashGenerator`** — the bytes-to-hash pipeline for any blittable typed input
+- **`BlobBuilder` + `BlobArray<T>`** — relocatable single-allocation blob layout via relative offsets; the builder returns a `NativeBlobAllocation` with no `unsafe` code. See [BlobBuilder](../experimental/blob-builder.md).
+- **`BlitSerializer<T>`** — registered so the descriptor can be hashed to its content-derived id
 - **Off-snapshot storage** — immutable shared blobs sit outside the per-frame snapshot path; only the `BlobId` round-trips on snapshot / rollback

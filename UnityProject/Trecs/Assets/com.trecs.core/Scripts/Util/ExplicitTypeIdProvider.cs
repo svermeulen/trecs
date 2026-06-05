@@ -16,7 +16,7 @@ using Trecs.Internal;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static class ExplicitTypeIdProvider
+    internal static class ExplicitTypeIdProvider
     {
         static readonly Dictionary<Type, int> _cache = new();
 
@@ -123,6 +123,15 @@ namespace Trecs.Internal
         public static void Register(Type type, int id)
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
+
+            // 0 is reserved for TypeId.Null. Reject an explicitly-pinned (or composite-
+            // generic) id of 0 at the single registration sink, so both FromType and
+            // TypeId<T> surface it loudly rather than aliasing the type onto the null id.
+            TrecsAssert.That(
+                id != 0,
+                "Explicit TypeId for {0} is 0, which is reserved for TypeId.Null; choose a non-zero id.",
+                type
+            );
 
             if (_cache.TryGetValue(type, out var existingId))
             {

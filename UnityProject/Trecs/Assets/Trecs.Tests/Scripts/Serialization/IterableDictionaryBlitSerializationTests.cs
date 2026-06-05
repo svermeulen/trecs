@@ -10,19 +10,15 @@ namespace Trecs.Tests
     public class IterableDictionaryBlitSerializationTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
@@ -33,10 +29,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserialized = _cacheHelper.ReadAll<IterableDictionary<int, float>>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var deserialized = _helper.ReadAll<IterableDictionary<int, float>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);
@@ -56,10 +56,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserialized = _cacheHelper.ReadAll<IterableDictionary<int, float>>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var deserialized = _helper.ReadAll<IterableDictionary<int, float>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);
@@ -90,10 +94,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserialized = _cacheHelper.ReadAll<IterableDictionary<int, Vector3>>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var deserialized = _helper.ReadAll<IterableDictionary<int, Vector3>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);
@@ -120,10 +128,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserialized = _cacheHelper.ReadAll<IterableDictionary<int2, float3>>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var deserialized = _helper.ReadAll<IterableDictionary<int2, float3>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);
@@ -152,10 +164,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserialized = _cacheHelper.ReadAll<IterableDictionary<int, int>>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var deserialized = _helper.ReadAll<IterableDictionary<int, int>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);
@@ -186,10 +202,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserialized = _cacheHelper.ReadAll<IterableDictionary<int, int>>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var deserialized = _helper.ReadAll<IterableDictionary<int, int>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);
@@ -207,15 +227,19 @@ namespace Trecs.Tests
             original.Add(3, 300);
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
 
             // Create a pre-existing empty dictionary
             var deserialized = new IterableDictionary<int, int>();
 
             // Act
-            _cacheHelper.ReadAll(ref deserialized);
+            _helper.ReadAll(_data, ref deserialized);
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserialized);

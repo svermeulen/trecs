@@ -18,7 +18,7 @@ namespace Trecs.Tests
             var sub = a.Events.OnSubmissionCompleted(() => callCount++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.Greater(callCount, 0, "SubmissionCompleted should fire on Submit");
             sub.Dispose();
@@ -34,11 +34,11 @@ namespace Trecs.Tests
             var sub = a.Events.OnSubmissionCompleted(() => callCount++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             int afterFirst = callCount;
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.Greater(callCount, afterFirst, "Should fire on each submit");
             sub.Dispose();
@@ -58,13 +58,13 @@ namespace Trecs.Tests
             var sub = a.Events.OnSubmissionCompleted(() => callCount++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, callCount);
 
             sub.Dispose();
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, callCount, "Should not fire after dispose");
         }
 
@@ -84,7 +84,7 @@ namespace Trecs.Tests
             var sub2 = a.Events.OnSubmissionCompleted(() => count2++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, count1);
             NAssert.AreEqual(1, count2);

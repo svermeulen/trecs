@@ -6,29 +6,10 @@ namespace Trecs
     public static class BlobIdGenerator
     {
         /// <summary>
-        /// Build a <see cref="BlobId"/> directly from a long-valued domain key
-        /// (level id, prefab id, etc.). Caller is responsible for namespacing —
-        /// two unrelated subsystems that pick the same long will collide.
-        /// Zero is reserved for <see cref="Null"/>; passing it throws.
-        /// </summary>
-        public static BlobId FromKey(long key)
-        {
-            if (key == 0)
-            {
-                throw new ArgumentException(
-                    "BlobIdGenerator.FromKey(0) is reserved for BlobId.Null",
-                    nameof(key)
-                );
-            }
-            return new BlobId(key);
-        }
-
-        /// <summary>
-        /// Build a <see cref="BlobId"/> as the xxHash64 of raw bytes. Use this for
-        /// true content-addressable lookup over already-serialized data. For typed
-        /// values, hash the value via <c>UniqueHashGenerator</c> in
-        /// <c>Trecs</c> and pass the result through <see cref="FromKey"/>
-        /// or this method. Empty input throws.
+        /// Build a <see cref="BlobId"/> as the xxHash64 of raw bytes. Use this for true
+        /// content-addressable lookup over already-serialized data. For typed values, prefer
+        /// <see cref="FromContent{T}(WorldAccessor, in T)"/>, which serializes and hashes for you.
+        /// Empty input throws.
         /// </summary>
         public static unsafe BlobId FromBytes(ReadOnlySpan<byte> bytes)
         {
@@ -50,6 +31,31 @@ namespace Trecs
                 }
                 return new BlobId(h);
             }
+        }
+
+        /// <summary>
+        /// Build a content-addressed <see cref="BlobId"/> from a typed <paramref name="value"/> by
+        /// serializing it (with <paramref name="world"/>'s serializer registry) and hashing the bytes.
+        /// Equal values produce the same id, so this is the way to derive a stable, dedup-friendly id
+        /// for content you compute on the fly: hash the value, check residency, and on a miss build it
+        /// and store under the id via <c>Alloc(world, id, ...)</c>. <typeparamref name="T"/> must be
+        /// registered for serialization; main-thread only.
+        /// </summary>
+        public static BlobId FromContent<T>(WorldAccessor world, in T value)
+        {
+            return world.BlobFactory.DeriveContentId(in value);
+        }
+
+        /// <summary>
+        /// Build a content-addressed <see cref="BlobId"/> from a typed <paramref name="value"/> using an
+        /// explicit <paramref name="hashGenerator"/> — for callers that hash against a serializer
+        /// registry but have no <see cref="WorldAccessor"/> (e.g. disk memoization keyed off a
+        /// descriptor). Equal values produce the same id. <typeparamref name="T"/> must be registered
+        /// for serialization; main-thread only.
+        /// </summary>
+        public static BlobId FromContent<T>(UniqueHashGenerator hashGenerator, in T value)
+        {
+            return new BlobId(hashGenerator.Generate(in value));
         }
     }
 }

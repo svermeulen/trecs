@@ -335,6 +335,51 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void AutoGrow_WithScatteredKeys_KeepsAllEntriesReachable()
+        {
+            // Regression: AddValue computed the bucket index *before* AppendEntry, which
+            // can grow the table and rebuild every bucket chain under a new BucketCount /
+            // FastModMultiplier. Writing the new bucket head with the stale index both
+            // orphaned the just-added entry (lookups would never find it) and clobbered an
+            // unrelated bucket. Sequential small keys hide it because Reduce returns the
+            // key directly when key < BucketCount; scattered large keys whose hash exceeds
+            // the bucket count expose it. We verify every inserted key is still retrievable
+            // immediately after each insert — a later rebuild can heal the corruption, so a
+            // check only at the end would miss it.
+            var cs = CreateChunkStore();
+            var dict = TrecsDictionary.Alloc<int, int>(cs, 4);
+            var w = dict.Write(cs);
+
+            const int count = 256;
+            var keys = new int[count];
+            for (int i = 0; i < count; i++)
+                keys[i] = unchecked((int)((uint)(i + 1) * 2654435761u));
+
+            for (int i = 0; i < count; i++)
+            {
+                w.Add(keys[i], i);
+
+                for (int j = 0; j <= i; j++)
+                {
+                    NAssert.IsTrue(
+                        w.TryGetValue(keys[j], out var v),
+                        $"Key index {j} became unreachable after inserting index {i}"
+                    );
+                    NAssert.AreEqual(
+                        j,
+                        v,
+                        $"Wrong value for key index {j} after inserting index {i}"
+                    );
+                }
+            }
+
+            NAssert.AreEqual(count, w.Count);
+
+            dict.Dispose(cs);
+            cs.Dispose();
+        }
+
+        [Test]
         public void EnsureCapacity_ThenWriteFromNative_Works()
         {
             var cs = CreateChunkStore();
@@ -429,6 +474,116 @@ namespace Trecs.Tests
                 count++;
             }
             NAssert.AreEqual(3, count);
+
+            dict.Dispose(cs);
+            cs.Dispose();
+        }
+
+        [Test]
+        public void Foreach_Read_SiblingMutation_Throws()
+        {
+            var cs = CreateChunkStore();
+            var dict = TrecsDictionary.Alloc<int, float>(cs, 8);
+            var w = dict.Write(cs);
+            w.Add(100, 1.0f);
+            w.Add(200, 2.0f);
+            w.Add(300, 3.0f);
+
+            var read = dict.Read(cs);
+
+            // Mutating through a sibling wrapper mid-iteration must be detected on
+            // the next MoveNext rather than silently reading stale/corrupt state.
+            bool threw = false;
+            try
+            {
+                int seen = 0;
+                foreach (var (key, value) in read)
+                {
+                    seen++;
+                    if (seen == 1)
+                    {
+                        var w2 = dict.Write(cs);
+                        w2.Add(400, 4.0f);
+                    }
+                }
+            }
+            catch (TrecsException)
+            {
+                threw = true;
+            }
+            NAssert.IsTrue(threw, "Read enumerator should detect sibling mutation");
+
+            dict.Dispose(cs);
+            cs.Dispose();
+        }
+
+        [Test]
+        public void Foreach_Write_SelfMutation_Throws()
+        {
+            var cs = CreateChunkStore();
+            var dict = TrecsDictionary.Alloc<int, float>(cs, 8);
+            var w = dict.Write(cs);
+            w.Add(100, 1.0f);
+            w.Add(200, 2.0f);
+            w.Add(300, 3.0f);
+
+            // Mutating through the *same* write wrapper mid-iteration changes the
+            // live Count; the captured-count guard catches it even though this
+            // wrapper resyncs its own version on each mutation.
+            bool threw = false;
+            try
+            {
+                int seen = 0;
+                foreach (var (key, value) in w)
+                {
+                    seen++;
+                    if (seen == 1)
+                    {
+                        w.Add(400, 4.0f);
+                    }
+                }
+            }
+            catch (TrecsException)
+            {
+                threw = true;
+            }
+            NAssert.IsTrue(threw, "Write enumerator should detect self mutation");
+
+            dict.Dispose(cs);
+            cs.Dispose();
+        }
+
+        [Test]
+        public void Foreach_Keys_SiblingMutation_Throws()
+        {
+            var cs = CreateChunkStore();
+            var dict = TrecsDictionary.Alloc<int, float>(cs, 8);
+            var w = dict.Write(cs);
+            w.Add(5, 1.0f);
+            w.Add(10, 2.0f);
+            w.Add(15, 3.0f);
+
+            var read = dict.Read(cs);
+
+            bool threw = false;
+            try
+            {
+                int seen = 0;
+                foreach (var key in read.Keys)
+                {
+                    seen++;
+                    if (seen == 1)
+                    {
+                        var w2 = dict.Write(cs);
+                        w2.Remove(15);
+                    }
+                }
+            }
+            catch (TrecsException)
+            {
+                threw = true;
+            }
+            NAssert.IsTrue(threw, "Keys enumerator should detect sibling mutation");
 
             dict.Dispose(cs);
             cs.Dispose();

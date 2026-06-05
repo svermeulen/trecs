@@ -164,25 +164,25 @@ namespace Trecs
         //
         // The XOR matches what
         // <see cref="Trecs.Internal.TypeIdSetRegistry"/> produces for the
-        // same inputs (XOR with the same `id == 0 → 1` normalization), so
-        // the result is a valid intern-table key as long as the world's
-        // managed init has registered each tag — true by construction
-        // during world construction.
+        // same inputs — the registry never remaps, so a set's id is exactly
+        // the XOR of its members — so the result is a valid intern-table key
+        // as long as the world's managed init has registered each tag (true by
+        // construction during world construction). A 0 result would mean a
+        // non-empty set whose members XOR to 0, which the registry rejects at
+        // registration, so no such group exists and the lookup simply misses.
         //
-        // Caller contract: the type arguments must be distinct ITag types.
-        // Duplicates would XOR-cancel and yield a different id than the
-        // managed-side dedup path produces. Asserted in DEBUG.
+        // Caller contract: the type arguments must be distinct ITag types — a
+        // duplicate is a caller error, asserted in DEBUG. As a release-safe
+        // fallback the XOR is deduped (see XorDistinct) so a duplicate that
+        // escapes the assert still yields the same id the managed registry path
+        // produces (the deduped set) rather than an XOR-cancelled, divergent id.
 
         public static TagSet BurstableFromTags<T1>()
             where T1 : struct, ITag
         {
-            int id = TypeId<T1>.Value.Value;
-            // TypeId values come from BurstRuntime.GetHashCode32 normalized to
-            // non-zero at TypeId construction, so id is guaranteed non-zero
-            // here. Re-asserting matches TypeIdSetRegistry.FromSingle exactly.
-            if (id == 0)
-                id = 1;
-            return new TagSet(id);
+            // TypeId values are normalized non-zero at construction, so a singleton id
+            // is never 0 and matches TypeIdSetRegistry.FromSingle exactly.
+            return new TagSet(TypeId<T1>.Value.Value);
         }
 
         public static TagSet BurstableFromTags<T1, T2>()
@@ -195,10 +195,7 @@ namespace Trecs
                 id1 != id2,
                 "BurstableFromTags called with duplicate tag types — XOR would cancel and produce an incorrect TagSet id"
             );
-            int id = id1 ^ id2;
-            if (id == 0)
-                id = 1;
-            return new TagSet(id);
+            return new TagSet(XorDistinct(id1, id2));
         }
 
         public static TagSet BurstableFromTags<T1, T2, T3>()
@@ -213,10 +210,7 @@ namespace Trecs
                 id1 != id2 && id1 != id3 && id2 != id3,
                 "BurstableFromTags called with duplicate tag types — XOR would cancel and produce an incorrect TagSet id"
             );
-            int id = id1 ^ id2 ^ id3;
-            if (id == 0)
-                id = 1;
-            return new TagSet(id);
+            return new TagSet(XorDistinct(id1, id2, id3));
         }
 
         public static TagSet BurstableFromTags<T1, T2, T3, T4>()
@@ -233,10 +227,43 @@ namespace Trecs
                 id1 != id2 && id1 != id3 && id1 != id4 && id2 != id3 && id2 != id4 && id3 != id4,
                 "BurstableFromTags called with duplicate tag types — XOR would cancel and produce an incorrect TagSet id"
             );
-            int id = id1 ^ id2 ^ id3 ^ id4;
-            if (id == 0)
-                id = 1;
-            return new TagSet(id);
+            return new TagSet(XorDistinct(id1, id2, id3, id4));
+        }
+
+        // Dedup-XOR of tag ids: XOR only the distinct values. Mirrors the managed
+        // TypeIdSetRegistry dedup so a duplicate type argument (a caller error guarded by
+        // the asserts above) still produces the registry-consistent id in release builds
+        // instead of an XOR-cancelled, divergent one. Burst constant-folds these when the
+        // ids are compile-time constants (the normal, all-distinct case), so there is no
+        // runtime branch cost.
+        internal static int XorDistinct(int a, int b)
+        {
+            int id = a;
+            if (b != a)
+                id ^= b;
+            return id;
+        }
+
+        internal static int XorDistinct(int a, int b, int c)
+        {
+            int id = a;
+            if (b != a)
+                id ^= b;
+            if (c != a && c != b)
+                id ^= c;
+            return id;
+        }
+
+        internal static int XorDistinct(int a, int b, int c, int d)
+        {
+            int id = a;
+            if (b != a)
+                id ^= b;
+            if (c != a && c != b)
+                id ^= c;
+            if (d != a && d != b && d != c)
+                id ^= d;
+            return id;
         }
     }
 

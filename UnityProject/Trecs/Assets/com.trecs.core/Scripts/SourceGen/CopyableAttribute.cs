@@ -9,7 +9,7 @@ namespace Trecs
     /// <remarks>
     /// <para>
     /// All <c>IEntityComponent</c> structs are treated as non-copyable by default
-    /// (enforced by <c>NonCopyableAnalyzer</c> — TRECS118 / TRECS119), reflecting
+    /// (enforced by <c>NonCopyableAnalyzer</c> — TRECS118 / TRECS131), reflecting
     /// the framework's invariant that components live in component buffers and are
     /// accessed by reference (via aspect properties, <c>NativeComponentLookup</c>
     /// indexers, etc.). Apply this attribute to small flat components — typed

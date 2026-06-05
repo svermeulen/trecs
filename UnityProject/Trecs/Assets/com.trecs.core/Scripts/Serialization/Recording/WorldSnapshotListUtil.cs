@@ -19,8 +19,8 @@ namespace Trecs.Internal
         /// preserving frame-ascending order. If the list already contains an
         /// entry at the same <see cref="WorldSnapshot.FixedFrame"/>, that
         /// entry is replaced in place (callers are responsible for any
-        /// cleanup of the displaced payload — see
-        /// <see cref="SnapshotSerializer.ReturnPayloadBuffer"/>).
+        /// cleanup of the displaced snapshot — releasing its pins and
+        /// despawning any retained data).
         /// </summary>
         public static void InsertOrReplaceByFrame(List<WorldSnapshot> list, WorldSnapshot entry)
         {
@@ -57,6 +57,31 @@ namespace Trecs.Internal
                 copy.Add(frame, checksum);
             }
             return copy;
+        }
+
+        /// <summary>
+        /// Return a snapshot whose payload is a contiguous <see cref="WorldSnapshot.Payload"/>,
+        /// materializing a <see cref="WorldSnapshot.RetainedData"/>-backed one into fresh bytes.
+        /// Used when handing live retained snapshots to a <see cref="RecordingBundle"/> for
+        /// saving — the bundle wire format embeds contiguous payloads. Cold path (save only);
+        /// the allocation is acceptable there. Snapshots already backed by
+        /// <see cref="WorldSnapshot.Payload"/> are returned unchanged.
+        /// </summary>
+        public static WorldSnapshot WithContiguousPayload(WorldSnapshot snapshot)
+        {
+            if (snapshot.RetainedData == null)
+            {
+                return snapshot;
+            }
+            var bytes = new byte[snapshot.RetainedData.ContiguousSize];
+            snapshot.RetainedData.CopyContiguousTo(bytes);
+            return new WorldSnapshot
+            {
+                FixedFrame = snapshot.FixedFrame,
+                Kind = snapshot.Kind,
+                Label = snapshot.Label,
+                Payload = bytes,
+            };
         }
     }
 }

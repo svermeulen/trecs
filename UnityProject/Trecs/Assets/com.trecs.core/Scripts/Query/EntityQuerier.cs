@@ -13,7 +13,7 @@ namespace Trecs.Internal
         readonly ComponentStore _componentStore;
         readonly SetStore _setStore;
 
-        internal EntityHandleMap _entityLocator;
+        internal readonly EntityHandleMap _entityLocator;
 
         // During OnRemoved callbacks, removed entities sit in the tail of each
         // group's component arrays at indices [newCount, originalCount). Normal
@@ -23,7 +23,7 @@ namespace Trecs.Internal
         // (EntityIndex.Component<T>) succeed for removed entities during the
         // callback window. Liveness checks (Exists, EntityIndexExists) are
         // intentionally unchanged. Zero means "no extension active".
-        int[] _removalExtendedCounts;
+        readonly int[] _removalExtendedCounts;
 
         internal EntityQuerier(
             TrecsLog log,
@@ -32,7 +32,7 @@ namespace Trecs.Internal
             int groupCount
         )
         {
-            _entityLocator.InitEntityHandleMap(groupCount);
+            _entityLocator = new EntityHandleMap(groupCount);
             _removalExtendedCounts = new int[groupCount];
 
             _log = log;
@@ -64,12 +64,6 @@ namespace Trecs.Internal
         public EntityIndex GetEntityIndex(EntityHandle entityHandle)
         {
             return _entityLocator.GetEntityIndex(entityHandle);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal EntityHandleMap GetEntityHandleMap()
-        {
-            return _entityLocator;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -117,9 +111,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool EntityIndexExists(EntityIndex entityIndex)
         {
-            var componentMap = _componentStore.GroupEntityComponentsDB[
-                entityIndex.GroupIndex.Index
-            ];
+            var componentMap = _componentStore.GetDBGroup(entityIndex.GroupIndex);
 
             foreach (var (_, componentArray) in componentMap)
             {
@@ -132,11 +124,11 @@ namespace Trecs.Internal
         public int CountEntitiesInGroup(GroupIndex group)
         {
             TrecsDebugAssert.That(
-                !group.IsNull && group.Index < _componentStore.GroupEntityComponentsDB.Length,
+                !group.IsNull && group.Index < _componentStore.GroupCount,
                 "Attempted to get count for unrecognized group {0}",
                 group
             );
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
+            var entitiesInGroupPerType = _componentStore.GetDBGroup(group);
 
             // Zero-component templates (e.g. tag/filter-only) have no
             // component arrays, so we can't sample from one. They also can't
@@ -146,24 +138,20 @@ namespace Trecs.Internal
                 return 0;
             }
 
-            int? count = null;
+            // All component arrays in a group are parallel arrays with the same
+            // count, so sampling the first is enough. Direct indexed access
+            // (no enumerator, no nullable) — this runs per group per query
+            // iteration.
+            int count = entitiesInGroupPerType.UnsafeValues[0].Count;
 
-            foreach (var (key, value) in entitiesInGroupPerType)
+#if DEBUG
+            foreach (var (_, value) in entitiesInGroupPerType)
             {
-                if (count == null)
-                {
-                    count = value.Count;
-#if !DEBUG
-                    break;
-#endif
-                }
-                else
-                {
-                    TrecsDebugAssert.IsEqual(count, value.Count);
-                }
+                TrecsDebugAssert.IsEqual(count, value.Count);
             }
+#endif
 
-            return count.Value;
+            return count;
         }
 
         // ── Native query methods ────────────────────────────────────────
@@ -345,13 +333,6 @@ namespace Trecs.Internal
             count = writeIdx;
         }
 
-        // ── Sets ────────────────────────────────────────────────────────
-
-        public TrecsSets GetSets()
-        {
-            return _setStore.GetTrecsSets();
-        }
-
         // ── Internal helpers ────────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -379,7 +360,7 @@ namespace Trecs.Internal
         )
             where T : unmanaged, IEntityComponent
         {
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
+            var entitiesInGroupPerType = _componentStore.GetDBGroup(group);
 
             if (!entitiesInGroupPerType.TryGetValue(TypeId<T>.Value, out var safeDictionary))
             {
@@ -394,7 +375,7 @@ namespace Trecs.Internal
         internal NativeBuffer<T> QuerySingleBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
+            var entitiesInGroupPerType = _componentStore.GetDBGroup(group);
 
             if (!SafeQueryEntityDictionary<T>(entitiesInGroupPerType, out var typeSafeDictionary))
                 return default;
@@ -405,7 +386,7 @@ namespace Trecs.Internal
         internal (NativeBuffer<T> buffer, int count) QuerySingleBufferWithCount<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
+            var entitiesInGroupPerType = _componentStore.GetDBGroup(group);
 
             if (!SafeQueryEntityDictionary<T>(entitiesInGroupPerType, out var typeSafeDictionary))
                 return (default, 0);
@@ -453,42 +434,6 @@ namespace Trecs.Internal
             buffer = (safeDictionary as IComponentArray<T>).GetValues(out _);
 
             return true;
-        }
-
-        bool GroupHasAllComponents(GroupIndex group, TypeId[] componentIds)
-        {
-            var componentMap = _componentStore.GroupEntityComponentsDB[group.Index];
-            for (int i = 0; i < componentIds.Length; i++)
-            {
-                if (!componentMap.TryGetValue(componentIds[i], out var arr) || arr.Count == 0)
-                    return false;
-            }
-            return true;
-        }
-
-        IComponentArray GetComponentArrayUntyped(GroupIndex group, TypeId componentId)
-        {
-            var componentMap = _componentStore.GroupEntityComponentsDB[group.Index];
-            if (!componentMap.TryGetValue(componentId, out var arr))
-                return null;
-            return arr;
-        }
-
-        // ── Nested types ────────────────────────────────────────────────
-
-        /// <summary>
-        /// Provides read-only access to the set store for set lookups.
-        /// </summary>
-        public readonly struct TrecsSets
-        {
-            internal TrecsSets(NativeHashMap<SetId, EntitySetStorage> entitySets)
-            {
-                _entitySets = entitySets;
-            }
-
-            internal NativeHashMap<SetId, EntitySetStorage> EntitySets => _entitySets;
-
-            readonly NativeHashMap<SetId, EntitySetStorage> _entitySets;
         }
     }
 }

@@ -79,7 +79,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var blob = new List<string> { "shared" };
-            var ptr = SharedPtr.Alloc(a, BlobIdGenerator.FromKey(1), blob);
+            var ptr = BlobTestUtil.AllocShared(a, new BlobId(1), blob);
 
             NAssert.IsFalse(ptr.IsNull);
 
@@ -96,7 +96,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var blob = new List<string> { "cloneable" };
-            var ptr = SharedPtr.Alloc(a, BlobIdGenerator.FromKey(1), blob);
+            var ptr = BlobTestUtil.AllocShared(a, new BlobId(1), blob);
             var clone = ptr.Clone(a);
 
             NAssert.IsFalse(clone.IsNull);

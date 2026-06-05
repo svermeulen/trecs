@@ -61,7 +61,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 |---|---|
 | **[Submission](entity-management/structural-changes.md)** | The point in the frame where queued structural ops are applied. Add / remove / partition transitions are deferred until submission. |
 | **[Heap](experimental/pointers.md)** | Storage for managed or unmanaged data outside the component buffer, accessed via `SharedPtr` / `UniquePtr` / native variants. |
-| **[BlobId](experimental/shared-heap-data.md#pattern-b-look-up-by-stable-blobid)** | Stable identifier for a heap blob. Supplied explicitly when allocating shared data on heap. |
+| **[BlobId](experimental/shared-heap-data.md#choosing-blobid-values)** | Stable identifier for a shared heap blob. Chosen explicitly for named blobs, or derived (from a descriptor or the content's hash) for the other allocation paths. |
 
 ## Quick mental model
 

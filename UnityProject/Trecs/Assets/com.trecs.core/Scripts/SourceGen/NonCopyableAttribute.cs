@@ -22,7 +22,7 @@ namespace Trecs
     ///   <item><b>TRECS118</b> — by-value local initialized from an existing variable
     ///   (field, local, parameter, or property). Initializing from a method return,
     ///   constructor, or <c>default</c> is allowed.</item>
-    ///   <item><b>TRECS119</b> — by-value method parameter. Must be declared
+    ///   <item><b>TRECS131</b> — by-value method parameter. Must be declared
     ///   <c>ref</c>, <c>in</c>, or <c>out</c>.</item>
     ///   <item><b>TRECS120</b> — the same struct also carries
     ///   <see cref="CopyableAttribute"/>; the two are contradictory.</item>

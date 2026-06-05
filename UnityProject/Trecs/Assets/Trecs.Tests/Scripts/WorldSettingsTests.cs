@@ -110,14 +110,14 @@ namespace Trecs.Tests
 
             // Both accessors can create entities
             a1.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();
-            a1.Submit();
+            a1.World.Submit();
 
             // Both see the same world state
             NAssert.AreEqual(1, a1.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.AreEqual(1, a2.CountEntitiesWithTags(TestTags.Alpha));
 
             a2.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 20 }).AssertComplete();
-            a2.Submit();
+            a2.World.Submit();
 
             NAssert.AreEqual(2, a1.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.AreEqual(2, a2.CountEntitiesWithTags(TestTags.Alpha));

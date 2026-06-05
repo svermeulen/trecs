@@ -8,7 +8,8 @@ namespace Trecs.Tests
     public class DeltaSerializationTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
 
         [SetUp]
         public void SetUp()
@@ -19,13 +20,8 @@ namespace Trecs.Tests
             // Register custom serializers for test classes
             _serializerRegistry.RegisterSerializer(new Foo.Serializer());
             _serializerRegistry.RegisterSerializerDelta<Foo.Serializer>();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
@@ -47,32 +43,30 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Test delta serialization
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 foo,
                 fooBase,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            var deltaSize = _cacheHelper.MemoryStream.Position;
+            var deltaSize = _data.ContiguousSize;
 
             // Write full object for comparison
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(foo, TestConstants.Version, includeTypeChecks: true, flags);
-            var fullSize = _cacheHelper.MemoryStream.Position;
+            _helper.WriteAll(_data, foo, TestConstants.Version, includeTypeChecks: true, flags);
+            var fullSize = _data.ContiguousSize;
 
             // Read back delta
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 foo,
                 fooBase,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta<Foo>(fooBase);
+            var result = _helper.ReadAllDelta<Foo>(_data, fooBase);
 
             // Assert
             TrecsDebugAssert.That(result.A == foo.A);
@@ -105,18 +99,17 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 foo,
                 fooBase,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            var deltaSize = _cacheHelper.MemoryStream.Position;
+            var deltaSize = _data.ContiguousSize;
 
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta<Foo>(fooBase);
+            var result = _helper.ReadAllDelta<Foo>(_data, fooBase);
 
             // Assert
             TrecsDebugAssert.That(result.A == foo.A);
@@ -149,16 +142,15 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllDelta(
+            _helper.WriteAllDelta(
+                _data,
                 foo,
                 fooBase,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllDelta<Foo>(fooBase);
+            var result = _helper.ReadAllDelta<Foo>(_data, fooBase);
 
             // Assert
             TrecsDebugAssert.That(result.A == foo.A);

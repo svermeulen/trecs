@@ -5,7 +5,7 @@ using Trecs.Collections;
 
 namespace Trecs.Internal
 {
-    public sealed class TopologicalSorter
+    internal sealed class TopologicalSorter
     {
         /// <summary>
         /// Note - int[] should be same length for all items

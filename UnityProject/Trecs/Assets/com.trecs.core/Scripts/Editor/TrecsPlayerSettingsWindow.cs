@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 namespace Trecs.Internal
 {
     /// <summary>
-    /// Modal popup for tuning the Trecs Player's settings (anchor cadence,
+    /// Modal popup for tuning the Trecs Player's settings (keyframe cadence,
     /// scrub-cache cadence, capacity caps). Backed by
     /// <see cref="TrecsPlayerSettingsStore"/> EditorPrefs so values persist
     /// across editor sessions and apply to all live recorders on Save.
@@ -14,12 +14,12 @@ namespace Trecs.Internal
     internal class TrecsPlayerSettingsWindow : EditorWindow
     {
         Toggle _autoRecordOnStartField;
-        FloatField _anchorIntervalField;
+        FloatField _keyframeIntervalField;
         FloatField _scrubCacheIntervalField;
-        IntegerField _maxAnchorCountField;
+        IntegerField _maxKeyframeCountField;
         IntegerField _maxScrubCacheMbField;
 
-        public static void Show(EditorWindow anchor)
+        public static void Show(EditorWindow centerOver)
         {
             var window = CreateInstance<TrecsPlayerSettingsWindow>();
             window.titleContent = new GUIContent("Trecs Player Settings");
@@ -27,9 +27,9 @@ namespace Trecs.Internal
             const float h = 290f;
             window.minSize = new Vector2(w, h);
             window.maxSize = new Vector2(w * 2, h);
-            if (anchor != null)
+            if (centerOver != null)
             {
-                var ap = anchor.position;
+                var ap = centerOver.position;
                 window.position = new Rect(
                     ap.x + (ap.width - w) / 2f,
                     ap.y + (ap.height - h) / 2f,
@@ -69,16 +69,16 @@ namespace Trecs.Internal
                 + "begin capturing.";
             root.Add(_autoRecordOnStartField);
 
-            _anchorIntervalField = new FloatField("Anchor interval (s)")
+            _keyframeIntervalField = new FloatField("Keyframe interval (s)")
             {
-                value = TrecsPlayerSettingsStore.AnchorIntervalSeconds,
+                value = TrecsPlayerSettingsStore.KeyframeIntervalSeconds,
             };
-            _anchorIntervalField.tooltip =
-                "Simulated seconds between persisted-anchor captures. Anchors "
+            _keyframeIntervalField.tooltip =
+                "Simulated seconds between persisted-keyframe captures. Keyframes "
                 + "survive Save/Load and bound how far back desync recovery "
                 + "or cold-scrub can jump. Larger is smaller files; smaller "
                 + "is faster recovery.";
-            root.Add(_anchorIntervalField);
+            root.Add(_keyframeIntervalField);
 
             _scrubCacheIntervalField = new FloatField("Scrub-cache interval (s)")
             {
@@ -90,12 +90,12 @@ namespace Trecs.Internal
                 + "scrub-back instant. Smaller is snappier scrubbing.";
             root.Add(_scrubCacheIntervalField);
 
-            _maxAnchorCountField = new IntegerField("Max anchor count")
+            _maxKeyframeCountField = new IntegerField("Max keyframe count")
             {
-                value = TrecsPlayerSettingsStore.MaxAnchorCount,
+                value = TrecsPlayerSettingsStore.MaxKeyframeCount,
             };
-            _maxAnchorCountField.tooltip = "0 = unbounded. Drop-oldest when hit.";
-            root.Add(_maxAnchorCountField);
+            _maxKeyframeCountField.tooltip = "0 = unbounded. Drop-oldest when hit.";
+            root.Add(_maxKeyframeCountField);
 
             // MB rather than bytes so the input is human-friendly. Max value is
             // clamped to int.MaxValue MB which is well past anything realistic.
@@ -160,9 +160,9 @@ namespace Trecs.Internal
             TrecsGameStateActivator.AutoRecordEnabled = _autoRecordOnStartField.value;
 
             TrecsPlayerSettingsStore.Save(
-                anchorIntervalSeconds: _anchorIntervalField.value,
+                keyframeIntervalSeconds: _keyframeIntervalField.value,
                 scrubCacheIntervalSeconds: _scrubCacheIntervalField.value,
-                maxAnchorCount: _maxAnchorCountField.value,
+                maxKeyframeCount: _maxKeyframeCountField.value,
                 maxScrubCacheBytes: (long)Math.Max(0, _maxScrubCacheMbField.value) * 1024L * 1024L
             );
             // Push onto any currently-running recorders so the change is
@@ -179,9 +179,9 @@ namespace Trecs.Internal
         {
             var defaults = new TrecsRewindBufferSettings();
             _autoRecordOnStartField.value = true; // matches AutoRecordEnabled's default in TrecsGameStateActivator
-            _anchorIntervalField.value = defaults.AnchorIntervalSeconds;
+            _keyframeIntervalField.value = defaults.KeyframeIntervalSeconds;
             _scrubCacheIntervalField.value = defaults.ScrubCacheIntervalSeconds;
-            _maxAnchorCountField.value = defaults.MaxAnchorCount;
+            _maxKeyframeCountField.value = defaults.MaxKeyframeCount;
             _maxScrubCacheMbField.value = (int)
                 Math.Min(int.MaxValue, defaults.MaxScrubCacheBytes / (1024L * 1024L));
         }

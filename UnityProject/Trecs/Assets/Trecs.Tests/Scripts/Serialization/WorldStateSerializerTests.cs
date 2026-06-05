@@ -72,22 +72,16 @@ namespace Trecs.Tests
 
         World CreateWorld(Action<WorldBuilder> customize = null)
         {
-            var testGlobals = new Template(
-                debugName: "TestGlobals",
-                localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
-                localTags: Array.Empty<Tag>()
-            );
-
-            var blobStore = new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
+            var testGlobals = TestTemplate
+                .Named("TestGlobals")
+                .Extending(TrecsTemplates.Globals.Template)
+                .Build();
 
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(testGlobals)
                 .AddTemplate(SerTestEntity.Template)
-                .AddTemplate(SerNativeListEntity.Template)
-                .AddBlobStore(blobStore);
+                .AddTemplate(SerNativeListEntity.Template);
 
             customize?.Invoke(builder);
 
@@ -100,11 +94,13 @@ namespace Trecs.Tests
         {
             var serializer = new WorldStateSerializer(world);
             var writer = new BinarySerializationWriter(_serializerRegistry);
-            writer.Start(version: 1, includeTypeChecks: false);
+            var serData = new SerializationData();
+            writer.Start(serData, version: 1, includeTypeChecks: false);
             serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
-            writer.Complete(outputStream);
+            writer.Complete();
+            serData.WriteContiguousTo(outputStream);
             return outputStream.ToArray();
         }
 
@@ -112,7 +108,7 @@ namespace Trecs.Tests
         {
             var serializer = new WorldStateSerializer(world);
             var reader = new BinarySerializationReader(_serializerRegistry);
-            reader.Start(data);
+            reader.Start(new ContiguousSerializationData(data));
             serializer.DeserializeState(reader);
         }
 
@@ -128,7 +124,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 42 })
                 .Set(new SerTestFloat { Value = 3.14f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
 
@@ -137,7 +133,7 @@ namespace Trecs.Tests
 
             // Modify world state
             a.RemoveEntitiesWithTags(PartitionA);
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
 
             // Deserialize — should restore the entity
@@ -165,13 +161,13 @@ namespace Trecs.Tests
                     .Set(new SerTestFloat { Value = i * 1.5f })
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
             // Clear and restore
             a.RemoveEntitiesWithTags(PartitionA);
-            a.Submit();
+            a.World.Submit();
 
             DeserializeWorld(world, data);
 
@@ -196,13 +192,13 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 200 })
                 .Set(new SerTestFloat { Value = 2.0f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
             a.RemoveEntitiesWithTags(PartitionA);
             a.RemoveEntitiesWithTags(PartitionB);
-            a.Submit();
+            a.World.Submit();
 
             DeserializeWorld(world, data);
 
@@ -246,7 +242,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 77 })
                 .Set(new SerTestFloat { Value = 7.7f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -327,64 +323,55 @@ namespace Trecs.Tests
             }
         }
 
+        // Registration-table semantics are tested on a standalone (unsealed)
+        // registry: a world's registry seals at Initialize, and these tests
+        // exercise pre-seal mutation behavior, not world wiring.
+
         [Test]
         public void Register_TryGet_ReturnsRegisteredSerializer()
         {
-            using var world = CreateWorld();
+            var registry = new ComponentArraySerializerRegistry();
             var custom = new InertCustomSerializer<SerTestInt>();
 
-            world.ComponentArraySerializerRegistry.Register(custom);
+            registry.Register(custom);
 
-            NAssert.IsTrue(
-                world.ComponentArraySerializerRegistry.TryGet<SerTestInt>(out var actual)
-            );
+            NAssert.IsTrue(registry.TryGet<SerTestInt>(out var actual));
             NAssert.AreSame(custom, actual);
         }
 
         [Test]
         public void TryGet_WhenNothingRegistered_ReturnsFalseAndNull()
         {
-            using var world = CreateWorld();
+            var registry = new ComponentArraySerializerRegistry();
 
-            NAssert.IsFalse(
-                world.ComponentArraySerializerRegistry.TryGet<SerTestInt>(out var actual)
-            );
+            NAssert.IsFalse(registry.TryGet<SerTestInt>(out var actual));
             NAssert.IsNull(actual);
         }
 
         [Test]
         public void Unregister_RemovesRegistration_AndReturnsTrueOnlyTheFirstTime()
         {
-            using var world = CreateWorld();
-            world.ComponentArraySerializerRegistry.Register(
-                new InertCustomSerializer<SerTestInt>()
-            );
+            var registry = new ComponentArraySerializerRegistry();
+            registry.Register(new InertCustomSerializer<SerTestInt>());
 
-            NAssert.IsTrue(world.ComponentArraySerializerRegistry.Unregister<SerTestInt>());
-            NAssert.IsFalse(world.ComponentArraySerializerRegistry.TryGet<SerTestInt>(out _));
+            NAssert.IsTrue(registry.Unregister<SerTestInt>());
+            NAssert.IsFalse(registry.TryGet<SerTestInt>(out _));
 
             // Second unregister with nothing registered returns false.
-            NAssert.IsFalse(world.ComponentArraySerializerRegistry.Unregister<SerTestInt>());
+            NAssert.IsFalse(registry.Unregister<SerTestInt>());
         }
 
         [Test]
         public void GetRegisteredComponentTypes_ReturnsRegisteredComponentTypes()
         {
-            using var world = CreateWorld();
+            var registry = new ComponentArraySerializerRegistry();
 
-            NAssert.AreEqual(
-                0,
-                world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes().Count
-            );
+            NAssert.AreEqual(0, registry.GetRegisteredComponentTypes().Count);
 
-            world.ComponentArraySerializerRegistry.Register(
-                new InertCustomSerializer<SerTestInt>()
-            );
-            world.ComponentArraySerializerRegistry.Register(
-                new InertCustomSerializer<SerTestFloat>()
-            );
+            registry.Register(new InertCustomSerializer<SerTestInt>());
+            registry.Register(new InertCustomSerializer<SerTestFloat>());
 
-            var keys = world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes();
+            var keys = registry.GetRegisteredComponentTypes();
             NAssert.AreEqual(2, keys.Count);
             var types = new List<Type>();
             foreach (var t in keys)
@@ -394,9 +381,9 @@ namespace Trecs.Tests
                 types
             );
 
-            world.ComponentArraySerializerRegistry.Unregister<SerTestInt>();
+            registry.Unregister<SerTestInt>();
 
-            keys = world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes();
+            keys = registry.GetRegisteredComponentTypes();
             types.Clear();
             foreach (var t in keys)
                 types.Add(t);
@@ -406,34 +393,28 @@ namespace Trecs.Tests
         [Test]
         public void Register_Duplicate_Throws()
         {
-            using var world = CreateWorld();
-            world.ComponentArraySerializerRegistry.Register(
-                new InertCustomSerializer<SerTestInt>()
-            );
+            var registry = new ComponentArraySerializerRegistry();
+            registry.Register(new InertCustomSerializer<SerTestInt>());
 
             // Duplicate registration is an error — callers that need to swap
             // should Unregister first.
             NAssert.Throws<TrecsException>(() =>
-                world.ComponentArraySerializerRegistry.Register(
-                    new InertCustomSerializer<SerTestInt>()
-                )
+                registry.Register(new InertCustomSerializer<SerTestInt>())
             );
         }
 
         [Test]
         public void RoundTrip_InvokesRegisteredCustomSerializer()
         {
-            using var world = CreateWorld();
+            var custom = new StubSerTestIntSerializer();
+            using var world = CreateWorld(b => b.RegisterComponentArraySerializer(custom));
             var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 99 })
                 .Set(new SerTestFloat { Value = 1.5f })
                 .AssertComplete();
-            a.Submit();
-
-            var custom = new StubSerTestIntSerializer();
-            world.ComponentArraySerializerRegistry.Register(custom);
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -444,7 +425,7 @@ namespace Trecs.Tests
 
             // Wipe and restore — the same registration on the world is reused.
             a.RemoveEntitiesWithTags(PartitionA);
-            a.Submit();
+            a.World.Submit();
 
             DeserializeWorld(world, data);
 
@@ -523,10 +504,10 @@ namespace Trecs.Tests
         [Test]
         public void RoundTrip_NativeListComponent_PreservesItemsAcrossRestore()
         {
-            using var world = CreateWorld();
+            using var world = CreateWorld(b =>
+                b.RegisterComponentArraySerializer(new NativeListItemsSerializer())
+            );
             var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
-            world.ComponentArraySerializerRegistry.Register(new NativeListItemsSerializer());
 
             // Manually disposed after world disposal — the test's component
             // has no OnRemoved handler to clean up the inner NativeList.
@@ -538,7 +519,7 @@ namespace Trecs.Tests
             a.AddEntity(NativeListPartition)
                 .Set(new SerTestNativeList { Items = items })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -575,18 +556,16 @@ namespace Trecs.Tests
         [Test]
         public void SkipComponentSerializer_AsserstEntryCountMatches()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
-            world.ComponentArraySerializerRegistry.Register(
-                new SkipComponentSerializer<SerTestInt>()
+            using var world = CreateWorld(b =>
+                b.RegisterComponentArraySerializer(new SkipComponentSerializer<SerTestInt>())
             );
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 1 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -595,7 +574,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 2 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             // Deserialize should now blow up because SkipComponentSerializer
             // sees a 1-entry count in the stream but 2 entries in the live array.
@@ -610,18 +589,16 @@ namespace Trecs.Tests
         [Test]
         public void SkipComponentSerializer_PreservesRuntimeValuesOnDeserialize()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
-            world.ComponentArraySerializerRegistry.Register(
-                new SkipComponentSerializer<SerTestInt>()
+            using var world = CreateWorld(b =>
+                b.RegisterComponentArraySerializer(new SkipComponentSerializer<SerTestInt>())
             );
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 42 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -647,12 +624,12 @@ namespace Trecs.Tests
         [Test]
         public void DefaultValueComponentSerializer_ResizesAndZeroInitsOnDeserialize()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
-            world.ComponentArraySerializerRegistry.Register(
-                new DefaultValueComponentSerializer<SerTestInt>()
+            using var world = CreateWorld(b =>
+                b.RegisterComponentArraySerializer(
+                    new DefaultValueComponentSerializer<SerTestInt>()
+                )
             );
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             // Snapshot state: 1 entity, SerTestInt.Value = 7 (the value doesn't
             // round-trip because DefaultValue skips it). SerTestFloat IS blit-
@@ -662,7 +639,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 7 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -674,7 +651,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 555 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
 
             DeserializeWorld(world, data);
@@ -709,7 +686,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 55 })
                 .Set(new SerTestFloat { Value = 0f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
             NAssert.Greater(custom.SerializeCallCount, 0);
@@ -736,11 +713,9 @@ namespace Trecs.Tests
         [Test]
         public void RoundTrip_CustomSerializer_InvokedOncePerGroupContainingComponent()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
             var custom = new StubSerTestIntSerializer();
-            world.ComponentArraySerializerRegistry.Register(custom);
+            using var world = CreateWorld(b => b.RegisterComponentArraySerializer(custom));
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 11 })
@@ -750,7 +725,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 22 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
             NAssert.GreaterOrEqual(
@@ -788,17 +763,15 @@ namespace Trecs.Tests
         [Test]
         public void CustomSerializer_AppliesAcrossFreshWorldStateSerializerInstances()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
             var custom = new StubSerTestIntSerializer();
-            world.ComponentArraySerializerRegistry.Register(custom);
+            using var world = CreateWorld(b => b.RegisterComponentArraySerializer(custom));
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 33 })
                 .Set(new SerTestFloat { Value = 0f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             // Two independent WorldStateSerializer instances — one for write,
             // one for read. The registration lives on the World, so both see it.
@@ -808,10 +781,12 @@ namespace Trecs.Tests
             byte[] data;
             {
                 var writer = new BinarySerializationWriter(_serializerRegistry);
-                writer.Start(version: 1, includeTypeChecks: false);
+                var serData = new SerializationData();
+                writer.Start(serData, version: 1, includeTypeChecks: false);
                 wsWrite.SerializeFullState(writer);
                 using var outputStream = new MemoryStream();
-                writer.Complete(outputStream);
+                writer.Complete();
+                serData.WriteContiguousTo(outputStream);
                 data = outputStream.ToArray();
             }
             NAssert.Greater(custom.SerializeCallCount, 0);
@@ -821,7 +796,7 @@ namespace Trecs.Tests
 
             {
                 var reader = new BinarySerializationReader(_serializerRegistry);
-                reader.Start(data);
+                reader.Start(new ContiguousSerializationData(data));
                 wsRead.DeserializeState(reader);
             }
 
@@ -876,11 +851,9 @@ namespace Trecs.Tests
         [Test]
         public void RoundTrip_CustomSerializer_HandlesEmptyGroup()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
             var custom = new LengthRecordingSerializer();
-            world.ComponentArraySerializerRegistry.Register(custom);
+            using var world = CreateWorld(b => b.RegisterComponentArraySerializer(custom));
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             // Add then remove an entity to materialize PartitionA's component
             // slots without leaving any entries — Trecs's component arrays are
@@ -891,9 +864,9 @@ namespace Trecs.Tests
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
             a.RemoveEntity(handle);
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
 
             var data = SerializeWorld(world);
@@ -948,13 +921,13 @@ namespace Trecs.Tests
         [Test]
         public void PerEntityComponentArraySerializer_RoundTripsViaInnerSerializer()
         {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
             var inner = new SerTestIntElementSerializer();
-            world.ComponentArraySerializerRegistry.Register(
-                new PerEntityComponentArraySerializer<SerTestInt>(inner)
+            using var world = CreateWorld(b =>
+                b.RegisterComponentArraySerializer(
+                    new PerEntityComponentArraySerializer<SerTestInt>(inner)
+                )
             );
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 11 })
@@ -964,14 +937,14 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 22 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
             NAssert.AreEqual(2, inner.SerializeCallCount);
 
             // Wipe and restore so a no-op deserialize would fail.
             a.RemoveEntitiesWithTags(PartitionA);
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
 
             DeserializeWorld(world, data);
@@ -1018,16 +991,16 @@ namespace Trecs.Tests
         [Test]
         public void Dispatcher_Throws_WhenUserSerializerLeavesWrongLength()
         {
-            using var world = CreateWorld();
+            using var world = CreateWorld(b =>
+                b.RegisterComponentArraySerializer(new WrongLengthSerializer())
+            );
             var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
-            world.ComponentArraySerializerRegistry.Register(new WrongLengthSerializer());
 
             a.AddEntity(PartitionA)
                 .Set(new SerTestInt { Value = 1 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -1041,17 +1014,17 @@ namespace Trecs.Tests
         /// <summary>
         /// Locks in the section-guard drift error path: corrupting the last
         /// byte of the data buffer (which the wire format guarantees is the
-        /// <c>AfterSystemEnable</c> guard byte, 0xA6) must trigger a
+        /// <c>AfterCustomSections</c> guard byte, 0xA9) must trigger a
         /// <see cref="SerializationException"/> whose message names the
         /// section that drifted.
         ///
         /// <para>
-        /// The other five section guards are covered by
+        /// The other section guards are covered by
         /// <see cref="Deserialize_ThrowsSerializationException_WhenEachSectionGuardCorrupted"/>
         /// via a value-scan; the last guard's position is structurally fixed
-        /// (last byte of the data buffer, written immediately before the
-        /// trailing EndOfPayloadMarker), so it gets its own targeted test
-        /// that doesn't depend on byte-value scanning.
+        /// (the final byte of the payload, since the data buffer ends with it
+        /// and the wire form has no trailing marker), so it gets its own
+        /// targeted test that doesn't depend on byte-value scanning.
         /// </para>
         /// </summary>
         [Test]
@@ -1064,33 +1037,27 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 7 })
                 .Set(new SerTestFloat { Value = 1.5f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
-            // Wire format: [...data buffer ending with AfterSystemEnable
-            // guard byte 0xA6][EndOfPayloadMarker 0x5E]. The last guard byte
-            // therefore lives at data.Length - 2.
+            // Wire form has no trailing payload marker, so the AfterCustomSections guard byte
+            // (0xA9), written last into the data section, is the final byte of the payload.
             NAssert.AreEqual(
-                (byte)0x5E,
+                (byte)0xA9,
                 data[data.Length - 1],
-                "Trailing byte should be EndOfPayloadMarker"
-            );
-            NAssert.AreEqual(
-                (byte)0xA6,
-                data[data.Length - 2],
-                "Byte before EndOfPayloadMarker should be the AfterSystemEnable guard"
+                "Final byte should be the AfterCustomSections guard"
             );
 
-            data[data.Length - 2] ^= 0xFF;
+            data[data.Length - 1] ^= 0xFF;
 
             var ex = NAssert.Throws<SerializationException>(() => DeserializeWorld(world, data));
-            StringAssert.Contains("AfterSystemEnable", ex.Message);
+            StringAssert.Contains("AfterCustomSections", ex.Message);
         }
 
         /// <summary>
         /// Drift-detection coverage for every section guard. For each guard
-        /// value (0xA1..0xA6), tries corrupting each occurrence of that byte
+        /// value, tries corrupting each occurrence of that byte
         /// in the snapshot stream and asserts that at least one corruption
         /// produces a <see cref="SerializationException"/> whose message
         /// names the section. The "at least one" framing is robust to
@@ -1114,6 +1081,7 @@ namespace Trecs.Tests
         [TestCase(0xA4, "AfterEntitySets")]
         [TestCase(0xA5, "AfterHeaps")]
         [TestCase(0xA6, "AfterSystemEnable")]
+        [TestCase(0xA9, "AfterCustomSections")]
         public void Deserialize_ThrowsSerializationException_WhenEachSectionGuardCorrupted(
             int guardValue,
             string sectionName
@@ -1126,7 +1094,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 13 })
                 .Set(new SerTestFloat { Value = 2.5f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 
@@ -1206,7 +1174,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 21 })
                 .Set(new SerTestFloat { Value = 3.5f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var data = SerializeWorld(world);
 

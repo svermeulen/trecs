@@ -4,17 +4,25 @@ namespace Trecs
 {
     /// <summary>
     /// Identifier for a shared blob allocation in <see cref="SharedPtr{T}"/> and
-    /// <see cref="NativeSharedPtr{T}"/> heaps. Callers always supply an explicit
-    /// <see cref="BlobId"/> for persistent allocations — use one of the factories
-    /// (<see cref="FromKey"/>, <see cref="FromGuid"/>, <see cref="FromBytes"/>,
-    /// or the content-hash extension from Trecs) to obtain one with
-    /// the semantics you want. A zero value represents a null (unallocated) blob.
+    /// <see cref="NativeSharedPtr{T}"/> heaps. Most blobs are <b>content-addressed</b> — the id is
+    /// derived for you by hashing the content or a descriptor recipe (the blessed default; you never
+    /// name the blob), via <see cref="BlobIdGenerator.FromContent{T}(WorldAccessor, in T)"/> or
+    /// <see cref="BlobIdGenerator.FromBytes"/>. When you instead have a stable external identity —
+    /// chiefly the out-of-core / baked opaque-blob store, which keys blobs by a durable domain key (a
+    /// level id, prefab id, asset id) — wrap it directly with the <see cref="BlobId(long)"/>
+    /// constructor. A zero value represents a null (unallocated) blob.
     /// </summary>
     [TypeId(283746019)]
     public readonly struct BlobId : IEquatable<BlobId>
     {
         public readonly long Value;
 
+        /// <summary>
+        /// Wraps a caller-chosen <paramref name="value"/> as a blob id — for durable external keys (a
+        /// level id, prefab id, asset id). Content-addressed ids should instead be derived via
+        /// <see cref="BlobIdGenerator.FromContent{T}(WorldAccessor, in T)"/>. <c>0</c> is
+        /// <see cref="Null"/>.
+        /// </summary>
         public BlobId(long value)
         {
             Value = value;

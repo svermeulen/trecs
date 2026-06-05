@@ -128,6 +128,10 @@ namespace Trecs
     public readonly unsafe struct NativeUniquePtr<T> : IEquatable<NativeUniquePtr<T>>
         where T : unmanaged
     {
+        /// <summary>
+        /// Opaque handle into the native unique heap identifying this allocation. A zero
+        /// handle represents the null ptr (see <see cref="IsNull"/>).
+        /// </summary>
         public readonly PtrHandle Handle;
 
         // Internal so external code can't fabricate a handle from an arbitrary uint.

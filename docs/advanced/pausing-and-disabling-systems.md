@@ -51,7 +51,7 @@ Like other deterministic-state mutations, this requires a context that can mutat
 
 ## Combined query
 
-`IsSystemEffectivelyEnabled` answers "would this system run on the next tick" — `true` iff no channel disabled and not paused. Available on both `World` and `WorldAccessor`:
+`IsSystemEffectivelyEnabled` answers "would this system run on the next tick" — `true` iff no channel disabled and not paused. Available on `WorldAccessor`:
 
 ```csharp
 bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
@@ -59,7 +59,7 @@ bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
 
 ## Building your own grouping
 
-Trecs has no built-in `[SystemGroup]` for bulk pause/unpause. The framework exposes the per-system registry entries so you can build whatever grouping fits your game (on `World` and `WorldAccessor`):
+Trecs has no built-in `[SystemGroup]` for bulk pause/unpause. The framework exposes the per-system registry entries so you can build whatever grouping fits your game (on `WorldAccessor`):
 
 ```csharp
 IReadOnlyList<SystemEntry> systems = world.GetSystems();

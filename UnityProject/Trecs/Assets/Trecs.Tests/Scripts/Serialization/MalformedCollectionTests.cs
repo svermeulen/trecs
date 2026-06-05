@@ -9,21 +9,18 @@ namespace Trecs.Tests
     [TestFixture]
     public class MalformedCollectionTests
     {
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
+        private SerializationReadBuffer _readBuffer;
         private SerializerRegistry _serializerRegistry;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
-            _cacheHelper = null;
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
+            _readBuffer = new SerializationReadBuffer();
         }
 
         [Test]
@@ -32,32 +29,22 @@ namespace Trecs.Tests
             var originalList = new List<string> { "hello", "world", "test" };
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalList,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            var serializedData = _cacheHelper.MemoryStream.ToArray();
+            var serializedData = _data.ToContiguousBytes();
 
             // Truncate the data in the middle of string serialization
             var truncatedData = new byte[serializedData.Length - 5]; // Remove last 5 bytes
             Array.Copy(serializedData, truncatedData, truncatedData.Length);
 
-            var newCacheHelper = new SerializationBuffer(_serializerRegistry);
-            try
-            {
-                newCacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(truncatedData),
-                    truncatedData.Length
-                );
-                TrecsDebugAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<string>>());
-            }
-            finally
-            {
-                newCacheHelper?.Dispose();
-            }
+            TrecsDebugAssert.Throws<Exception>(() =>
+                _helper.ReadAll<List<string>>(_readBuffer.Wrap(truncatedData))
+            );
         }
 
         [Test]
@@ -67,9 +54,8 @@ namespace Trecs.Tests
 
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(list1, TestConstants.Version, includeTypeChecks: true, flags);
-            var serializedData = _cacheHelper.MemoryStream.ToArray();
+            _helper.WriteAll(_data, list1, TestConstants.Version, includeTypeChecks: true, flags);
+            var serializedData = _data.ToContiguousBytes();
 
             {
                 int offset = 0;
@@ -79,9 +65,12 @@ namespace Trecs.Tests
                     ref offset
                 );
 
-                BitReader bitReader = new();
-                bitReader.Reset(span, ref offset);
-                bitReader.Complete();
+                // Section length prefix: [bitCount][bitFieldByteCount][dataByteCount]; skip it and
+                // the bit-field section to land at the start of the data section.
+                offset += sizeof(int); // bitCount
+                int bitFieldByteCount = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset));
+                offset += sizeof(int) * 2; // bitFieldByteCount + dataByteCount
+                offset += bitFieldByteCount;
 
                 if (includesTypeChecks)
                 {
@@ -102,19 +91,9 @@ namespace Trecs.Tests
                 );
             }
 
-            var newCacheHelper = new SerializationBuffer(_serializerRegistry);
-            try
-            {
-                newCacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(serializedData),
-                    serializedData.Length
-                );
-                TrecsDebugAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<int>>());
-            }
-            finally
-            {
-                newCacheHelper?.Dispose();
-            }
+            TrecsDebugAssert.Throws<Exception>(() =>
+                _helper.ReadAll<List<int>>(_readBuffer.Wrap(serializedData))
+            );
         }
 
         [Test]
@@ -124,9 +103,8 @@ namespace Trecs.Tests
 
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(list1, TestConstants.Version, includeTypeChecks: true, flags);
-            var serializedData = _cacheHelper.MemoryStream.ToArray();
+            _helper.WriteAll(_data, list1, TestConstants.Version, includeTypeChecks: true, flags);
+            var serializedData = _data.ToContiguousBytes();
 
             {
                 int offset = 0;
@@ -136,9 +114,12 @@ namespace Trecs.Tests
                     ref offset
                 );
 
-                BitReader bitReader = new();
-                bitReader.Reset(span, ref offset);
-                bitReader.Complete();
+                // Section length prefix: [bitCount][bitFieldByteCount][dataByteCount]; skip it and
+                // the bit-field section to land at the start of the data section.
+                offset += sizeof(int); // bitCount
+                int bitFieldByteCount = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset));
+                offset += sizeof(int) * 2; // bitFieldByteCount + dataByteCount
+                offset += bitFieldByteCount;
 
                 if (includesTypeChecks)
                 {
@@ -158,19 +139,9 @@ namespace Trecs.Tests
                 );
             }
 
-            var newCacheHelper = new SerializationBuffer(_serializerRegistry);
-            try
-            {
-                newCacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(serializedData),
-                    serializedData.Length
-                );
-                TrecsDebugAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<int>>());
-            }
-            finally
-            {
-                newCacheHelper?.Dispose();
-            }
+            TrecsDebugAssert.Throws<Exception>(() =>
+                _helper.ReadAll<List<int>>(_readBuffer.Wrap(serializedData))
+            );
         }
     }
 }

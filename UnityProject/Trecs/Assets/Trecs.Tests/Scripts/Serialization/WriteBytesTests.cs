@@ -7,20 +7,16 @@ namespace Trecs.Tests
     public class WriteBytesTests
     {
         SerializerRegistry _serializerRegistry;
-        SerializationBuffer _binary;
+        SerializationHelper _helper;
+        SerializationData _data;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
-            _binary = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _binary?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         void BinaryRoundTrip(
@@ -31,16 +27,18 @@ namespace Trecs.Tests
             out int outCount
         )
         {
-            _binary.ClearMemoryStream();
-            _binary.StartWrite(TestConstants.Version, includeTypeChecks: true, 0L);
-            _binary.WriteBytes("bytes", payload, offset, count);
-            _binary.EndWrite();
-            _binary.ResetMemoryPosition();
-
-            _binary.StartRead();
+            _helper.Writer.Start(
+                _data,
+                version: TestConstants.Version,
+                includeTypeChecks: true,
+                flags: 0L
+            );
+            _helper.Writer.WriteBytes("bytes", payload, offset, count);
+            _helper.Writer.Complete();
+            _helper.Reader.Start(_data);
             outBuffer = null;
-            outCount = _binary.ReadBytes("bytes", ref outBuffer);
-            _binary.StopRead(verifySentinel: true);
+            outCount = _helper.Reader.ReadBytes("bytes", ref outBuffer);
+            _helper.Reader.Complete();
         }
 
         [Test]
@@ -94,17 +92,20 @@ namespace Trecs.Tests
         {
             var data = new byte[] { 1, 2, 3 };
 
-            _binary.ClearMemoryStream();
-            _binary.StartWrite(TestConstants.Version, includeTypeChecks: true, 0L);
-            _binary.WriteBytes("bytes", data, 0, data.Length);
-            _binary.EndWrite();
-            _binary.ResetMemoryPosition();
+            _helper.Writer.Start(
+                _data,
+                version: TestConstants.Version,
+                includeTypeChecks: true,
+                flags: 0L
+            );
+            _helper.Writer.WriteBytes("bytes", data, 0, data.Length);
+            _helper.Writer.Complete();
 
             var preallocated = new byte[16];
-            _binary.StartRead();
+            _helper.Reader.Start(_data);
             var buf = preallocated;
-            int count = _binary.ReadBytes("bytes", ref buf);
-            _binary.StopRead(verifySentinel: true);
+            int count = _helper.Reader.ReadBytes("bytes", ref buf);
+            _helper.Reader.Complete();
 
             TrecsDebugAssert.That(count == 3);
             TrecsDebugAssert.That(

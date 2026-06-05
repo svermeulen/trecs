@@ -8,7 +8,7 @@ namespace Trecs.Internal
 {
     // Opaque index wrapper so callers can't pass arbitrary ints
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct UnsafeArrayIndex
+    internal struct UnsafeArrayIndex
     {
         internal uint Index;
     }
@@ -213,47 +213,32 @@ namespace Trecs.Internal
                     UnsafeUtility.Malloc(newCapacity, PointerAlignment, _allocator.ToAllocator);
                 UnsafeUtility.MemClear(newPointer, newCapacity);
 
-                // Copy existing content into the new buffer
+                // Copy existing content into the new buffer. The live region can wrap
+                // in BOTH the old buffer (offsets taken % oldCapacity) and the new
+                // buffer (% newCapacity), so copy in chunks bounded by whichever ring
+                // reaches the end of its backing array first. This preserves the
+                // invariant that each element's unwrapped index maps to
+                // (index % capacity) under the new capacity. The previous two-branch
+                // copy assumed the relocated data never wrapped in the new buffer; when
+                // _readIndex % newCapacity landed high enough the tail copy wrote past
+                // the end of newPointer (heap overflow + data loss).
                 var currentSize = _writeIndex - _readIndex;
-                if (currentSize > 0)
+                uint copied = 0;
+                while (copied < currentSize)
                 {
-                    var oldReaderHead = _readIndex % oldCapacity;
-                    var oldWriterHead = _writeIndex % oldCapacity;
+                    var srcOffset = (_readIndex + copied) % oldCapacity;
+                    var dstOffset = (_readIndex + copied) % newCapacity;
+                    var srcRemaining = oldCapacity - srcOffset;
+                    var dstRemaining = newCapacity - dstOffset;
 
-                    // Reader behind writer means no wrap — single contiguous copy
-                    if (oldReaderHead < oldWriterHead)
-                    {
-                        var newReaderHead = _readIndex % newCapacity;
+                    var chunk = currentSize - copied;
+                    if (chunk > srcRemaining)
+                        chunk = srcRemaining;
+                    if (chunk > dstRemaining)
+                        chunk = dstRemaining;
 
-                        Unsafe.CopyBlock(
-                            newPointer + newReaderHead,
-                            ptr + oldReaderHead,
-                            (uint)currentSize
-                        );
-                    }
-                    else
-                    {
-                        // Writer wrapped — copy tail (reader→end) then head (0→writer)
-                        var byteCountToEnd = oldCapacity - oldReaderHead;
-                        var newReaderHead = _readIndex % newCapacity;
-
-#if TRECS_INTERNAL_CHECKS && DEBUG
-                        if (newReaderHead + byteCountToEnd + oldWriterHead > newCapacity)
-                            throw new TrecsException(
-                                "something is wrong with my previous assumptions"
-                            );
-#endif
-                        Unsafe.CopyBlock(
-                            newPointer + newReaderHead,
-                            ptr + oldReaderHead,
-                            byteCountToEnd
-                        );
-                        Unsafe.CopyBlock(
-                            newPointer + newReaderHead + byteCountToEnd,
-                            ptr + 0,
-                            (uint)oldWriterHead
-                        ); // from start of old array to old writer head (the writer head wrapped)
-                    }
+                    Unsafe.CopyBlock(newPointer + dstOffset, ptr + srcOffset, chunk);
+                    copied += chunk;
                 }
 
                 if (ptr != null)

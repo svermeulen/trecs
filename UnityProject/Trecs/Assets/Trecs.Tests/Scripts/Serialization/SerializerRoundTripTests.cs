@@ -19,29 +19,29 @@ namespace Trecs.Tests
     public class SerializerRoundTripTests
     {
         SerializerRegistry _registry;
-        SerializationBuffer _buffer;
+        SerializationHelper _helper;
+        SerializationData _data;
 
         [SetUp]
         public void SetUp()
         {
             _registry = TestSerializerInstaller.CreateTestRegistry();
-            _buffer = new SerializationBuffer(_registry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _buffer?.Dispose();
+            _helper = new SerializationHelper(_registry);
+            _data = new SerializationData();
         }
 
         // ── Helpers ──────────────────────────────────────────────
 
         T RoundTrip<T>(in T value)
         {
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll(value, TestConstants.Version, includeTypeChecks: true, flags: 0L);
-            _buffer.ResetMemoryPosition();
-            return _buffer.ReadAll<T>();
+            _helper.WriteAll(
+                _data,
+                value,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags: 0L
+            );
+            return _helper.ReadAll<T>(_data);
         }
 
         static void AssertListEqual<T>(IReadOnlyList<T> expected, IReadOnlyList<T> actual)
@@ -213,6 +213,16 @@ namespace Trecs.Tests
             original.Enqueue(1);
             original.Enqueue(2);
             original.Enqueue(3);
+            CollectionAssert.AreEqual(original.ToArray(), RoundTrip(original).ToArray());
+        }
+
+        [Test]
+        public void Queue_String()
+        {
+            var original = new Queue<string>();
+            original.Enqueue("hello");
+            original.Enqueue("world");
+            original.Enqueue("");
             CollectionAssert.AreEqual(original.ToArray(), RoundTrip(original).ToArray());
         }
 

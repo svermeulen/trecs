@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
 using Trecs.Internal;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -9,7 +9,8 @@ namespace Trecs.Tests
     public class PolymorphicSerializationTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
 
         [SetUp]
         public void SetUp()
@@ -19,13 +20,8 @@ namespace Trecs.Tests
             // Register polymorphic types (concrete classes only - framework doesn't support interfaces)
             _serializerRegistry.RegisterSerializer(new BaseClassSerializer());
             _serializerRegistry.RegisterSerializer(new DerivedClassSerializer());
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
@@ -42,17 +38,21 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(original, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<DerivedTestClass>();
+            _helper.WriteAll(
+                _data,
+                original,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<DerivedTestClass>(_data);
 
             // Assert
-            Assert.IsNotNull(result);
-            Assert.That(result.BaseValue == 42);
-            Assert.That(result.BaseData == "test");
-            Assert.That(result.DerivedValue == 100);
-            Assert.That(result.ExtraData == "extra");
+            NAssert.IsNotNull(result);
+            NAssert.That(result.BaseValue == 42);
+            NAssert.That(result.BaseData == "test");
+            NAssert.That(result.DerivedValue == 100);
+            NAssert.That(result.ExtraData == "extra");
         }
 
         [Test]
@@ -68,24 +68,23 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Use WriteAllObject for polymorphic serialization
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 original,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var resultObj = _cacheHelper.ReadAllObject();
+            var resultObj = _helper.ReadAllObject(_data);
             var result = resultObj as BaseTestClass;
 
             // Assert
-            Assert.IsNotNull(result);
-            Assert.That(result is DerivedTestClass);
+            NAssert.IsNotNull(result);
+            NAssert.That(result is DerivedTestClass);
             var derived = result as DerivedTestClass;
-            Assert.That(derived.BaseValue == 100);
-            Assert.That(derived.DerivedValue == 200);
-            Assert.That(derived.ExtraData == "derived");
+            NAssert.That(derived.BaseValue == 100);
+            NAssert.That(derived.DerivedValue == 200);
+            NAssert.That(derived.ExtraData == "derived");
         }
 
         [Test]
@@ -96,22 +95,21 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Use WriteAllObject for polymorphic serialization
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 original,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var resultObj = _cacheHelper.ReadAllObject();
+            var resultObj = _helper.ReadAllObject(_data);
             var result = resultObj as BaseTestClass;
 
             // Assert
-            Assert.IsNotNull(result);
-            Assert.That(result.GetType() == typeof(BaseTestClass));
-            Assert.That(result.BaseValue == 50);
-            Assert.That(result.BaseData == "base");
+            NAssert.IsNotNull(result);
+            NAssert.That(result.GetType() == typeof(BaseTestClass));
+            NAssert.That(result.BaseValue == 50);
+            NAssert.That(result.BaseData == "base");
         }
 
         // Test classes for polymorphic serialization

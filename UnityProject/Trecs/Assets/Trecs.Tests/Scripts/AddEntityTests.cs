@@ -125,7 +125,7 @@ namespace Trecs.Tests
             nativeEcs.AddEntity(TestTags.Beta, sortKey: 1, refs[2]).Set(new TestInt { Value = 10 });
 
             refs.Dispose();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Beta));
 
@@ -153,7 +153,7 @@ namespace Trecs.Tests
                 .Set(new TestFloat { Value = 7.5f });
 
             refs.Dispose();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Beta));
             NAssert.AreEqual(0, a.Component<TestInt>(new EntityIndex(0, group)).Read.Value);
@@ -172,7 +172,7 @@ namespace Trecs.Tests
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 0).Set(new TestInt { Value = 100 });
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 1).Set(new TestInt { Value = 200 });
 
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.AreEqual(100, a.Component<TestInt>(new EntityIndex(0, group)).Read.Value);
@@ -189,7 +189,7 @@ namespace Trecs.Tests
 
             nativeEcs.AddEntity<TestAlpha>(sortKey: 5).Set(new TestInt { Value = 99 });
 
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.AreEqual(99, a.Component<TestInt>(new EntityIndex(0, group)).Read.Value);
         }
@@ -232,7 +232,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 77 });
             refs.Dispose();
 
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionAOnly));
             var comp = a.Component<TestInt>(new EntityIndex(0, expectedGroup));
@@ -266,7 +266,7 @@ namespace Trecs.Tests
                         .Set(new TestInt { Value = sortKeys[i] * 11 });
                 }
                 refs.Dispose();
-                a.Submit();
+                a.World.Submit();
 
                 var snapshot = new int[sortKeys.Length];
                 for (int i = 0; i < sortKeys.Length; i++)
@@ -314,7 +314,7 @@ namespace Trecs.Tests
             // this, Submit() asserts on outstanding jobs.
             a.JobScheduler.CompleteAllOutstanding();
 
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(Count, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -359,7 +359,7 @@ namespace Trecs.Tests
                 .Complete();
 
             a.JobScheduler.CompleteAllOutstanding();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(Count, a.CountEntitiesWithTags(partitionATags));
 

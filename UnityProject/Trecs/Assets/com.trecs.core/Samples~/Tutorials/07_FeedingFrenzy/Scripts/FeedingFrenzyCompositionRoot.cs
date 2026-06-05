@@ -67,7 +67,9 @@ namespace Trecs.Samples.FeedingFrenzy101
                 )
                 .Build();
 
-            var cleanupHandler = new RemoveCleanupHandler(world);
+            // Cross-entity cleanup (fish↔meal) is handled declaratively by the
+            // [CascadeRemove] attributes on TargetMeal.Value / ApproachingFish.Value
+            // (see Schema.cs) — no manual OnRemoved observer needed.
 
             var inputSystem = new InputSystem();
 
@@ -92,7 +94,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             initializables = new() { world.Initialize };
             tickables = new() { inputSystem.Tick, world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { cleanupHandler.Dispose, world.Dispose };
+            disposables = new() { world.Dispose };
         }
     }
 }

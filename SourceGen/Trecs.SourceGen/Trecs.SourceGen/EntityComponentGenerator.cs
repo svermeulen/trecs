@@ -33,6 +33,12 @@ namespace Trecs.SourceGen
     [Generator]
     public class EntityComponentGenerator : IIncrementalGenerator
     {
+        // Name of the generated compile-time layout-hash constant. Must stay in sync
+        // with the runtime reader in WorldSchemaFingerprintCalculator (it looks the
+        // field up by this exact name via reflection). Public so the generator tests
+        // can assert against it.
+        public const string ComponentLayoutHashFieldName = "__TrecsComponentLayoutHash";
+
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
@@ -118,14 +124,25 @@ namespace Trecs.SourceGen
             // non-generic structs.
             string typeParameterList = SymbolAnalyzer.FormatTypeParameterList(symbol);
 
+            // Compile-time field-layout hash, emitted as a const and read by the
+            // runtime WorldSchemaFingerprint to close the same-size field-edit gap
+            // (a field swap that preserves struct size fingerprints identically on
+            // size alone). Computed here in the transform — folded into the semantic
+            // work ExtractModel already does — and stored as a primitive ulong, so it
+            // costs the incremental pipeline an extra field-walk only when a component
+            // struct's source actually changes, and never defeats caching.
+            ulong layoutHash = ComponentLayoutHasher.Compute(symbol);
+
             return new EntityComponentModel(
                 TypeName: symbol.Name,
                 TypeParameterList: typeParameterList,
                 Namespace: PerformanceCache.GetDisplayString(symbol.ContainingNamespace),
                 Accessibility: GetAccessibility(symbol),
+                Location: LocationInfo.From(structDecl.GetLocation()),
                 IsPartial: isPartial,
                 IsUnwrap: isUnwrap,
                 IsSerializable: isSerializable,
+                LayoutHash: layoutHash,
                 UnwrapFieldName: unwrapFieldName,
                 UnwrapFieldTypeDisplay: unwrapFieldTypeDisplay,
                 HasUnwrapConstructor: hasUnwrapConstructor,
@@ -145,9 +162,23 @@ namespace Trecs.SourceGen
 
                 if (!model.IsPartial)
                 {
+                    // Emitting the Equals/GetHashCode/operator partial against a
+                    // non-partial struct produces a phantom second declaration
+                    // that nothing merges into, yielding confusing CS0260-style
+                    // errors. Report a clean "must be partial" diagnostic and
+                    // skip generation instead — mirroring how the aspect and
+                    // template generators handle their own non-partial types.
                     SourceGenLogger.Log(
-                        $"[EntityComponentGenerator] Type {model.TypeName} is not declared as partial, generated code may cause errors"
+                        $"[EntityComponentGenerator] Type {model.TypeName} is not declared as partial, skipping generation and reporting diagnostic"
                     );
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.ComponentMustBePartial,
+                            model.Location.ToLocation(),
+                            model.TypeName
+                        )
+                    );
+                    return;
                 }
 
                 var source = GenerateComponentCode(model);
@@ -212,6 +243,19 @@ namespace Trecs.SourceGen
             indentLevel++;
 
             var methodIndent = new string(' ', indentLevel * 4);
+
+            // Compile-time field-layout hash. The runtime WorldSchemaFingerprint
+            // calculator reads this const by name via reflection and mixes it into
+            // the groups hash, so a same-size field reorder (which slips past the
+            // size-only check) still changes the schema fingerprint and a stale
+            // snapshot fails loudly instead of blitting bytes into the wrong fields.
+            // Internal/generated surface — name is deliberately unusual to avoid
+            // colliding with user members; nothing should reference it by hand.
+            sb.AppendLine($"{methodIndent}{GeneratedCodeAttributes.Line}");
+            sb.AppendLine(
+                $"{methodIndent}public const ulong {ComponentLayoutHashFieldName} = {model.LayoutHash}UL;"
+            );
+            sb.AppendLine();
 
             if (
                 model.IsUnwrap
@@ -305,9 +349,11 @@ namespace Trecs.SourceGen
         string TypeParameterList,
         string Namespace,
         string Accessibility,
+        LocationInfo Location,
         bool IsPartial,
         bool IsUnwrap,
         bool IsSerializable,
+        ulong LayoutHash,
         string? UnwrapFieldName,
         string? UnwrapFieldTypeDisplay,
         bool HasUnwrapConstructor,

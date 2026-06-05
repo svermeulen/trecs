@@ -132,16 +132,18 @@ namespace Trecs.Tests
         [Test]
         public void SharedPtr_WithValues_IsNotNull()
         {
-            var ptr = new SharedPtr<string>(new PtrHandle(1), new BlobId(10));
+            var ptr = new SharedPtr<string>(new BlobId(10));
             NAssert.IsFalse(ptr.IsNull);
         }
 
         [Test]
         public void SharedPtr_Equality()
         {
-            var a = new SharedPtr<string>(new PtrHandle(1), new BlobId(10));
-            var b = new SharedPtr<string>(new PtrHandle(1), new BlobId(10));
-            var c = new SharedPtr<string>(new PtrHandle(2), new BlobId(10));
+            // Identity is the BlobId: same id ⇒ equal (including a clone of the same blob),
+            // different id ⇒ not equal.
+            var a = new SharedPtr<string>(new BlobId(10));
+            var b = new SharedPtr<string>(new BlobId(10));
+            var c = new SharedPtr<string>(new BlobId(20));
 
             NAssert.IsTrue(a.Equals(b));
             NAssert.IsFalse(a.Equals(c));
@@ -152,41 +154,41 @@ namespace Trecs.Tests
         [Test]
         public void SharedPtr_HashCode()
         {
-            var a = new SharedPtr<string>(new PtrHandle(1), new BlobId(10));
-            var b = new SharedPtr<string>(new PtrHandle(1), new BlobId(10));
+            var a = new SharedPtr<string>(new BlobId(10));
+            var b = new SharedPtr<string>(new BlobId(10));
             NAssert.AreEqual(a.GetHashCode(), b.GetHashCode());
         }
 
         #endregion
 
-        #region BlobPtr
+        #region SharedAnchor
 
         [Test]
-        public void BlobPtr_DefaultIsNull()
+        public void SharedAnchor_DefaultIsNull()
         {
-            var ptr = default(BlobPtr<string>);
+            var ptr = default(SharedAnchor<string>);
             NAssert.IsTrue(ptr.IsNull);
         }
 
         [Test]
-        public void BlobPtr_NullField_IsNull()
+        public void SharedAnchor_NullField_IsNull()
         {
-            NAssert.IsTrue(BlobPtr<string>.Null.IsNull);
+            NAssert.IsTrue(SharedAnchor<string>.Null.IsNull);
         }
 
         [Test]
-        public void BlobPtr_WithValues_IsNotNull()
+        public void SharedAnchor_WithValues_IsNotNull()
         {
-            var ptr = new BlobPtr<string>(new PtrHandle(1), new BlobId(10));
+            var ptr = new SharedAnchor<string>(new PtrHandle(1), new BlobId(10));
             NAssert.IsFalse(ptr.IsNull);
         }
 
         [Test]
-        public void BlobPtr_Equality()
+        public void SharedAnchor_Equality()
         {
-            var a = new BlobPtr<string>(new PtrHandle(1), new BlobId(10));
-            var b = new BlobPtr<string>(new PtrHandle(1), new BlobId(10));
-            var c = new BlobPtr<string>(new PtrHandle(2), new BlobId(10));
+            var a = new SharedAnchor<string>(new PtrHandle(1), new BlobId(10));
+            var b = new SharedAnchor<string>(new PtrHandle(1), new BlobId(10));
+            var c = new SharedAnchor<string>(new PtrHandle(2), new BlobId(10));
 
             NAssert.IsTrue(a.Equals(b));
             NAssert.IsFalse(a.Equals(c));
@@ -195,42 +197,42 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void BlobPtr_HashCode()
+        public void SharedAnchor_HashCode()
         {
-            var a = new BlobPtr<string>(new PtrHandle(1), new BlobId(10));
-            var b = new BlobPtr<string>(new PtrHandle(1), new BlobId(10));
+            var a = new SharedAnchor<string>(new PtrHandle(1), new BlobId(10));
+            var b = new SharedAnchor<string>(new PtrHandle(1), new BlobId(10));
             NAssert.AreEqual(a.GetHashCode(), b.GetHashCode());
         }
 
         #endregion
 
-        #region NativeBlobPtr
+        #region NativeSharedAnchor
 
         [Test]
-        public void NativeBlobPtr_DefaultIsNull()
+        public void NativeSharedAnchor_DefaultIsNull()
         {
-            NAssert.IsTrue(default(NativeBlobPtr<int>).IsNull);
+            NAssert.IsTrue(default(NativeSharedAnchor<int>).IsNull);
         }
 
         [Test]
-        public void NativeBlobPtr_NullField_IsNull()
+        public void NativeSharedAnchor_NullField_IsNull()
         {
-            NAssert.IsTrue(NativeBlobPtr<int>.Null.IsNull);
+            NAssert.IsTrue(NativeSharedAnchor<int>.Null.IsNull);
         }
 
         [Test]
-        public void NativeBlobPtr_WithValues_IsNotNull()
+        public void NativeSharedAnchor_WithValues_IsNotNull()
         {
-            var ptr = new NativeBlobPtr<int>(new PtrHandle(1), new BlobId(10));
+            var ptr = new NativeSharedAnchor<int>(new PtrHandle(1), new BlobId(10));
             NAssert.IsFalse(ptr.IsNull);
         }
 
         [Test]
-        public void NativeBlobPtr_Equality()
+        public void NativeSharedAnchor_Equality()
         {
-            var a = new NativeBlobPtr<int>(new PtrHandle(1), new BlobId(10));
-            var b = new NativeBlobPtr<int>(new PtrHandle(1), new BlobId(10));
-            var c = new NativeBlobPtr<int>(new PtrHandle(2), new BlobId(10));
+            var a = new NativeSharedAnchor<int>(new PtrHandle(1), new BlobId(10));
+            var b = new NativeSharedAnchor<int>(new PtrHandle(1), new BlobId(10));
+            var c = new NativeSharedAnchor<int>(new PtrHandle(2), new BlobId(10));
 
             NAssert.IsTrue(a.Equals(b));
             NAssert.IsFalse(a.Equals(c));
@@ -239,10 +241,10 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeBlobPtr_HashCode()
+        public void NativeSharedAnchor_HashCode()
         {
-            var a = new NativeBlobPtr<int>(new PtrHandle(1), new BlobId(10));
-            var b = new NativeBlobPtr<int>(new PtrHandle(1), new BlobId(10));
+            var a = new NativeSharedAnchor<int>(new PtrHandle(1), new BlobId(10));
+            var b = new NativeSharedAnchor<int>(new PtrHandle(1), new BlobId(10));
             NAssert.AreEqual(a.GetHashCode(), b.GetHashCode());
         }
 
@@ -287,22 +289,33 @@ namespace Trecs.Tests
         #endregion
 
         // ───────────────────────────────────────────────────────────
-        // GroupIndex 2: BlobCache + BlobPtr Integration Tests
+        // GroupIndex 2: BlobCache + SharedAnchor Integration Tests
         // ───────────────────────────────────────────────────────────
 
         static BlobCache CreateBlobCache()
         {
-            var blobStore = new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
-            var settings = new BlobCacheSettings { SerializationVersion = 1 };
+            var settings = new BlobCacheSettings();
             // The pool is intentionally not disposed by the test — boxes return their
             // native memory to AllocatorManager on Dispose, and the pool's free-list
             // holds only managed wrapper references that GC reclaims when the test ends.
-            return new BlobCache(
-                TrecsLog.Default,
-                new List<IBlobStore> { blobStore },
-                settings,
-                new NativeBlobBoxPool()
-            );
+            return new BlobCache(TrecsLog.Default, settings, new NativeBlobBoxPool());
+        }
+
+        // Register-then-acquire helpers: the heaps no longer expose an eager CreateBlob, so
+        // tests register a (constant) source and acquire a handle. Overloaded by heap type so
+        // call sites read the same for managed and native.
+        static SharedPtr<T> CreateBlob<T>(SharedHeap heap, BlobId id, T value)
+            where T : class
+        {
+            heap.RegisterBlob(id, value);
+            return heap.GetBlobById<T>(id);
+        }
+
+        static NativeSharedPtr<T> CreateBlob<T>(NativeSharedHeap heap, BlobId id, in T value)
+            where T : unmanaged
+        {
+            heap.RegisterBlob(id, in value);
+            return heap.GetBlob<T>(id);
         }
 
         [Test]
@@ -344,7 +357,7 @@ namespace Trecs.Tests
             var blob = new List<string> { "test" };
             var ptr = blobCache.AllocManagedBlob(new BlobId(1), blob);
 
-            NAssert.IsTrue(blobCache.Contains(ptr.BlobId));
+            NAssert.IsTrue(blobCache.IsResident(ptr.BlobId));
 
             ptr.Dispose(blobCache);
             blobCache.Dispose();
@@ -355,13 +368,13 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            NAssert.IsFalse(blobCache.Contains(new BlobId(999999)));
+            NAssert.IsFalse(blobCache.IsResident(new BlobId(999999)));
 
             blobCache.Dispose();
         }
 
         [Test]
-        public void BlobPtr_Get_ReturnsBlobValue()
+        public void SharedAnchor_Get_ReturnsBlobValue()
         {
             var blobCache = CreateBlobCache();
 
@@ -376,7 +389,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void BlobPtr_TryGet_ReturnsTrueAndValue()
+        public void SharedAnchor_TryGet_ReturnsTrueAndValue()
         {
             var blobCache = CreateBlobCache();
 
@@ -392,7 +405,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void BlobPtr_CanGet_TrueForValid_FalseForDisposed()
+        public void SharedAnchor_CanGet_TrueForValid_FalseForDisposed()
         {
             var blobCache = CreateBlobCache();
 
@@ -408,7 +421,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void BlobPtr_Clone_CreatesIndependentHandle()
+        public void SharedAnchor_Clone_CreatesIndependentHandle()
         {
             var blobCache = CreateBlobCache();
 
@@ -431,7 +444,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void BlobPtr_Dispose_InvalidatesHandle()
+        public void SharedAnchor_Dispose_InvalidatesHandle()
         {
             var blobCache = CreateBlobCache();
 
@@ -446,11 +459,11 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void BlobPtr_Clone_OnNull_ReturnsNull()
+        public void SharedAnchor_Clone_OnNull_ReturnsNull()
         {
             var blobCache = CreateBlobCache();
 
-            var result = BlobPtr<string>.Null.Clone(blobCache);
+            var result = SharedAnchor<string>.Null.Clone(blobCache);
             NAssert.IsTrue(result.IsNull);
 
             blobCache.Dispose();
@@ -565,45 +578,12 @@ namespace Trecs.Tests
             blobCache.Dispose();
         }
 
-        [Test]
-        public void BlobCache_GetStatsPerStore_ReturnsOneEntryPerStore()
-        {
-            var blobCache = CreateBlobCache();
-
-            var ptr = blobCache.AllocManagedBlob(new BlobId(1), new List<string> { "perstore" });
-
-            var perStore = new List<BlobStoreStats>();
-            blobCache.GetStatsPerStore(perStore);
-
-            NAssert.AreEqual(1, perStore.Count);
-            NAssert.AreEqual(1, perStore[0].TotalManagedEntries);
-            NAssert.AreEqual(0, perStore[0].InactiveManagedEntries);
-
-            ptr.Dispose(blobCache);
-            blobCache.Dispose();
-        }
-
-        [Test]
-        public void BlobCache_GetStatsPerStore_ClearsOutputListBeforePopulating()
-        {
-            var blobCache = CreateBlobCache();
-
-            var perStore = new List<BlobStoreStats> { new(99, 99, 99, 99), new(99, 99, 99, 99) };
-
-            blobCache.GetStatsPerStore(perStore);
-
-            NAssert.AreEqual(1, perStore.Count);
-            NAssert.AreEqual(0, perStore[0].TotalManagedEntries);
-
-            blobCache.Dispose();
-        }
-
         // ───────────────────────────────────────────────────────────
-        // GroupIndex 2b: NativeBlobPtr + BlobCache Integration Tests
+        // GroupIndex 2b: NativeSharedAnchor + BlobCache Integration Tests
         // ───────────────────────────────────────────────────────────
 
         [Test]
-        public void NativeBlobPtr_CreateNativeHandle_ReturnsValidPtr()
+        public void NativeSharedAnchor_CreateNativeHandle_ReturnsValidPtr()
         {
             var blobCache = CreateBlobCache();
 
@@ -618,13 +598,13 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeBlobPtr_Get_ReturnsStoredValue()
+        public void NativeSharedAnchor_Get_ReturnsStoredValue()
         {
             var blobCache = CreateBlobCache();
 
             var ptr = blobCache.AllocNativeBlob<int>(new BlobId(1), 42);
 
-            ref int value = ref ptr.Get(blobCache);
+            ref readonly int value = ref ptr.Get(blobCache);
             NAssert.AreEqual(42, value);
 
             ptr.Dispose(blobCache);
@@ -632,7 +612,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeBlobPtr_TryGetPtr_ReturnsTrueAndPtr()
+        public void NativeSharedAnchor_TryGetPtr_ReturnsTrueAndPtr()
         {
             var blobCache = CreateBlobCache();
 
@@ -647,7 +627,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeBlobPtr_CanGet_TrueForValid_FalseForDisposed()
+        public void NativeSharedAnchor_CanGet_TrueForValid_FalseForDisposed()
         {
             var blobCache = CreateBlobCache();
 
@@ -662,7 +642,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeBlobPtr_Clone_CreatesIndependentHandle()
+        public void NativeSharedAnchor_Clone_CreatesIndependentHandle()
         {
             var blobCache = CreateBlobCache();
 
@@ -676,7 +656,7 @@ namespace Trecs.Tests
             ptr.Dispose(blobCache);
             NAssert.IsTrue(clone.CanGet(blobCache));
 
-            ref int value = ref clone.Get(blobCache);
+            ref readonly int value = ref clone.Get(blobCache);
             NAssert.AreEqual(42, value);
 
             clone.Dispose(blobCache);
@@ -684,18 +664,18 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeBlobPtr_Clone_OnNull_ReturnsNull()
+        public void NativeSharedAnchor_Clone_OnNull_ReturnsNull()
         {
             var blobCache = CreateBlobCache();
 
-            var result = NativeBlobPtr<int>.Null.Clone(blobCache);
+            var result = NativeSharedAnchor<int>.Null.Clone(blobCache);
             NAssert.IsTrue(result.IsNull);
 
             blobCache.Dispose();
         }
 
         [Test]
-        public void NativeBlobPtr_Dispose_InvalidatesHandle()
+        public void NativeSharedAnchor_Dispose_InvalidatesHandle()
         {
             var blobCache = CreateBlobCache();
 
@@ -715,7 +695,8 @@ namespace Trecs.Tests
         static (SharedHeap heap, BlobCache blobCache) CreateSharedHeap()
         {
             var blobCache = CreateBlobCache();
-            var heap = new SharedHeap(TrecsLog.Default, blobCache);
+            var factory = new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry());
+            var heap = new SharedHeap(TrecsLog.Default, blobCache, factory);
             return (heap, blobCache);
         }
 
@@ -725,10 +706,9 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "shared" };
-            var ptr = heap.CreateBlob(new BlobId(1), blob);
+            var ptr = CreateBlob(heap, new BlobId(1), blob);
 
             NAssert.IsFalse(ptr.IsNull);
-            NAssert.IsFalse(ptr.Handle.IsNull);
             NAssert.IsFalse(ptr.Id.IsNull);
 
             heap.Dispose();
@@ -741,9 +721,9 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "getblob" };
-            var ptr = heap.CreateBlob(new BlobId(1), blob);
+            var ptr = CreateBlob(heap, new BlobId(1), blob);
 
-            var retrieved = heap.GetBlob<List<object>>(ptr.Handle);
+            var retrieved = heap.GetBlob<List<object>>(ptr.Id);
             NAssert.AreSame(blob, retrieved);
 
             heap.Dispose();
@@ -756,11 +736,11 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "remove" };
-            var ptr = heap.CreateBlob(new BlobId(1), blob);
+            var ptr = CreateBlob(heap, new BlobId(1), blob);
 
             NAssert.AreEqual(1, heap.NumEntries);
 
-            heap.DisposeHandle(ptr.Handle);
+            heap.DecrementRef(ptr.Id);
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -773,15 +753,15 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "cloneshared" };
-            var ptr = heap.CreateBlob(new BlobId(1), blob);
+            var ptr = CreateBlob(heap, new BlobId(1), blob);
 
-            heap.TryClone<List<object>>(ptr.Handle, out var clone);
+            heap.TryClone<List<object>>(ptr.Id, out var clone);
             NAssert.IsFalse(clone.IsNull);
 
-            heap.DisposeHandle(ptr.Handle);
-            NAssert.IsTrue(heap.CanGetBlob(clone.Handle));
+            heap.DecrementRef(ptr.Id);
+            NAssert.IsTrue(heap.ContainsBlobDirect(clone.Id));
 
-            var retrieved = heap.GetBlob<List<object>>(clone.Handle);
+            var retrieved = heap.GetBlob<List<object>>(clone.Id);
             NAssert.AreSame(blob, retrieved);
 
             heap.Dispose();
@@ -795,16 +775,16 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(0, heap.NumEntries);
 
-            var ptr1 = heap.CreateBlob(new BlobId(1), new List<object> { "a" });
+            var ptr1 = CreateBlob(heap, new BlobId(1), new List<object> { "a" });
             NAssert.AreEqual(1, heap.NumEntries);
 
-            var ptr2 = heap.CreateBlob(new BlobId(2), new List<object> { "b" });
+            var ptr2 = CreateBlob(heap, new BlobId(2), new List<object> { "b" });
             NAssert.AreEqual(2, heap.NumEntries);
 
-            heap.DisposeHandle(ptr1.Handle);
+            heap.DecrementRef(ptr1.Id);
             NAssert.AreEqual(1, heap.NumEntries);
 
-            heap.DisposeHandle(ptr2.Handle);
+            heap.DecrementRef(ptr2.Id);
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1049,7 +1029,8 @@ namespace Trecs.Tests
         static (NativeSharedHeap heap, BlobCache blobCache) CreateNativeSharedHeap()
         {
             var blobCache = CreateBlobCache();
-            var heap = new NativeSharedHeap(TrecsLog.Default, blobCache);
+            var factory = new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry());
+            var heap = new NativeSharedHeap(TrecsLog.Default, blobCache, factory);
             return (heap, blobCache);
         }
 
@@ -1058,7 +1039,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(42), 42);
 
             NAssert.IsFalse(ptr.IsNull);
             NAssert.AreNotEqual(0u, ptr.Handle);
@@ -1073,7 +1054,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(42), 42);
 
             ref readonly int value = ref heap.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
@@ -1087,7 +1068,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(42), 42);
 
             NAssert.AreEqual(1, heap.NumEntries);
 
@@ -1104,7 +1085,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(42), 42);
 
             heap.TryClone<int>(ptr.Handle, out var clone);
             NAssert.IsFalse(clone.IsNull);
@@ -1123,7 +1104,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(42), 42);
             NAssert.AreEqual(1, heap.NumEntries);
 
             heap.DecrementRef(ptr.Handle);
@@ -1149,7 +1130,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(42), 42);
             heap.DecrementRef(ptr.Handle);
 
             NAssert.Throws<TrecsException>(() => heap.DecrementRef(ptr.Handle));
@@ -1165,10 +1146,10 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(0, heap.NumEntries);
 
-            var ptr1 = heap.CreateBlob<int>(new BlobId(10), 10);
+            var ptr1 = CreateBlob<int>(heap, new BlobId(10), 10);
             NAssert.AreEqual(1, heap.NumEntries);
 
-            var ptr2 = heap.CreateBlob<int>(new BlobId(20), 20);
+            var ptr2 = CreateBlob<int>(heap, new BlobId(20), 20);
             NAssert.AreEqual(2, heap.NumEntries);
 
             heap.DecrementRef(ptr1.Handle);
@@ -1339,24 +1320,24 @@ namespace Trecs.Tests
             var ptrB = default(InputNativeUniquePtr<int>);
             var ptrC = default(InputNativeUniquePtr<int>);
 
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
             // Write
             var src = new InputNativeUniqueHeap(TrecsLog.Default);
             ptrA = src.Alloc<int>(10, 100);
             ptrB = src.Alloc<int>(11, 200);
             ptrC = src.Alloc<int>(12, 300);
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
             // Read
-            buffer.ResetMemoryPosition();
             var dst = new InputNativeUniqueHeap(TrecsLog.Default);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(3, dst.NumLiveFrames);
             NAssert.AreEqual(100, ptrA.Read(dst.Resolver));
@@ -1373,7 +1354,8 @@ namespace Trecs.Tests
             // carry their own ID into the wire format. Deserialize re-mints
             // an allocation per ID and bumps the counter past the max so a
             // subsequent live Alloc doesn't collide.
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
             var src = new InputNativeUniqueHeap(TrecsLog.Default);
             src.Alloc<int>(10, 100);
@@ -1383,16 +1365,15 @@ namespace Trecs.Tests
             var ptr13 = src.Alloc<int>(13, 400);
             var ptr14 = src.Alloc<int>(14, 500);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
             var dst = new InputNativeUniqueHeap(TrecsLog.Default);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(3, dst.NumLiveFrames);
             NAssert.AreEqual(300, ptr12.Read(dst.Resolver));
@@ -1455,19 +1436,19 @@ namespace Trecs.Tests
             // InputAllocation. After deserialize, same-T reads succeed and
             // wrong-T reads must throw — i.e. the deserialized heap behaves
             // identically to a live heap with respect to the type-check.
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
             var src = new InputNativeUniqueHeap(TrecsLog.Default);
             var ptr = src.Alloc<int>(1, 42);
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
             var dst = new InputNativeUniqueHeap(TrecsLog.Default);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.DoesNotThrow(() => dst.ResolveUnsafePtr<int>(ptr.Handle));
             NAssert.Throws<TrecsException>(() => dst.ResolveUnsafePtr<float>(ptr.Handle));
@@ -1503,7 +1484,8 @@ namespace Trecs.Tests
             const int Count = 5000;
             var ptrs = new InputNativeUniquePtr<int>[Count];
 
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
             var src = new InputNativeUniqueHeap(TrecsLog.Default);
             for (int i = 0; i < Count; i++)
@@ -1517,16 +1499,15 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i * 7, ptrs[i].Read(src.Resolver));
             }
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
             var dst = new InputNativeUniqueHeap(TrecsLog.Default);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(Count, dst.NumLiveAllocations);
             for (int i = 0; i < Count; i++)
@@ -1556,25 +1537,33 @@ namespace Trecs.Tests
             // one refcount handle per (frame, BlobId) entry so the blob stays
             // pinned for the lifetime of the input frame.
             var blobCache = CreateBlobCache();
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
-            var src = new InputNativeSharedHeap(TrecsLog.Default, blobCache);
+            var src = new InputNativeSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
             var ptrA = src.Alloc<int>(10, new BlobId(1), 100);
             var ptrB = src.Alloc<int>(11, new BlobId(2), 200);
             var ptrC = src.Alloc<int>(12, new BlobId(3), 300);
 
             NAssert.AreEqual(3, src.NumLiveFrames);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
-            var dst = new InputNativeSharedHeap(TrecsLog.Default, blobCache);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            var dst = new InputNativeSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(3, dst.NumLiveFrames);
             // The blob bytes were never serialized — they're still in the
@@ -1595,9 +1584,14 @@ namespace Trecs.Tests
             // itself. The round-trip must preserve the surviving (frame, BlobId)
             // pairs and re-mint one refcount handle per pair on Deserialize.
             var blobCache = CreateBlobCache();
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
-            var src = new InputNativeSharedHeap(TrecsLog.Default, blobCache);
+            var src = new InputNativeSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
             src.Alloc<int>(10, new BlobId(1), 100);
             src.Alloc<int>(11, new BlobId(2), 200);
             // TryAcquire bumps refcount on BlobId(1) under a new frame.
@@ -1610,16 +1604,19 @@ namespace Trecs.Tests
             src.ClearAtOrBeforeFrame(11);
             NAssert.AreEqual(2, src.NumLiveFrames);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
-            var dst = new InputNativeSharedHeap(TrecsLog.Default, blobCache);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            var dst = new InputNativeSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(2, dst.NumLiveFrames);
             NAssert.AreEqual(100, blobCache.GetNativeBlobRef<int>(ptr12.BlobId));
@@ -1645,28 +1642,36 @@ namespace Trecs.Tests
             // dirty heap so a missed caller-side ClearAll doesn't double-mint
             // refcount handles for entries from the prior session.
             var blobCache = CreateBlobCache();
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
-            var src = new InputNativeSharedHeap(TrecsLog.Default, blobCache);
+            var src = new InputNativeSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
             src.Alloc<int>(10, new BlobId(1), 100);
             src.Alloc<int>(11, new BlobId(2), 200);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
             // dst already has unrelated state — Alloc<int>(99, …) — when
             // Deserialize is called. The defensive ClearAll inside Deserialize
             // must release that handle before re-minting from the wire.
-            buffer.ResetMemoryPosition();
-            var dst = new InputNativeSharedHeap(TrecsLog.Default, blobCache);
+            var dst = new InputNativeSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
             dst.Alloc<int>(99, new BlobId(999), 9999);
             NAssert.AreEqual(1, dst.NumLiveFrames);
 
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             // Dirty entry got wiped; only the deserialized frames are live.
             NAssert.AreEqual(2, dst.NumLiveFrames);
@@ -1685,11 +1690,21 @@ namespace Trecs.Tests
         {
             // InputUniqueHeap.Serialize / Deserialize round-trip arbitrary
             // managed values via WriteObject / ReadObject, which needs a
-            // type-resolved serializer in the registry. ListSerializer<int>
+            // type-resolved serializer in the registry. ListSerializerManaged<int>
             // covers our test payloads (List<int>) without dragging the full
             // TestSerializerInstaller surface area into this fixture.
             var registry = MakeRegistry();
-            registry.RegisterSerializer(new ListSerializer<int>());
+            registry.RegisterSerializer(new ListSerializerUnmanaged<int>());
+            return registry;
+        }
+
+        static SerializerRegistry MakeRegistryWithManagedListString()
+        {
+            // The InputSharedHeap round-trip tests below alloc List<string> payloads through the
+            // content-addressed InputSharedHeap.Alloc, which hashes (serializes) the value to derive
+            // its BlobId — so the BlobFactory's registry needs a type-resolved ListSerializerManaged<string>.
+            var registry = MakeRegistry();
+            registry.RegisterSerializer(new ListSerializerManaged<string>());
             return registry;
         }
 
@@ -1701,28 +1716,36 @@ namespace Trecs.Tests
             // handles only, and Deserialize re-mints one handle per
             // (frame, BlobId) entry.
             var blobCache = CreateBlobCache();
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
-            var src = new InputSharedHeap(TrecsLog.Default, blobCache);
+            var src = new InputSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistryWithManagedListString())
+            );
             var listA = new List<string> { "a" };
             var listB = new List<string> { "b" };
             var listC = new List<string> { "c" };
-            var ptrA = src.Alloc<List<string>>(10, new BlobId(1), listA);
-            var ptrB = src.Alloc<List<string>>(11, new BlobId(2), listB);
-            var ptrC = src.Alloc<List<string>>(12, new BlobId(3), listC);
+            var ptrA = src.Alloc<List<string>>(10, listA);
+            var ptrB = src.Alloc<List<string>>(11, listB);
+            var ptrC = src.Alloc<List<string>>(12, listC);
 
             NAssert.AreEqual(3, src.NumLiveFrames);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
-            var dst = new InputSharedHeap(TrecsLog.Default, blobCache);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            var dst = new InputSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(3, dst.NumLiveFrames);
             NAssert.AreSame(listA, blobCache.GetManagedBlob<List<string>>(ptrA.BlobId));
@@ -1736,35 +1759,43 @@ namespace Trecs.Tests
         public void InputSharedHeap_SerializeDeserialize_AfterTryAcquireAndTrim_RoundTrips()
         {
             var blobCache = CreateBlobCache();
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
-            var src = new InputSharedHeap(TrecsLog.Default, blobCache);
+            var src = new InputSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistryWithManagedListString())
+            );
             var listA = new List<string> { "a" };
             var listB = new List<string> { "b" };
             var listC = new List<string> { "c" };
-            src.Alloc<List<string>>(10, new BlobId(1), listA);
-            src.Alloc<List<string>>(11, new BlobId(2), listB);
-            NAssert.IsTrue(src.TryAcquire<List<string>>(12, new BlobId(1), out var ptr12));
-            src.Alloc<List<string>>(13, new BlobId(3), listC);
-            NAssert.IsTrue(src.TryAcquire<List<string>>(13, new BlobId(2), out var ptr13b));
+            var ptrA = src.Alloc<List<string>>(10, listA);
+            var ptrB = src.Alloc<List<string>>(11, listB);
+            NAssert.IsTrue(src.TryAcquire<List<string>>(12, ptrA.BlobId, out var ptr12));
+            var ptrC = src.Alloc<List<string>>(13, listC);
+            NAssert.IsTrue(src.TryAcquire<List<string>>(13, ptrB.BlobId, out var ptr13b));
             src.ClearAtOrBeforeFrame(11);
             NAssert.AreEqual(2, src.NumLiveFrames);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
-            var dst = new InputSharedHeap(TrecsLog.Default, blobCache);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            var dst = new InputSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistry())
+            );
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(2, dst.NumLiveFrames);
             NAssert.AreSame(listA, blobCache.GetManagedBlob<List<string>>(ptr12.BlobId));
             NAssert.AreSame(listB, blobCache.GetManagedBlob<List<string>>(ptr13b.BlobId));
-            NAssert.AreSame(listC, blobCache.GetManagedBlob<List<string>>(new BlobId(3)));
+            NAssert.AreSame(listC, blobCache.GetManagedBlob<List<string>>(ptrC.BlobId));
 
             dst.ClearAtOrBeforeFrame(12);
             NAssert.AreEqual(1, dst.NumLiveFrames);
@@ -1777,31 +1808,39 @@ namespace Trecs.Tests
         public void InputSharedHeap_Deserialize_OnDirtyHeap_DefensiveClearAll()
         {
             var blobCache = CreateBlobCache();
-            using var buffer = new SerializationBuffer(MakeRegistry());
+            var helper = new SerializationHelper(MakeRegistry());
+            var data = new SerializationData();
 
-            var src = new InputSharedHeap(TrecsLog.Default, blobCache);
+            var src = new InputSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistryWithManagedListString())
+            );
             var listA = new List<string> { "a" };
             var listB = new List<string> { "b" };
-            src.Alloc<List<string>>(10, new BlobId(1), listA);
-            src.Alloc<List<string>>(11, new BlobId(2), listB);
+            var ptrA = src.Alloc<List<string>>(10, listA);
+            var ptrB = src.Alloc<List<string>>(11, listB);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
-            var dst = new InputSharedHeap(TrecsLog.Default, blobCache);
-            dst.Alloc<List<string>>(99, new BlobId(999), new List<string> { "dirty" });
+            var dst = new InputSharedHeap(
+                TrecsLog.Default,
+                blobCache,
+                new BlobFactory(TrecsLog.Default, blobCache, MakeRegistryWithManagedListString())
+            );
+            dst.Alloc<List<string>>(99, new List<string> { "dirty" });
             NAssert.AreEqual(1, dst.NumLiveFrames);
 
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(2, dst.NumLiveFrames);
-            NAssert.AreSame(listA, blobCache.GetManagedBlob<List<string>>(new BlobId(1)));
-            NAssert.AreSame(listB, blobCache.GetManagedBlob<List<string>>(new BlobId(2)));
+            NAssert.AreSame(listA, blobCache.GetManagedBlob<List<string>>(ptrA.BlobId));
+            NAssert.AreSame(listB, blobCache.GetManagedBlob<List<string>>(ptrB.BlobId));
 
             dst.Dispose();
             blobCache.Dispose();
@@ -1847,7 +1886,8 @@ namespace Trecs.Tests
             // entry from the wire and rebuilds _handlesByFrame from each
             // entry's Frame field.
             var pool = new StubPoolManager();
-            using var buffer = new SerializationBuffer(MakeRegistryWithManagedListInt());
+            var helper = new SerializationHelper(MakeRegistryWithManagedListInt());
+            var data = new SerializationData();
 
             var src = new InputUniqueHeap(TrecsLog.Default, pool);
             var ptrA = src.Alloc<List<int>>(10, new List<int> { 100 });
@@ -1856,16 +1896,15 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(3, src.NumLiveAllocations);
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
             var dst = new InputUniqueHeap(TrecsLog.Default, pool);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(3, dst.NumLiveAllocations);
             // Each handle resolves back to a deserialized List<int> with the
@@ -1900,7 +1939,8 @@ namespace Trecs.Tests
             // AfterFrameTrim test. This is the path the task description calls
             // out as the "load-on-top-of-running-game" scenario.
             var pool = new StubPoolManager();
-            using var buffer = new SerializationBuffer(MakeRegistryWithManagedListInt());
+            var helper = new SerializationHelper(MakeRegistryWithManagedListInt());
+            var data = new SerializationData();
 
             var src = new InputUniqueHeap(TrecsLog.Default, pool);
             src.Alloc<List<int>>(10, new List<int> { 100 });
@@ -1910,16 +1950,15 @@ namespace Trecs.Tests
             var ptr13 = src.Alloc<List<int>>(13, new List<int> { 400 });
             var ptr14 = src.Alloc<List<int>>(14, new List<int> { 500 });
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
             var dst = new InputUniqueHeap(TrecsLog.Default, pool);
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             NAssert.AreEqual(3, dst.NumLiveAllocations);
             CollectionAssert.AreEqual(new[] { 300 }, dst.ResolveValue<List<int>>(ptr12.Handle));
@@ -1943,25 +1982,25 @@ namespace Trecs.Tests
         public void InputUniqueHeap_Deserialize_OnDirtyHeap_DefensiveClearAll()
         {
             var pool = new StubPoolManager();
-            using var buffer = new SerializationBuffer(MakeRegistryWithManagedListInt());
+            var helper = new SerializationHelper(MakeRegistryWithManagedListInt());
+            var data = new SerializationData();
 
             var src = new InputUniqueHeap(TrecsLog.Default, pool);
             src.Alloc<List<int>>(10, new List<int> { 100 });
             src.Alloc<List<int>>(11, new List<int> { 200 });
 
-            buffer.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buffer.Writer);
-            buffer.EndWrite();
+            helper.Writer.Start(data, version: 1, includeTypeChecks: true);
+            src.Serialize(helper.Writer);
+            helper.Writer.Complete();
             src.Dispose();
 
-            buffer.ResetMemoryPosition();
             var dst = new InputUniqueHeap(TrecsLog.Default, pool);
             dst.Alloc<List<int>>(99, new List<int> { 9999 });
             NAssert.AreEqual(1, dst.NumLiveAllocations);
 
-            buffer.StartRead();
-            dst.Deserialize(buffer.Reader);
-            buffer.StopRead(verifySentinel: false);
+            helper.Reader.Start(data);
+            dst.Deserialize(helper.Reader);
+            helper.Reader.CompletePartial();
 
             // Dirty entry was scrubbed by the defensive ClearAll at the top
             // of Deserialize.

@@ -46,6 +46,10 @@ namespace Trecs
     public readonly struct UniquePtr<T> : IEquatable<UniquePtr<T>>
         where T : class
     {
+        /// <summary>
+        /// Opaque handle into the unique heap identifying this allocation. A zero handle
+        /// represents the null ptr (see <see cref="IsNull"/>).
+        /// </summary>
         public readonly PtrHandle Handle;
 
         // Internal so external code can't fabricate a handle from an arbitrary uint.

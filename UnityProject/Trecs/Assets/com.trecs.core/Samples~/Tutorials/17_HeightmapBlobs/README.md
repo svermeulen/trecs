@@ -20,7 +20,7 @@ front, you derive one from the inputs that produced the data.
    `UniqueHashGenerator` can serialize and hash it.
 3. At init time, hash the descriptor → `BlobId`.
 4. Call `SharedPtr.GetOrAlloc(heap, blobId, factory)` /
-   `NativeSharedPtr.TryGet(...)` first; the heightmap builder only runs
+   `NativeSharedPtr.TryAcquire(...)` first; the heightmap builder only runs
    when the cache doesn't already have the answer.
 
 ```csharp

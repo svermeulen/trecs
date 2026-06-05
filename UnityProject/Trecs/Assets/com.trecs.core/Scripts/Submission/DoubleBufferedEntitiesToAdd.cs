@@ -298,7 +298,7 @@ namespace Trecs.Internal
         /// sort-key order rather than bag-thread arrival order. Pre-reserved
         /// handles (non-Null) are skipped.
         /// </summary>
-        internal void ClaimDeferredHandlesForNativeAdds(ref EntityHandleMap entityHandleMap)
+        internal void ClaimDeferredHandlesForNativeAdds(EntityHandleMap entityHandleMap)
         {
             for (int gi = 0; gi < _currentPendingReferences.Length; gi++)
             {

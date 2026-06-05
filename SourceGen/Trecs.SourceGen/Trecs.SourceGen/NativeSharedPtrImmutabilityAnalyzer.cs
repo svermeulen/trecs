@@ -34,12 +34,13 @@ namespace Trecs.SourceGen
     /// post-Alloc mutation silently desyncs determinism. Both accepted shapes
     /// above prevent that.</para>
     ///
-    /// <para>Also catches the static factory methods on the non-generic
-    /// <c>Trecs.NativeSharedPtr</c> helper class (<c>Alloc</c>, <c>Acquire</c>,
-    /// <c>TryGet</c>, <c>AllocTakingOwnership</c>, <c>GetOrAlloc</c>,
-    /// <c>GetOrAllocTakingOwnership</c>) so a call like
+    /// <para>Also catches <i>every</i> generic static factory method on the
+    /// non-generic <c>Trecs.NativeSharedPtr</c> helper class (<c>Register</c>,
+    /// <c>Acquire</c>, <c>TryGet</c>, <c>Alloc</c>) so a call like
     /// <c>NativeSharedPtr.Alloc&lt;Bad&gt;(...)</c> is rejected at the call
-    /// site too, not just wherever the returned handle lands.</para>
+    /// site too, not just wherever the returned handle lands. Matching is by
+    /// containing type + arity, not method name, so new factory methods are
+    /// covered automatically.</para>
     ///
     /// <list type="bullet">
     ///   <item><b>TRECS124</b> — type argument is not defensive-copy-safe (not readonly struct, not all-readonly-members struct, not a primitive / enum)</item>

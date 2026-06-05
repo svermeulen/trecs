@@ -32,8 +32,9 @@ namespace Trecs.Internal
         void Clear();
 
         /// <summary>
-        /// Returns the element size in bytes and the unsafe pointer to the underlying
-        /// native buffer. Used by Burst jobs to perform type-erased data movement.
+        /// The element size in bytes of the stored component type. Combined with
+        /// <see cref="GetUnsafePtr"/> for type-erased data movement (Burst jobs,
+        /// raw serialization blits).
         /// </summary>
         int ElementSize { get; }
 

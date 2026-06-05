@@ -49,6 +49,39 @@ namespace Trecs.Internal
         NativeList<DeferredHandleFreeEntry> _cachedDeferredHandleFrees;
         readonly List<(GroupIndex Group, int PostRemoveCount)> _cachedDeferredHandleTrims;
 
+        // Groups whose departed entities must be removed from their sets *after*
+        // OnRemoved fires (so the entity is still a set member during the callback,
+        // mirroring component-data accessibility). Only populated when an entire
+        // group's current contents are removed in one batch (newCount == 0) — in
+        // that case there are no survivors to swap-back, so no set entry collides.
+        readonly List<GroupIndex> _cachedDeferredSetRemovalGroups;
+
+        // Per-group (group, liveCountAtRemoval) records for the whole-group removal
+        // fast path. Because a whole-group removal has no swap-back, the reverse-map
+        // slots are left untouched until after OnRemoved (so ToHandle still resolves
+        // during the callback); the handles are then freed in one Burst pass per
+        // group (BatchFreeWholeGroupHandles) instead of the capture/relocate/finalize
+        // dance the per-entity path needs.
+        readonly List<(GroupIndex Group, int OriginalCount)> _cachedFullRemoveGroups;
+
+        // Per-group [CascadeRemove]/[DisposeOnRemove] handlers, precomputed at world
+        // build (a group is a fixed component set, so this never changes). A null
+        // entry means that group has no handlers of that kind. Indexed by
+        // GroupIndex.Index. Populated by PrecomputeRemovalHandlers.
+        RemovalFieldHandler[][] _removalReadHandlersByGroup;
+        RemovalFieldHandler[][] _removalDisposeHandlersByGroup;
+        bool _hasAnyRemovalHandlers;
+
+        // Unrestricted accessor used to read fields / queue removes / dispose
+        // heap storage from inside the removal window. Set in FreezeConfiguration.
+        WorldAccessor _removalHandlerAccessor;
+
+        // Scratch reused across the two removal phases within one
+        // FireRemoveCallbacks / FireFullRemoveCallbacks call: the (group, range)
+        // pairs whose groups have [DisposeOnRemove] handlers, so the dispose phase
+        // re-walks exactly the ranges the read phase saw.
+        readonly List<(GroupIndex Group, EntityRange Range)> _removalDisposeRanges = new();
+
         // Per-removed-entity originalSlot → tailSlot lookup table. NativeHashMap
         // (vs the prior IterableDictionary) because step (a)'s Burst job needs
         // native data; insertion order doesn't matter here — every lookup is
@@ -71,6 +104,8 @@ namespace Trecs.Internal
         > _moveEntities;
 
         static readonly Action<List<int>[], EntitySubmitter> _removeEntities;
+
+        static readonly Action<bool[], EntitySubmitter> _fullGroupRemoveEntities;
 
         internal readonly ComponentStore _componentStore;
         readonly EntityQuerier _entitiesQuerier;
@@ -140,10 +175,19 @@ namespace Trecs.Internal
 
         bool _isRunningSubmit;
 
+        // Set once by World.Dispose (via MarkShutdownInProgress) before the
+        // dispose-time RemoveAllEntities + Submit. While set: structural adds are
+        // rejected (assert in debug, dropped in release — they could never receive
+        // a matching OnRemoved), and per-entity removes are ignored (every group is
+        // already marked for whole-group removal, so they are redundant). Global
+        // component writes are unaffected — they don't pass through these gates.
+        bool _shutdownInProgress;
+
         static EntitySubmitter()
         {
             _moveEntities = MoveEntities;
             _removeEntities = RemoveEntities;
+            _fullGroupRemoveEntities = FullGroupRemoveEntities;
         }
 
         static unsafe PerGroupAddBags CreatePerGroupAddBags(WorldInfo worldInfo)
@@ -198,6 +242,8 @@ namespace Trecs.Internal
                 Allocator.Persistent
             );
             _cachedDeferredHandleTrims = new List<(GroupIndex, int)>();
+            _cachedDeferredSetRemovalGroups = new List<GroupIndex>();
+            _cachedFullRemoveGroups = new List<(GroupIndex, int)>();
             _cachedTailSlotByOriginalSlot = new NativeHashMap<int, int>(64, Allocator.Persistent);
             _worldInfo = worldInfo;
             _accessorRegistry = accessorRegistry;
@@ -239,6 +285,12 @@ namespace Trecs.Internal
         public void Submit()
         {
             SubmitImpl();
+        }
+
+        // Enters the dispose/shutdown guard. Idempotent. See _shutdownInProgress.
+        internal void MarkShutdownInProgress()
+        {
+            _shutdownInProgress = true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -408,6 +460,18 @@ namespace Trecs.Internal
             int callerLine = 0
         )
         {
+            // Adds during dispose / OnShutdown / the final OnRemoved pass can
+            // never receive a matching OnRemoved, so they are rejected: this
+            // throws in debug (surfacing the misuse) and, because the assert is
+            // stripped in release, the staged add is dropped later by
+            // AddEntities — no entity is ever materialized either way.
+            TrecsDebugAssert.That(
+                !_shutdownInProgress,
+                "AddEntity called while the World is shutting down (group {0}). Adds during "
+                    + "dispose are not allowed — they would never receive a matching OnRemoved.",
+                group
+            );
+
 #if DEBUG && !TRECS_IS_PROFILING
             _groupsWithEntitiesEverAdded.Add(group);
             var trackingId = _initTracker.Register(
@@ -448,11 +512,150 @@ namespace Trecs.Internal
             );
         }
 
-        internal void FreezeConfiguration()
+        internal void FreezeConfiguration(WorldAccessor removalHandlerAccessor)
         {
             _groupedEntityToAdd.FreezeConfiguration();
-            _entitiesQuerier._entityLocator.FreezeConfiguration();
             _componentStore.FreezeConfiguration();
+            PrecomputeRemovalHandlers(removalHandlerAccessor);
+        }
+
+        // Walk every group's resolved component set once and collect the
+        // [CascadeRemove] (read-phase) and [DisposeOnRemove] (dispose-phase)
+        // handlers contributed by each component type. A group is a fixed
+        // component set, so this is computed exactly once at world build; the
+        // removal window then just indexes the precomputed arrays by group.
+        void PrecomputeRemovalHandlers(WorldAccessor removalHandlerAccessor)
+        {
+            _removalHandlerAccessor = removalHandlerAccessor;
+
+            int groupCount = _worldInfo.AllGroups.Count;
+            _removalReadHandlersByGroup = new RemovalFieldHandler[groupCount][];
+            _removalDisposeHandlersByGroup = new RemovalFieldHandler[groupCount][];
+            _hasAnyRemovalHandlers = false;
+
+            // One reusable collector: every ResolvedComponentDeclaration<T>
+            // implements IRemovalHandlerCollectable, so a per-group instance
+            // would allocate for every group (most contribute nothing). Each
+            // group copies its handlers out before the next group is collected.
+            var collector = new RemovalHandlerCollector();
+
+            foreach (var group in _worldInfo.AllGroups)
+            {
+                collector.Clear();
+
+                var resolved = _worldInfo.GetResolvedTemplateForGroup(group);
+                foreach (var declaration in resolved.ComponentDeclarations)
+                {
+                    if (declaration is IRemovalHandlerCollectable collectable)
+                    {
+                        collectable.CollectRemovalHandlers(collector);
+                    }
+                }
+
+                if (collector.IsEmpty)
+                {
+                    continue;
+                }
+
+                if (collector.ReadHandlerCount > 0)
+                {
+                    _removalReadHandlersByGroup[group.Index] = collector.CopyReadHandlers();
+                }
+
+                if (collector.DisposeHandlerCount > 0)
+                {
+                    _removalDisposeHandlersByGroup[group.Index] = collector.CopyDisposeHandlers();
+                }
+
+                _hasAnyRemovalHandlers = true;
+            }
+        }
+
+        // Invoke one kind of precomputed removal handler for a single group's
+        // just-removed range. Exceptions are accumulated (mirroring the user
+        // OnRemoved fan-out) so one faulty handler doesn't abort the rest of the
+        // removal window.
+        static void InvokeRemovalHandlers(
+            RemovalFieldHandler[][] handlersByGroup,
+            GroupIndex group,
+            EntityRange range,
+            EntitySubmitter ecsRoot,
+            ref List<Exception> callbackExceptions
+        )
+        {
+            var handlers = handlersByGroup[group.Index];
+            if (handlers == null)
+            {
+                return;
+            }
+
+            var world = ecsRoot._removalHandlerAccessor;
+            for (int h = 0; h < handlers.Length; h++)
+            {
+                try
+                {
+                    handlers[h](world, group, range);
+                }
+                catch (Exception ex)
+                {
+                    callbackExceptions ??= new List<Exception>();
+                    callbackExceptions.Add(ex);
+                }
+            }
+        }
+
+        // Removal read phase for one group: run its [CascadeRemove] handlers
+        // (which queue child removals) and, if the group also has [DisposeOnRemove]
+        // handlers, record its range for the later global dispose phase. No-op
+        // when the feature is unused. Shared by the per-entity and whole-group
+        // removal paths; callers must Clear _removalDisposeRanges before the
+        // group loop and call RunRemovalDisposePhase after it.
+        static void RunRemovalReadPhase(
+            EntitySubmitter ecsRoot,
+            GroupIndex group,
+            EntityRange range,
+            ref List<Exception> callbackExceptions
+        )
+        {
+            if (!ecsRoot._hasAnyRemovalHandlers)
+            {
+                return;
+            }
+
+            InvokeRemovalHandlers(
+                ecsRoot._removalReadHandlersByGroup,
+                group,
+                range,
+                ecsRoot,
+                ref callbackExceptions
+            );
+
+            if (ecsRoot._removalDisposeHandlersByGroup[group.Index] != null)
+            {
+                ecsRoot._removalDisposeRanges.Add((group, range));
+            }
+        }
+
+        // Removal dispose phase (global): run [DisposeOnRemove] handlers for every
+        // group the read phase recorded — strictly after all OnRemoved + cascade
+        // reads, so a callback never observes a field another entity freed.
+        static void RunRemovalDisposePhase(
+            EntitySubmitter ecsRoot,
+            ref List<Exception> callbackExceptions
+        )
+        {
+            var disposeRanges = ecsRoot._removalDisposeRanges;
+            for (int i = 0; i < disposeRanges.Count; i++)
+            {
+                var (group, range) = disposeRanges[i];
+                InvokeRemovalHandlers(
+                    ecsRoot._removalDisposeHandlersByGroup,
+                    group,
+                    range,
+                    ecsRoot,
+                    ref callbackExceptions
+                );
+            }
         }
 
         /// <summary>
@@ -539,13 +742,18 @@ namespace Trecs.Internal
             IComponentBuilder[] componentBuilders
         )
         {
+            // During shutdown every group is already marked for whole-group removal,
+            // so a per-entity remove from a shutdown callback is redundant — ignore it.
+            if (_shutdownInProgress)
+                return;
+
             _entitiesOperations.QueueRemoveOperation(entityHandlex, componentBuilders);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void QueueRemoveAllInGroup(GroupIndex group, int entityCount)
+        public void QueueRemoveAllInGroup(GroupIndex group)
         {
-            _entitiesOperations.QueueRemoveAllInGroup(group, entityCount);
+            _entitiesOperations.QueueRemoveAllInGroup(group);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -556,13 +764,30 @@ namespace Trecs.Internal
                 ClearChecksForMultipleOperationsOnTheSameEntity();
             }
 
-            _entitiesOperations.ExecuteRemoveAndSwappingOperations(
-                _moveEntities,
-                _removeEntities,
-                this
-            );
+            // Phase order: moves + per-entity removes → adds → full-group removals.
+            // ExecuteRemoveAndSwappingOperations swaps the double-buffered Info but
+            // no longer clears it; the try/finally below guarantees the buffer
+            // (which still holds this iteration's full-group markers) is cleared
+            // once after all three phases, even if a phase throws. The swap itself
+            // lives inside the try so that an exception thrown by a move/remove
+            // callback still clears _lastSubmittedInfo — otherwise the stale,
+            // already-applied ops would be re-processed by the next submit.
+            try
+            {
+                _entitiesOperations.ExecuteRemoveAndSwappingOperations(
+                    _moveEntities,
+                    _removeEntities,
+                    this
+                );
 
-            AddEntities();
+                AddEntities();
+
+                _entitiesOperations.ExecuteFullGroupRemovals(_fullGroupRemoveEntities, this);
+            }
+            finally
+            {
+                _entitiesOperations.ClearLastSubmittedInfo();
+            }
 
             using (TrecsProfiling.Start("ClearMultiOpCheck Post"))
             {
@@ -577,6 +802,7 @@ namespace Trecs.Internal
                 ecsRoot._cachedRangeOfSubmittedIndices.Clear();
                 ecsRoot._cachedDeferredHandleFrees.Clear();
                 ecsRoot._cachedDeferredHandleTrims.Clear();
+                ecsRoot._cachedDeferredSetRemovalGroups.Clear();
 
                 try
                 {
@@ -589,6 +815,20 @@ namespace Trecs.Internal
                     }
 
                     FireRemoveCallbacks(removeOperations, ecsRoot);
+
+                    // Whole-group removals deferred their set removal so the entity
+                    // stayed a set member during OnRemoved; remove them now that the
+                    // callbacks have fired (still inside the extended-count window,
+                    // which the finally clears).
+                    for (int i = 0; i < ecsRoot._cachedDeferredSetRemovalGroups.Count; i++)
+                    {
+                        var group = ecsRoot._cachedDeferredSetRemovalGroups[i];
+                        var list = removeOperations[group.Index];
+                        if (list != null && list.Count > 0)
+                        {
+                            ecsRoot._setStore.RemoveDepartedEntitiesFromSets(list, group);
+                        }
+                    }
                 }
                 finally
                 {
@@ -747,11 +987,23 @@ namespace Trecs.Internal
             {
                 using (TrecsProfiling.Start("Remove Filters"))
                 {
-                    ecsRoot._setStore.RemoveEntitiesFromSets(
-                        entityHandlesToRemove,
-                        fromGroup,
-                        ecsRoot._transientEntityIDsAffectedByRemoveAtSwapBack
-                    );
+                    if (originalCount - numRemovals == 0)
+                    {
+                        // Whole group removed in this batch: no survivors to re-key,
+                        // and the departed entities stay parked at their original
+                        // slots in the tail. Defer removing them from their sets until
+                        // after OnRemoved fires, so they read as set members during
+                        // the callback (consistent with the runtime-removal contract).
+                        ecsRoot._cachedDeferredSetRemovalGroups.Add(fromGroup);
+                    }
+                    else
+                    {
+                        ecsRoot._setStore.RemoveEntitiesFromSets(
+                            entityHandlesToRemove,
+                            fromGroup,
+                            ecsRoot._transientEntityIDsAffectedByRemoveAtSwapBack
+                        );
+                    }
                 }
             }
 
@@ -790,7 +1042,7 @@ namespace Trecs.Internal
             var postRemoveCount = originalCount - numRemovals;
             using (TrecsProfiling.Start("Remove Refs"))
             {
-                ref var locator = ref ecsRoot._entitiesQuerier._entityLocator;
+                var locator = ecsRoot._entitiesQuerier._entityLocator;
 
                 // Build (originalSlot → tailSlot) so we can capture in
                 // entityHandlesToRemove (submission) order. This bridge
@@ -804,7 +1056,7 @@ namespace Trecs.Internal
                 // FinalizeDeferredHandleFrees. The free list is a linked
                 // list embedded in the unused slots' Index fields, with
                 // _nextFreeIndex pointing at the head. Both are byte-
-                // serialized by WorldStateSerializer.WriteEntityHandlesMap
+                // serialized by EntityHandleMap.Serialize
                 // for snapshots AND for the determinism checksum used by
                 // replay / desync detection. Changing the push order here
                 // would shift the checksum and desync any existing
@@ -852,7 +1104,7 @@ namespace Trecs.Internal
         // back down to its post-remove count.
         static void FinalizeDeferredHandleFrees(EntitySubmitter ecsRoot)
         {
-            ref var locator = ref ecsRoot._entitiesQuerier._entityLocator;
+            var locator = ecsRoot._entitiesQuerier._entityLocator;
 
             var frees = ecsRoot._cachedDeferredHandleFrees;
             unsafe
@@ -875,6 +1127,173 @@ namespace Trecs.Internal
                 locator.ValidateGroupConsistency(entry.Group, entry.PostRemoveCount);
 #endif
             }
+        }
+
+        // Whole-group removal phase. Mirrors RemoveEntities' structure (clear the
+        // shared remove caches, execute per group, fire callbacks, clear sets,
+        // finalize handle frees) but uses the fast path in ExecuteFullRemoveForGroup
+        // that skips the sort / swap-back / data-movement jobs. Runs after
+        // AddEntities so an entity added into a marked group this submit fires
+        // OnAdded (add phase) then OnRemoved (here).
+        static void FullGroupRemoveEntities(bool[] fullGroupRemoval, EntitySubmitter ecsRoot)
+        {
+            using (TrecsProfiling.Start("full group remove Entities"))
+            {
+                ecsRoot._cachedRangeOfSubmittedIndices.Clear();
+                ecsRoot._cachedDeferredSetRemovalGroups.Clear();
+                ecsRoot._cachedFullRemoveGroups.Clear();
+
+                try
+                {
+                    for (int i = 0; i < fullGroupRemoval.Length; i++)
+                    {
+                        if (!fullGroupRemoval[i])
+                            continue;
+                        ExecuteFullRemoveForGroup(GroupIndex.FromIndex(i), ecsRoot);
+                    }
+
+                    FireFullRemoveCallbacks(ecsRoot);
+
+                    // Whole-group removals deferred their set clear so each entity
+                    // stayed a set member during OnRemoved; clear them now that the
+                    // callbacks have fired (still inside the extended-count window,
+                    // which the finally clears).
+                    for (int i = 0; i < ecsRoot._cachedDeferredSetRemovalGroups.Count; i++)
+                    {
+                        ecsRoot._setStore.ClearGroupFromSets(
+                            ecsRoot._cachedDeferredSetRemovalGroups[i]
+                        );
+                    }
+                }
+                finally
+                {
+                    // Always finalize so freed handle ids return to the free list and
+                    // the extended-count window closes, even if an observer threw. The
+                    // free pass is one single-threaded Burst job per group (sequential
+                    // because the free list is a linked chain), walking slots [0..n)
+                    // so the push order — and thus the determinism checksum — matches
+                    // the per-entity path exactly.
+                    ecsRoot._entitiesQuerier.ClearRemovalExtendedCounts();
+
+                    var locator = ecsRoot._entitiesQuerier._entityLocator;
+                    var groups = ecsRoot._cachedFullRemoveGroups;
+                    using (TrecsProfiling.Start("Full Remove Free Handles"))
+                    {
+                        for (int i = 0; i < groups.Count; i++)
+                        {
+                            var (group, originalCount) = groups[i];
+                            locator.BatchFreeWholeGroupHandles(group, originalCount);
+                            locator.TrimGroupList(group, 0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fast-path removal of a group's entire current contents. Because every
+        // slot is removed there are no survivors to swap-back, so this skips the
+        // descending sort, the swap-back plan, and the data-movement Burst job that
+        // ExecuteRemoveForGroup performs. It also skips the capture/relocate handle
+        // dance: with no swap-back the reverse-map slots never move, so they're left
+        // intact here (ToHandle still resolves the removed entities during OnRemoved)
+        // and every handle is freed in a single Burst pass after the callbacks fire
+        // (BatchFreeWholeGroupHandles). That free pass walks slots [0..n) in order,
+        // pushing freed ids onto the handle free list in ascending slot order —
+        // byte-identical to what a per-entity removal of the whole group would
+        // produce, so the determinism / serialization checksum is unchanged.
+        static void ExecuteFullRemoveForGroup(GroupIndex fromGroup, EntitySubmitter ecsRoot)
+        {
+            var fromGroupDictionary = ecsRoot.GetDBGroup(fromGroup);
+            if (fromGroupDictionary.Count == 0)
+            {
+                return;
+            }
+
+            var originalCount = GetGroupEntityCount(fromGroupDictionary);
+            if (originalCount == 0)
+            {
+                return;
+            }
+
+            using (TrecsProfiling.Start("Full Remove Counts"))
+            {
+                // Shrink the logical count to 0. NativeList.Length stays at
+                // originalCount so component-data tail reads stay valid during
+                // OnRemoved; SetRemovalExtendedCount keeps the read window open.
+                foreach (var (_, fromComponentsDictionary) in fromGroupDictionary)
+                {
+                    fromComponentsDictionary.SetCount(0);
+                }
+
+                ecsRoot._cachedRangeOfSubmittedIndices.Add(new EntityRange(0, originalCount));
+                ecsRoot._entitiesQuerier.SetRemovalExtendedCount(fromGroup, originalCount);
+            }
+
+            if (ecsRoot._setStore.HasAnySets)
+            {
+                ecsRoot._cachedDeferredSetRemovalGroups.Add(fromGroup);
+            }
+
+            // Handles are freed after OnRemoved (see FullGroupRemoveEntities'
+            // finally). Until then the reverse-map slots stay untouched so ToHandle
+            // resolves removed entities during the callback; Exists() is already
+            // false because the component count is 0.
+            ecsRoot._cachedFullRemoveGroups.Add((fromGroup, originalCount));
+        }
+
+        // Fires OnRemoved for each whole-group removal. _cachedFullRemoveGroups holds
+        // exactly one (group, originalCount) entry per group that had a removal, in
+        // ascending group order — the same order ExecuteFullRemoveForGroup added
+        // ranges to _cachedRangeOfSubmittedIndices, so the range enumerator stays
+        // aligned 1:1 with it.
+        static void FireFullRemoveCallbacks(EntitySubmitter ecsRoot)
+        {
+            var rangeEnumerator = ecsRoot._cachedRangeOfSubmittedIndices.GetEnumerator();
+            List<Exception> callbackExceptions = null;
+            var groups = ecsRoot._cachedFullRemoveGroups;
+
+            // Same two-global-phase contract as FireRemoveCallbacks: all reads
+            // (user OnRemoved + [CascadeRemove]) before any [DisposeOnRemove]. On the
+            // shutdown path the queued cascade removes are harmless no-ops (every
+            // group is already marked for whole-group removal); [DisposeOnRemove]
+            // still runs so heap-backed fields are freed as entities tear down.
+            ecsRoot._removalDisposeRanges.Clear();
+
+            using (TrecsProfiling.Start("Execute full remove Callbacks"))
+            {
+                for (int t = 0; t < groups.Count; t++)
+                {
+                    var group = groups[t].Group;
+
+                    var advanced = rangeEnumerator.MoveNext();
+                    TrecsDebugAssert.That(advanced);
+                    var range = rangeEnumerator.Current;
+
+                    if (
+                        ecsRoot._eventsManager.ReactiveOnRemovedObservers.TryGetValue(
+                            group,
+                            out var groupRemovedSubject
+                        )
+                    )
+                    {
+                        try
+                        {
+                            groupRemovedSubject.Invoke(range);
+                        }
+                        catch (Exception ex)
+                        {
+                            callbackExceptions ??= new List<Exception>();
+                            callbackExceptions.Add(ex);
+                        }
+                    }
+
+                    RunRemovalReadPhase(ecsRoot, group, range, ref callbackExceptions);
+                }
+
+                RunRemovalDisposePhase(ecsRoot, ref callbackExceptions);
+            }
+
+            ObserverExceptionHelper.Rethrow(callbackExceptions);
         }
 
         /// <summary>
@@ -935,6 +1354,13 @@ namespace Trecs.Internal
             //
             // rangeEnumerator yields one EntityRange per group that had
             // removals, in the iteration order RemoveEntities used.
+            // Two global phases across all removed groups (see RemovalHandlers.cs
+            // / the ordering contract): the entire READ phase — user OnRemoved
+            // then [CascadeRemove] — completes before ANY [DisposeOnRemove] runs, so
+            // a callback reaching across a handle into another entity removed in
+            // this same submission never observes freed storage.
+            ecsRoot._removalDisposeRanges.Clear();
+
             using (TrecsProfiling.Start("Execute remove Callbacks Fast"))
             {
                 for (int groupIdx = 0; groupIdx < removeOperations.Length; groupIdx++)
@@ -962,7 +1388,10 @@ namespace Trecs.Internal
 
                     var advanced = rangeEnumerator.MoveNext();
                     TrecsDebugAssert.That(advanced);
+                    var range = rangeEnumerator.Current;
 
+                    // Phase 1a: user OnRemoved (entity fully intact — nothing
+                    // freed, no children queued yet).
                     if (
                         ecsRoot._eventsManager.ReactiveOnRemovedObservers.TryGetValue(
                             group,
@@ -972,7 +1401,7 @@ namespace Trecs.Internal
                     {
                         try
                         {
-                            groupRemovedSubject.Invoke(rangeEnumerator.Current);
+                            groupRemovedSubject.Invoke(range);
                         }
                         catch (Exception ex)
                         {
@@ -980,7 +1409,15 @@ namespace Trecs.Internal
                             callbackExceptions.Add(ex);
                         }
                     }
+
+                    // Phase 1b: [CascadeRemove] read handlers (queue child
+                    // removals — they drain on later submission iterations).
+                    RunRemovalReadPhase(ecsRoot, group, range, ref callbackExceptions);
                 }
+
+                // Phase 2 (global): [DisposeOnRemove] handlers, strictly after every
+                // read handler and OnRemoved callback above.
+                RunRemovalDisposePhase(ecsRoot, ref callbackExceptions);
             }
 
             ObserverExceptionHelper.Rethrow(callbackExceptions);
@@ -1375,6 +1812,21 @@ namespace Trecs.Internal
             // Swap double buffers: current becomes previous, previous becomes current
             _groupedEntityToAdd.Swap();
 
+            if (_shutdownInProgress)
+            {
+                // Release-safe net for the AddEntity shutdown guard: any add staged
+                // during shutdown (e.g. from an OnRemoved callback fired by the
+                // dispose-time RemoveAllEntities) is dropped here without
+                // materializing or firing OnAdded. In debug AddEntity already threw;
+                // in release the assert was stripped so this is where the doomed add
+                // is discarded. Leaked handle ids are irrelevant during dispose.
+                if (_groupedEntityToAdd.AnyPreviousEntityCreated())
+                {
+                    _groupedEntityToAdd.ClearLastAddOperations();
+                }
+                return;
+            }
+
             // Iterate the previous buffer (now swapped into "other")
             if (_groupedEntityToAdd.AnyPreviousEntityCreated())
             {
@@ -1535,8 +1987,7 @@ namespace Trecs.Internal
         internal unsafe NativeWorldAccessor ProvideNativeWorldAccessor(
             int accessorId,
             bool canMutateSimulation,
-            float deltaTime,
-            float elapsedTime
+            NativeWorldTickInfo tickInfo
         )
         {
             var flags = NativeWorldAccessorFlags.None;
@@ -1569,15 +2020,14 @@ namespace Trecs.Internal
                 _nativeMoveOperationQueue,
                 _nativeRemoveOperationQueue,
                 accessorId,
-                _entitiesQuerier._entityLocator,
+                _entitiesQuerier._entityLocator.View,
                 flags,
                 _nativeSharedHeap.Resolver,
                 _inputNativeSharedHeap.Resolver,
                 chunkStoreResolver,
                 _setStore.DeferredQueues,
                 fastAdd,
-                deltaTime,
-                elapsedTime
+                tickInfo
             );
         }
 
@@ -2077,7 +2527,7 @@ namespace Trecs.Internal
                 using (TrecsProfiling.Start("NatAdd Claim"))
                 {
                     _groupedEntityToAdd.ClaimDeferredHandlesForNativeAdds(
-                        ref _entitiesQuerier._entityLocator
+                        _entitiesQuerier._entityLocator
                     );
                 }
             }

@@ -38,9 +38,8 @@ namespace Trecs.Samples.HeightmapBlobs
         /// <summary>
         /// Build a fully-populated, immutable <see cref="NativeHeightmapData"/>
         /// from <paramref name="d"/>. Resolution × Resolution must be ≤ 256.
-        /// Returns the populated blob by value; the caller hands it off to
-        /// <c>NativeSharedPtr.Alloc(world, blobId, in data)</c>, which copies
-        /// the bytes onto the native heap. Since <see cref="NativeHeightmapData"/>
+        /// Returns the populated blob by value; the interner's inline-value
+        /// builder copies the bytes onto the native heap. Since <see cref="NativeHeightmapData"/>
         /// is a <c>readonly struct</c>, mutation happens here on a fresh local
         /// <see cref="FixedArray256{T}"/> before the blob is sealed by the
         /// constructor.

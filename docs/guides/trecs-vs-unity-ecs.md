@@ -74,7 +74,7 @@ The chunk model's advantage is per-chunk metadata: change-filter version numbers
 | **Components shared across many entities** | `ISharedComponentData` | No equivalent; share by reference via a [heap pointer](../experimental/pointers.md) |
 | **Cleanup-after-destroy components** | `ICleanupComponentData` — persists past entity destruction so a system can finalize and explicitly remove them | None — use [`OnRemoved`](../entity-management/entity-events.md) observer events for finalization |
 | **Per-chunk shared data** | Chunk components — one value attached per chunk (a 16 KB block of entities in the same archetype) | None — Trecs uses flat per-group buffers without sub-chunks; share via a [heap pointer](../experimental/pointers.md) or a `Globals` component |
-| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../experimental/pointers.md) with [stable `BlobId`s](../experimental/shared-heap-data.md#pattern-b-look-up-by-stable-blobid) for cross-run identity |
+| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../experimental/pointers.md) with [stable `BlobId`s](../experimental/shared-heap-data.md#choosing-blobid-values) for cross-run identity |
 
 ### Systems
 

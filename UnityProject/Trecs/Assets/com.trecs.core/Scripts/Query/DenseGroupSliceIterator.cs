@@ -31,6 +31,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DenseGroupSliceIterator GetEnumerator() => this;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()
         {
             while (++_groupIndex < _validGroups.Count)

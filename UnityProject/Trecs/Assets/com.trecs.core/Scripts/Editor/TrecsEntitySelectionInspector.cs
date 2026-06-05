@@ -225,20 +225,19 @@ namespace Trecs
             _templateLabel.text = $"Template: {rt.DebugName}";
             _worldLabel.text = $"World: {world.DebugName ?? "(unnamed)"}";
 
-            var tags = world.WorldInfo.GetGroupTags(group);
-            // Tags are reasonably stable per group, but a structural change
-            // can swap which tags apply (e.g. partition move). Rebuild the
-            // row only if the set actually differs to avoid hover-state churn.
-            int hash = tags.Count;
-            foreach (var t in tags)
-            {
-                hash ^= t.Value;
-            }
-            if (hash == _lastTagsHash)
+            // Tags are reasonably stable per group, but a structural change can swap which
+            // tags apply (e.g. partition move). The group's TagSet id is exactly the XOR of
+            // its member tags, so it's a ready-made change key — rebuild the row only when
+            // it differs (avoiding hover-state churn) and skip fetching the tags entirely
+            // when it hasn't.
+            int tagsKey = world.WorldInfo.ToTagSet(group).Id;
+            if (tagsKey == _lastTagsHash)
             {
                 return;
             }
-            _lastTagsHash = hash;
+            _lastTagsHash = tagsKey;
+
+            var tags = world.WorldInfo.GetGroupTags(group);
             _tagsRow.Clear();
             if (tags.Count == 0)
             {

@@ -199,24 +199,13 @@ namespace Trecs.Tests
         TestEnvironment CreateEnvWithSystems(params ISystem[] systems) =>
             CreateEnvWithSystems(TrecsTemplates.Globals.Template, systems);
 
-        TestEnvironment CreateEnvWithSystems(Template globalsTemplate, params ISystem[] systems)
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(globalsTemplate)
-                .AddTemplate(TestTemplates.SimpleAlpha)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
-
-            var world = builder.Build();
-
-            foreach (var system in systems)
-            {
-                world.AddSystem(system);
-            }
-
-            world.Initialize();
-            return new TestEnvironment(world);
-        }
+        TestEnvironment CreateEnvWithSystems(Template globalsTemplate, params ISystem[] systems) =>
+            EcsTestHelper.CreateEnvironment(
+                new WorldSettings(),
+                configure: b => b.AddSystems(systems),
+                globalsTemplate: globalsTemplate,
+                TestTemplates.SimpleAlpha
+            );
 
         [SetUp]
         public void SetUp()
@@ -288,7 +277,7 @@ namespace Trecs.Tests
             // hadn't logically cleared the world before the shutdown hook ran.
             var a = env.Accessor;
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
 
             env.Dispose();
@@ -352,8 +341,7 @@ namespace Trecs.Tests
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(TestTemplates.SimpleAlpha)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(TestTemplates.SimpleAlpha);
 
             var world = builder.Build();
             world.AddSystem(new ShutdownInputSystem());
@@ -373,8 +361,7 @@ namespace Trecs.Tests
             // component so we're exercising the queue, not entity lifecycle.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddTemplate(ShutdownInputGlobals.Template)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+                .AddTemplate(ShutdownInputGlobals.Template);
 
             var world = builder.Build();
             world.AddSystem(new ShutdownInputAddInputSystem());

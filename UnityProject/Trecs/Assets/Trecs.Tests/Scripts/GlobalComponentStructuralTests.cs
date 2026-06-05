@@ -39,7 +39,7 @@ namespace Trecs.Tests
                     .Set(new TestVec())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(999, a.GlobalComponent<TestGlobalInt>().Read.Value);
             NAssert.AreEqual(3.14f, a.GlobalComponent<TestGlobalFloat>().Read.Value, 0.001f);
@@ -64,14 +64,14 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             a.GlobalComponent<TestGlobalInt>().Write.Value = 42;
 
             // Remove scattered entities causing multiple swap-backs
             for (int i = 0; i < 20; i += 3)
                 a.RemoveEntity(handles[i]);
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(42, a.GlobalComponent<TestGlobalInt>().Read.Value);
         }
@@ -89,12 +89,12 @@ namespace Trecs.Tests
                     .Set(new TestVec())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             a.GlobalComponent<TestGlobalInt>().Write.Value = 77;
 
             a.RemoveEntitiesWithTags(PartitionA);
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(77, a.GlobalComponent<TestGlobalInt>().Read.Value);
@@ -119,13 +119,13 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             a.GlobalComponent<TestGlobalInt>().Write.Value = 123;
 
             for (int i = 0; i < 5; i++)
                 a.SetTag<TestPartitionB>(handles[i].ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(123, a.GlobalComponent<TestGlobalInt>().Read.Value);
         }
@@ -149,7 +149,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             a.GlobalComponent<TestGlobalInt>().Write.Value = 555;
             a.GlobalComponent<TestGlobalFloat>().Write.Value = 2.718f;
@@ -166,7 +166,7 @@ namespace Trecs.Tests
                     .Set(new TestVec())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(555, a.GlobalComponent<TestGlobalInt>().Read.Value);
             NAssert.AreEqual(2.718f, a.GlobalComponent<TestGlobalFloat>().Read.Value, 0.001f);
@@ -191,13 +191,13 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.GlobalComponent<TestGlobalInt>().Write.Value = 10;
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(10, a.GlobalComponent<TestGlobalInt>().Read.Value);
 
             // Frame 2: remove some, update global
             a.RemoveEntitiesWithTags(PartitionA);
             a.GlobalComponent<TestGlobalInt>().Write.Value = 20;
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(20, a.GlobalComponent<TestGlobalInt>().Read.Value);
 
             // Frame 3: add more, update global again
@@ -209,7 +209,7 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.GlobalComponent<TestGlobalInt>().Write.Value = 30;
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(30, a.GlobalComponent<TestGlobalInt>().Read.Value);
         }
 
@@ -236,17 +236,17 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
             NAssert.IsTrue(globalHandle.Exists(a), "After adds");
 
             a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
-            a.Submit();
+            a.World.Submit();
             NAssert.IsTrue(globalHandle.Exists(a), "After move+remove");
 
             a.RemoveEntitiesWithTags(PartitionA);
             a.RemoveEntitiesWithTags(PartitionB);
-            a.Submit();
+            a.World.Submit();
             NAssert.IsTrue(globalHandle.Exists(a), "After bulk remove of all regular entities");
         }
 
@@ -267,7 +267,7 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             int globalValueInCallback = -1;
             var sub = a
@@ -280,7 +280,7 @@ namespace Trecs.Tests
                 );
 
             a.RemoveEntity(handle);
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(
                 88,
@@ -314,7 +314,7 @@ namespace Trecs.Tests
                     .Set(new TestVec())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(
                 5,

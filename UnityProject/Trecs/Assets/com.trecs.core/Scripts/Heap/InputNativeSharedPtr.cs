@@ -31,6 +31,34 @@ namespace Trecs
             return world.InputNativeSharedHeap.Acquire<T>(world.FixedFrame, blobId);
         }
 
+        /// <summary>
+        /// Interns <paramref name="descriptor"/> — hashing it to a content-derived
+        /// <see cref="BlobId"/>, deduplicating against the cache, and running the registered builder
+        /// on a miss — and acquires a frame-scoped input handle in one step. Register the builder
+        /// once at setup with <see cref="NativeSharedAnchor.Register{TDesc,T}(WorldAccessor, System.Func{TDesc,T})"/>
+        /// (the factory registry is shared across the sim and input pointer types).
+        /// <para>
+        /// Unlike the simulation-side <see cref="NativeSharedPtr.Acquire{TDesc,T}(WorldAccessor, in TDesc)"/>,
+        /// the registered source is ambient (input is not simulation state, so the sim cannot
+        /// resolve the id until it justifies it — see the input→sim conversion
+        /// <see cref="NativeSharedPtr.Acquire{T}(WorldAccessor, InputNativeSharedPtr{T})"/>); the
+        /// descriptor is recorded into the input stream so a fresh-process replay can re-derive the
+        /// blob.
+        /// </para>
+        /// </summary>
+        public static InputNativeSharedPtr<T> Acquire<TDesc, T>(
+            WorldAccessor world,
+            in TDesc descriptor
+        )
+            where T : unmanaged
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputNativeSharedHeap.AcquireFromDescriptor<TDesc, T>(
+                world.FixedFrame,
+                in descriptor
+            );
+        }
+
         public static bool TryAcquire<T>(
             WorldAccessor world,
             BlobId blobId,
@@ -69,26 +97,21 @@ namespace Trecs
 
         public readonly NativeSharedRead<T> Read(WorldAccessor world)
         {
-            var entry = world.InputNativeSharedHeap.ResolveEntry<T>(BlobId);
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new NativeSharedRead<T>(
-                entry.Ptr.ToPointer(),
-                slot: null,
-                capturedGeneration: 0,
-                entry.Safety
-            );
-#else
-            return new NativeSharedRead<T>(
-                entry.Ptr.ToPointer(),
-                slot: null,
-                capturedGeneration: 0
-            );
-#endif
+            return ToRead(world.InputNativeSharedHeap.ResolveEntry<T>(BlobId));
         }
 
         public readonly NativeSharedRead<T> Read(in NativeWorldAccessor world)
         {
-            var entry = world.InputSharedPtrResolver.ResolveEntry<T>(BlobId);
+            return ToRead(world.InputSharedPtrResolver.ResolveEntry<T>(BlobId));
+        }
+
+        // Input native shared reads pass slot: null / capturedGeneration: 0 — they intentionally opt
+        // out of the slot/generation use-after-free check the simulation NativeSharedPtr uses,
+        // relying instead on the input phase model (allocation in the input phase, Burst reads in the
+        // fixed phase, never concurrent) plus the AtomicSafetyHandle in checks builds.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static NativeSharedRead<T> ToRead(in InputNativeSharedHeapEntry entry)
+        {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             return new NativeSharedRead<T>(
                 entry.Ptr.ToPointer(),

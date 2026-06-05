@@ -1,6 +1,3 @@
-using System;
-using Trecs.Internal;
-
 namespace Trecs.Tests
 {
     // All test tags are ITag structs; their integer IDs come from
@@ -60,152 +57,68 @@ namespace Trecs.Tests
         public short Value;
     }
 
+    // A pair used by WorldSchemaFingerprintTests to prove the source-gen layout
+    // hash distinguishes a same-size field reorder. Both are 8 bytes
+    // (UnsafeUtility.SizeOf identical), so only the generated
+    // __TrecsComponentLayoutHash tells them apart.
+    public partial struct TestLayoutIntFloat : IEntityComponent
+    {
+        public int A;
+        public float B;
+    }
+
+    public partial struct TestLayoutFloatInt : IEntityComponent
+    {
+        public float B;
+        public int A;
+    }
+
     public static class TestTemplates
     {
         public static Template SimpleAlpha =>
-            new Template(
-                debugName: "TestSimpleAlpha",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestInt)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Alpha }
-            );
+            TestTemplate
+                .Named("TestSimpleAlpha")
+                .WithTags(TestTags.Alpha)
+                .WithComponent<TestInt>(default(TestInt));
 
         public static Template TwoCompBeta =>
-            new Template(
-                debugName: "TestTwoCompBeta",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestInt)
-                    ),
-                    new ComponentDeclaration<TestFloat>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestFloat)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Beta }
-            );
+            TestTemplate
+                .Named("TestTwoCompBeta")
+                .WithTags(TestTags.Beta)
+                .WithComponent<TestInt>(default(TestInt))
+                .WithComponent<TestFloat>(default(TestFloat));
 
         public static Template WithPartitions =>
-            new Template(
-                debugName: "TestWithPartitions",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: new TagSet[]
-                {
+            TestTemplate
+                .Named("TestWithPartitions")
+                .WithTags(TestTags.Gamma)
+                .WithPartitions(
                     TagSet.FromTags(TestTags.PartitionA),
-                    TagSet.FromTags(TestTags.PartitionB),
-                },
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestInt)
-                    ),
-                    new ComponentDeclaration<TestVec>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestVec)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Gamma },
-                dimensions: new TagSet[]
-                {
-                    TagSet.FromTags(TestTags.PartitionA, TestTags.PartitionB),
-                }
-            );
+                    TagSet.FromTags(TestTags.PartitionB)
+                )
+                .WithDimensions(TagSet.FromTags(TestTags.PartitionA, TestTags.PartitionB))
+                .WithComponent<TestInt>(default(TestInt))
+                .WithComponent<TestVec>(default(TestVec));
 
         public static Template WithDefaults =>
-            new Template(
-                debugName: "TestWithDefaults",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        new TestInt { Value = 42 }
-                    ),
-                    new ComponentDeclaration<TestFloat>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        new TestFloat { Value = 3.14f }
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Delta }
-            );
+            TestTemplate
+                .Named("TestWithDefaults")
+                .WithTags(TestTags.Delta)
+                .WithComponent<TestInt>(new TestInt { Value = 42 })
+                .WithComponent<TestFloat>(new TestFloat { Value = 3.14f });
 
         public static Template ChildOfAlpha =>
-            new Template(
-                debugName: "TestChildOfAlpha",
-                localBaseTemplates: new Template[] { SimpleAlpha },
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestFloat>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestFloat)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Beta }
-            );
+            TestTemplate
+                .Named("TestChildOfAlpha")
+                .Extending(SimpleAlpha)
+                .WithTags(TestTags.Beta)
+                .WithComponent<TestFloat>(default(TestFloat));
 
         public static Template ChildWithDefaults =>
-            new Template(
-                debugName: "TestChildWithDefaults",
-                localBaseTemplates: new Template[] { WithDefaults },
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<TestVec>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(TestVec)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Epsilon }
-            );
+            TestTemplate
+                .Named("TestChildWithDefaults")
+                .Extending(WithDefaults)
+                .WithTags(TestTags.Epsilon)
+                .WithComponent<TestVec>(default(TestVec));
     }
 }

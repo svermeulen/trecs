@@ -31,5 +31,13 @@ namespace Trecs
         public static string Recordings => Path.Combine(LibraryRoot, "recordings");
 
         public static string Snapshots => Path.Combine(LibraryRoot, "snapshots");
+
+        /// <summary>
+        /// Content-addressed store for the opaque (eager) blob bytes referenced by saved snapshots
+        /// and recordings. One shared directory (a <c>BlobId → bytes</c> <see cref="FileBlobStore"/>)
+        /// so a blob is written once and deduplicated across every <c>.snap</c> / <c>.trec</c> that
+        /// references it.
+        /// </summary>
+        public static string Blobs => Path.Combine(LibraryRoot, "blobs");
     }
 }

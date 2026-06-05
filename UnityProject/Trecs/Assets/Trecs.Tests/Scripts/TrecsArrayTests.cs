@@ -577,11 +577,13 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void WorldAccessor_WriteFromVariableRoleAccessor_Works()
+        public void WorldAccessor_WriteFromVariableRoleAccessor_Throws()
         {
-            // Unlike TrecsList where auto-grow needs the persistent-alloc gate,
-            // TrecsArrayWrite never allocates — it just gives indexed access to the
-            // existing buffer. Opening from a Variable-role accessor is fine.
+            // Opening a Write view mutates snapshotted simulation heap state — even
+            // though TrecsArrayWrite never reallocates (fixed length), writing into
+            // the buffer is still a deterministic-state mutation. So Write gates on
+            // AssertCanMutateHeap, same as TrecsList / TrecsDictionary: a Variable-role
+            // (rendering) accessor must throw.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var unrestrictedWorld = env.Accessor;
             var variableWorld = env.World.CreateAccessor(
@@ -590,12 +592,26 @@ namespace Trecs.Tests
             );
 
             var arr = TrecsArray.Alloc<int>(unrestrictedWorld, 4);
-            var w = arr.Write(variableWorld);
-            w[0] = 1;
-            w[1] = 2;
-            w[2] = 3;
-            w[3] = 4;
-            NAssert.AreEqual(2, w[1]);
+            NAssert.Throws<TrecsException>(() => arr.Write(variableWorld));
+
+            arr.Dispose(unrestrictedWorld);
+        }
+
+        [Test]
+        public void WorldAccessor_DisposeFromVariableRoleAccessor_Throws()
+        {
+            // Dispose frees snapshotted heap state, so it gates on AssertCanMutateHeap
+            // too — a Variable-role accessor must throw. Mirrors TrecsList /
+            // TrecsDictionary Dispose.
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var unrestrictedWorld = env.Accessor;
+            var variableWorld = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                debugName: "VariableHeapTest"
+            );
+
+            var arr = TrecsArray.Alloc<int>(unrestrictedWorld, 4);
+            NAssert.Throws<TrecsException>(() => arr.Dispose(variableWorld));
 
             arr.Dispose(unrestrictedWorld);
         }

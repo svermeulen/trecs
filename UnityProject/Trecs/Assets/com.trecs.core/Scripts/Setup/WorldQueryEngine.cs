@@ -71,14 +71,18 @@ namespace Trecs.Internal
         {
             TrecsDebugAssert.That(componentTypes.Count > 0);
 
-            var componentsHash = TypeId.FromType(componentTypes[0]).Value;
-
+            // Build the set through the intern table rather than XORing raw values: this
+            // reuses the registry's always-on collision guard — two distinct component
+            // sets whose TypeIds XOR-collide would otherwise silently alias to the same
+            // cache key (wrong group results) — and yields the same id == XOR(members)
+            // used everywhere else.
+            var set = TypeIdSet.FromMember(TypeId.FromType(componentTypes[0]));
             for (int i = 1; i < componentTypes.Count; i++)
             {
-                componentsHash ^= TypeId.FromType(componentTypes[i]).Value;
+                set = set.Add(TypeId.FromType(componentTypes[i]));
             }
 
-            return componentsHash;
+            return set.Id;
         }
 
         public ReadOnlyList<GroupIndex> CommonGetTaggedGroupsWithComponents(

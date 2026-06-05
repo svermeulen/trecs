@@ -11,12 +11,16 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
     [Unwrap]
     public partial struct TargetMeal : IEntityComponent
     {
+        // Removing a fish cascades to its targeted meal (stale/Null skipped).
+        [CascadeRemove]
         public EntityHandle Value;
     }
 
     [Unwrap]
     public partial struct ApproachingFish : IEntityComponent
     {
+        // Removing a meal cascades to its approaching fish (stale/Null skipped).
+        [CascadeRemove]
         public EntityHandle Value;
     }
 

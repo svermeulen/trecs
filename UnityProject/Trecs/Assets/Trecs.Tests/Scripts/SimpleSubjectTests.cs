@@ -108,5 +108,33 @@ namespace Trecs.Tests
             subject.Invoke();
             NAssert.AreEqual(1, count, "Disposed observer should not be invoked");
         }
+
+        [Test]
+        public void Invoke_Reentrant_OnSameSubject_Throws()
+        {
+            // Reentrant Invoke on the same subject is unsupported — it would mutate the
+            // observer list mid-iteration (the old bool-flag version corrupted state /
+            // threw IndexOutOfRange). An always-on assert makes it a deterministic, loud
+            // failure instead. The inner Invoke's throw surfaces through the outer
+            // dispatch's per-observer exception aggregation.
+            var subject = new SimpleSubject();
+            subject.Subscribe(() => subject.Invoke()); // observer re-invokes this subject
+
+            var ex = NAssert.Throws<TrecsException>(() => subject.Invoke());
+            StringAssert.Contains("already being invoked", ex.Message);
+        }
+
+        [Test]
+        public void Subscribe_DuringInvoke_Throws()
+        {
+            // Subscribing mid-dispatch would insert into the observer list while Invoke
+            // iterates a captured count (skip/double-fire). The guard is now always-on
+            // (TrecsAssert) so it throws in every build rather than corrupting in release.
+            var subject = new SimpleSubject();
+            subject.Subscribe(() => subject.Subscribe(() => { }));
+
+            var ex = NAssert.Throws<TrecsException>(() => subject.Invoke());
+            StringAssert.Contains("Cannot subscribe during invocation", ex.Message);
+        }
     }
 }

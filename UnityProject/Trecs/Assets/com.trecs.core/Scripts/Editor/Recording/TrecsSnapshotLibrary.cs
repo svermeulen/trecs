@@ -41,10 +41,23 @@ namespace Trecs.Internal
         readonly World _world;
         readonly SnapshotSerializer _snapshotSerializer;
         readonly TrecsRecordingSession _session;
+        readonly OpaqueBlobPersistence _opaqueBlobPersistence;
+
+        // Caller-owned working space for the stateless SnapshotSerializer; reused across
+        // calls. Cold paths, but a member keeps the call sites uniform with the recorder stack.
+        readonly SnapshotSerializerScratch _scratch = new();
+        readonly List<OpaqueBlobRef> _opaqueRefScratch = new();
+
+        // Opaque (eager) blob bytes referenced by a .snap are persisted to / read back from a shared
+        // content-addressed store under Library/com.trecs/blobs, so a fresh-process load can rebuild
+        // them. Lazily created — a given library instance may never save or load.
+        FileBlobStore _blobStore;
+        FileBlobStore BlobStore => _blobStore ??= new FileBlobStore(TrecsPaths.Blobs);
 
         public TrecsSnapshotLibrary(
             World world,
             SnapshotSerializer snapshotSerializer,
+            OpaqueBlobPersistence opaqueBlobPersistence,
             TrecsRecordingSession session
         )
         {
@@ -52,6 +65,7 @@ namespace Trecs.Internal
             _snapshotSerializer =
                 snapshotSerializer ?? throw new ArgumentNullException(nameof(snapshotSerializer));
             _session = session ?? throw new ArgumentNullException(nameof(session));
+            _opaqueBlobPersistence = opaqueBlobPersistence;
         }
 
         /// <summary>
@@ -74,13 +88,29 @@ namespace Trecs.Internal
             try
             {
                 Directory.CreateDirectory(GetSnapshotsDirectory());
-                _snapshotSerializer.SaveSnapshot(
+                var data = new SerializationData();
+                var opaqueBlobIds = new List<BlobId>();
+                _snapshotSerializer.Serialize(
                     SnapshotFileVersion,
-                    path,
-                    includeTypeChecks: true
+                    includeTypeChecks: true,
+                    data,
+                    _scratch,
+                    opaqueBlobIds,
+                    requireOpaqueHandling: true
                 );
+                // Durable save: the snapshot only records opaque-blob ids, so flush their
+                // bytes to the shared store (content-addressed — present ids are skipped).
+                foreach (var id in opaqueBlobIds)
+                {
+                    _opaqueBlobPersistence.Persist(id, BlobStore);
+                }
+                using (var fs = File.Create(path))
+                {
+                    data.WriteContiguousTo(fs);
+                }
                 _log.Info("Saved snapshot '{0}' to {1}", name, path);
                 TrecsRecordingSession.NotifySavesChanged();
+                TrecsBlobStoreGc.Sweep(_snapshotSerializer, _world.SerializerRegistry);
                 return true;
             }
             catch (Exception e)
@@ -115,7 +145,16 @@ namespace Trecs.Internal
             _session.StopAutoRecording();
             try
             {
-                _snapshotSerializer.LoadSnapshot(path);
+                // Fresh-process load: any opaque blob the snapshot references that isn't
+                // resident must be restored from the shared store before the load.
+                var bytes = new ReadOnlyMemory<byte>(File.ReadAllBytes(path));
+                _opaqueBlobPersistence.RestoreReferencedBlobs(
+                    _snapshotSerializer,
+                    _scratch.ReadBuffer.Wrap(bytes),
+                    BlobStore,
+                    _opaqueRefScratch
+                );
+                _snapshotSerializer.Deserialize(_scratch.ReadBuffer.Wrap(bytes), _scratch.Metadata);
                 // LoadSnapshot only restores component state; the input
                 // queue still has the abandoned timeline's inputs at >=
                 // the loaded frame. The next tick's input-phase AddInput
@@ -149,6 +188,7 @@ namespace Trecs.Internal
             File.Delete(path);
             _log.Info("Deleted snapshot '{0}'", name);
             TrecsRecordingSession.NotifySavesChanged();
+            TrecsBlobStoreGc.Sweep(_snapshotSerializer, _world.SerializerRegistry);
             return true;
         }
 

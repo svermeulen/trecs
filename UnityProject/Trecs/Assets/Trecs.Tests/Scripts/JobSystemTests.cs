@@ -284,7 +284,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             env.StepFixedFrames(1);
 
@@ -346,7 +346,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
         }
 
         /// <summary>

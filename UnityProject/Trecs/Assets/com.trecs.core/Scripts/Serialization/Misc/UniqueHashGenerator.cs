@@ -1,4 +1,3 @@
-using System;
 using Trecs.Internal;
 
 namespace Trecs
@@ -10,18 +9,16 @@ namespace Trecs
     /// "recipe" of an expensive computation (so the result can be cached before
     /// the work is done) or the raw output itself.
     /// </summary>
-    public sealed class UniqueHashGenerator : IDisposable
+    public sealed class UniqueHashGenerator
     {
-        readonly SerializationBuffer _serializeHelper;
+        readonly SerializationHelper _helper;
+
+        // Reusable two-section serialize buffer; the writer clears it on each Generate.
+        readonly SerializationData _data = new();
 
         public UniqueHashGenerator(SerializerRegistry serializationManager)
         {
-            _serializeHelper = new(serializationManager);
-        }
-
-        public void Dispose()
-        {
-            _serializeHelper.Dispose();
+            _helper = new SerializationHelper(serializationManager);
         }
 
         /// <summary>
@@ -39,13 +36,12 @@ namespace Trecs
 
             using (TrecsProfiling.Start("Generating guid for type {0}", typeof(T)))
             {
-                _serializeHelper.ClearMemoryStream();
-
                 // Enable includeTypeChecks so that two values with identical binary
                 // representations but different types produce different hashes.
                 if (typeof(T).IsValueType)
                 {
-                    _serializeHelper.WriteAll<T>(
+                    _helper.WriteAll<T>(
+                        _data,
                         input,
                         version: 1,
                         includeTypeChecks: true,
@@ -54,7 +50,8 @@ namespace Trecs
                 }
                 else
                 {
-                    _serializeHelper.WriteAllObject(
+                    _helper.WriteAllObject(
+                        _data,
                         input,
                         version: 1,
                         includeTypeChecks: true,
@@ -62,9 +59,11 @@ namespace Trecs
                     );
                 }
 
-                _serializeHelper.ResetMemoryPosition();
-
-                var hash = _serializeHelper.GetMemoryStreamCollisionResistantHash();
+                // Hash the contiguous wire form in place — no intermediate contiguous byte[].
+                // ComputeContiguousChecksum is byte-identical to hashing the materialized contiguous
+                // form (see XxHash64Builder), so cached ids — including DiskMemoize's persistent disk
+                // keys — stay stable across the move off SerializationBuffer.
+                var hash = unchecked((long)_data.ComputeContiguousChecksum());
                 if (hash == 0)
                     hash = 1; // Reserve 0 for null
                 return hash;

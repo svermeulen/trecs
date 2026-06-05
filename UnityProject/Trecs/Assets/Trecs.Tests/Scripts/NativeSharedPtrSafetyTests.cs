@@ -1,5 +1,4 @@
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
 using Unity.Burst;
@@ -27,15 +26,24 @@ namespace Trecs.Tests
     {
         static (NativeSharedHeap heap, BlobCache cache) CreateHeap()
         {
-            var blobStore = new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
             var cache = new BlobCache(
                 TrecsLog.Default,
-                new List<IBlobStore> { blobStore },
-                new BlobCacheSettings { SerializationVersion = 1 },
+                new BlobCacheSettings(),
                 new NativeBlobBoxPool()
             );
-            var heap = new NativeSharedHeap(TrecsLog.Default, cache);
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var factory = new BlobFactory(TrecsLog.Default, cache, registry);
+            var heap = new NativeSharedHeap(TrecsLog.Default, cache, factory);
             return (heap, cache);
+        }
+
+        // The heap no longer exposes an eager CreateBlob; register a (constant) source and acquire.
+        static NativeSharedPtr<T> CreateBlob<T>(NativeSharedHeap heap, BlobId id, in T value)
+            where T : unmanaged
+        {
+            heap.RegisterBlob(id, in value);
+            return heap.GetBlob<T>(id);
         }
 
         [BurstCompile]
@@ -56,7 +64,7 @@ namespace Trecs.Tests
         {
             var (heap, cache) = CreateHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(1), 42);
+            var ptr = CreateBlob<int>(heap, new BlobId(1), 42);
 
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
@@ -81,7 +89,7 @@ namespace Trecs.Tests
             // Unity's walker still treats them as compatible readers.
             var (heap, cache) = CreateHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(2), 7);
+            var ptr = CreateBlob<int>(heap, new BlobId(2), 7);
             heap.TryClone<int>(ptr.Handle, out var clone);
 
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
@@ -105,7 +113,7 @@ namespace Trecs.Tests
         {
             var (heap, cache) = CreateHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(3), 99);
+            var ptr = CreateBlob<int>(heap, new BlobId(3), 99);
 
             heap.DecrementRef(ptr.Handle);
 
@@ -122,7 +130,7 @@ namespace Trecs.Tests
             // mismatched type-hashes the same way ResolveUnsafePtr<T> does.
             var (heap, cache) = CreateHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(4), 99);
+            var ptr = CreateBlob<int>(heap, new BlobId(4), 99);
 
             NAssert.Throws<TrecsException>(() =>
             {
@@ -143,7 +151,7 @@ namespace Trecs.Tests
             // held past Dispose carry a released handle and throw on next access.
             var (heap, cache) = CreateHeap();
 
-            var ptr = heap.CreateBlob<int>(new BlobId(5), 17);
+            var ptr = CreateBlob<int>(heap, new BlobId(5), 17);
 
             var read = heap.Read(in ptr);
             NAssert.AreEqual(17, read.Value); // works while alive

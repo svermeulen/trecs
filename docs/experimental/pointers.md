@@ -36,27 +36,44 @@ The two axes give four types:
 
 ### Allocating
 
+`UniquePtr` / `NativeUniquePtr` are single-owner — allocate in one call, no ID needed:
+
 ```csharp
 // Managed payloads
 UniquePtr<MyData> unique = UniquePtr.Alloc(World, new MyData());
-SharedPtr<MyData> shared = SharedPtr.Alloc(World, MyBlobs.Foo, new MyData());
 
 // Unmanaged payloads (Burst-safe)
 NativeUniquePtr<NativeData> nativeUnique = NativeUniquePtr.Alloc(World, new NativeData());
 NativeUniquePtr<NativeData> nativeUnique2 = NativeUniquePtr.Alloc<NativeData>(World); // uninitialized
-NativeSharedPtr<NativeData> nativeShared = NativeSharedPtr.Alloc(World, MyBlobs.Bar, new NativeData());
 ```
 
-`SharedPtr` / `NativeSharedPtr` require a caller-supplied `BlobId` so multiple call sites can resolve to the same allocation and snapshots can round-trip the reference. See [Shared Heap Data](shared-heap-data.md) for seeder and lookup patterns.
-
-`UniquePtr` / `NativeUniquePtr` are single-owner — no ID needed.
-
-For shared pointers, `GetOrAlloc` is a convenience that allocates on the first call and returns the existing blob on subsequent calls:
+`SharedPtr` / `NativeSharedPtr` are reference-counted and identified by a `BlobId`, so multiple call sites can resolve to the same allocation and snapshots can round-trip the reference. There are three ways to get one — covered in full under [Shared Heap Data](shared-heap-data.md#the-three-ways-to-create-a-shared-blob); the most common is **`Register` a blob once against a stable `BlobId`, then `Acquire` a handle by that id**:
 
 ```csharp
-SharedPtr<MyData> ptr = SharedPtr.GetOrAlloc(World, MyBlobs.Foo, () => new MyData());
-NativeSharedPtr<NativeData> nPtr = NativeSharedPtr.GetOrAlloc(World, MyBlobs.Bar, () => new NativeData());
+// Managed payload
+SharedPtr.Register(World, MyBlobs.Foo, new MyData());
+SharedPtr<MyData> shared = SharedPtr.Acquire<MyData>(World, MyBlobs.Foo);
+
+// Unmanaged payload (Burst-safe)
+NativeSharedPtr.Register(World, MyBlobs.Bar, new NativeData());
+NativeSharedPtr<NativeData> nativeShared = NativeSharedPtr.Acquire<NativeData>(World, MyBlobs.Bar);
 ```
+
+`Register` also has a factory overload, so the blob is materialized lazily on the first `Acquire` and reused on every subsequent call:
+
+```csharp
+SharedPtr.Register(World, MyBlobs.Foo, () => new MyData());
+SharedPtr<MyData> ptr = SharedPtr.Acquire<MyData>(World, MyBlobs.Foo);
+```
+
+For opaque content computed on the fly that you don't want to name, **`Alloc`** derives the `BlobId` by hashing the content (identical content deduplicates):
+
+```csharp
+SharedPtr<MyData> shared = SharedPtr.Alloc(World, new MyData());
+NativeSharedPtr<NativeData> nativeShared = NativeSharedPtr.Alloc(World, in nativeValue);
+```
+
+See [Shared Heap Data](shared-heap-data.md) for the descriptor-derived path, the seeder pattern, and `BlobId` strategies.
 
 ### Reading and writing
 
@@ -110,8 +127,9 @@ public partial struct CMeshReference : IEntityComponent
 }
 
 // At entity creation
+SharedPtr.Register(World, MeshIds.Bullet, mesh);
 World.AddEntity<MyTag>()
-    .Set(new CMeshReference { Mesh = SharedPtr.Alloc(World, MeshIds.Bullet, mesh) });
+    .Set(new CMeshReference { Mesh = SharedPtr.Acquire<Mesh>(World, MeshIds.Bullet) });
 
 // At a system call site
 ref readonly CMeshReference meshRef = ref entity.Component<CMeshReference>(World).Read;
@@ -129,13 +147,14 @@ When you specifically need a Unity `NativeList<T>`, wrap it in a `NativeUniquePt
 `SharedPtr<T>` and `NativeSharedPtr<T>` use reference counting. `Clone` bumps the refcount and returns a handle to the same blob. Each clone must be independently disposed:
 
 ```csharp
-SharedPtr<MyData> first  = SharedPtr.Alloc(World, MyBlobs.Foo, new MyData());
+SharedPtr.Register(World, MyBlobs.Foo, new MyData());
+SharedPtr<MyData> first  = SharedPtr.Acquire<MyData>(World, MyBlobs.Foo);
 SharedPtr<MyData> second = first.Clone(World);  // same blob; refcount = 2
 second.Dispose(World); // refcount = 1
 first.Dispose(World);  // refcount = 0, blob freed
 ```
 
-`SharedPtr.Acquire(World, blobId)` is `Clone` addressed by ID instead of by reference — it finds the existing blob, bumps the refcount, and returns a handle. See [Shared Heap Data — Pattern B](shared-heap-data.md#pattern-b-look-up-by-stable-blobid).
+`SharedPtr.Acquire(World, blobId)` is `Clone` addressed by ID instead of by reference — it finds the existing blob, bumps the refcount, and returns a handle. See [Shared Heap Data](shared-heap-data.md#the-three-ways-to-create-a-shared-blob).
 
 ### Disposing { #cleanup-is-manual-for-entity-owned-pointers }
 

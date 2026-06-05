@@ -63,10 +63,10 @@ public partial class FishDeathSystem : ISystem
 
 See [OnReady](../core/systems.md#onready-hook) and [OnShutdown](../core/systems.md#onshutdown-hook) for system lifecycle details.
 
-The same pattern works outside systems — any class that has access to a `WorldAccessor` can subscribe. Use a `DisposeCollection` when managing multiple subscriptions:
+The same pattern works outside systems — any class that has access to a `WorldAccessor` can subscribe. Use a `DisposeCollection` when managing multiple subscriptions, and dispose them from the [`OnShutdown` frame event](#frame-events) so the handler is still subscribed for the final `OnRemoved` pass during `World.Dispose()` (see the warning below):
 
 ```csharp
-public partial class RemoveCleanupHandler : IDisposable
+public partial class RemoveCleanupHandler
 {
     readonly DisposeCollection _disposables = new();
 
@@ -78,6 +78,10 @@ public partial class RemoveCleanupHandler : IDisposable
             .EntitiesWithTags<FrenzyTags.Fish>()
             .OnRemoved(OnFishRemoved)
             .AddTo(_disposables);
+
+        // Tear down our subscriptions when the world shuts down, after the
+        // final OnRemoved pass has run.
+        World.Events.OnShutdown(() => _disposables.Dispose()).AddTo(_disposables);
     }
 
     WorldAccessor World { get; }
@@ -88,15 +92,25 @@ public partial class RemoveCleanupHandler : IDisposable
         if (targetMeal.Value.Exists(World))
             targetMeal.Value.Remove(World);
     }
-
-    public void Dispose() => _disposables.Dispose();
 }
 ```
+
+!!! warning "Dispose subscriptions in `OnShutdown`, not before `World.Dispose()`"
+    `World.Dispose()` runs `RemoveAllEntities` (firing a final `OnRemoved` for every
+    entity) **before** it fires the [`OnShutdown` event](#frame-events). If you dispose
+    your subscriptions *before* calling `World.Dispose()` — for example from a
+    composition root's disposables list ordered `{ handler.Dispose, world.Dispose }` —
+    the handler is already unsubscribed when that final `OnRemoved` fires, so any
+    cleanup it performs is silently skipped. This is invisible when the handler only
+    touches ECS state (it's all torn down anyway), but it's a real leak when `OnRemoved`
+    frees resources *outside* the world, such as destroying GameObjects. Registering
+    disposal through `World.Events.OnShutdown(...)` avoids this: `OnShutdown` fires after
+    the final `OnRemoved` pass but while the events system is still alive.
 
 All `[ForEachEntity]` features are supported on event handlers, including aspects:
 
 ```csharp
-public partial class CleanupHandlers : IDisposable
+public partial class CleanupHandlers
 {
     readonly RenderableGameObjectManager _goManager;
     readonly DisposeCollection _disposables = new();
@@ -110,6 +124,8 @@ public partial class CleanupHandlers : IDisposable
             .EntitiesWithTags<SampleTags.Prey>()
             .OnRemoved(OnPreyRemoved)
             .AddTo(_disposables);
+
+        World.Events.OnShutdown(() => _disposables.Dispose()).AddTo(_disposables);
     }
 
     WorldAccessor World { get; }
@@ -117,11 +133,12 @@ public partial class CleanupHandlers : IDisposable
     [ForEachEntity]
     void OnPreyRemoved(in Prey prey)
     {
+        // Destroying the GameObject here is exactly why disposal must run from
+        // OnShutdown: if this handler were disposed before World.Dispose(), the
+        // GameObjects for the final batch of prey would never be destroyed.
         var go = _goManager.Resolve(prey.GameObjectId);
         UnityEngine.Object.Destroy(go);
     }
-
-    public void Dispose() => _disposables.Dispose();
 
     partial struct Prey : IAspect, IRead<GameObjectId, ApproachingPredator> { }
 }
@@ -145,7 +162,15 @@ World.Events
     });
 ```
 
-Note that `EntityHandle.Exists()` returns `false` for removed entities during the callback — it reflects liveness, not data accessibility. Guard cross-entity cleanup with `Exists()` as usual to avoid operating on already-removed entities.
+### The `OnRemoved` contract
+
+Inside an `OnRemoved` callback, for each entity being removed:
+
+- **Component data is still readable** (as above) — both `[ForEachEntity]` parameters and dynamic `EntityIndex.Component<T>()` reads see the pre-removal values.
+- **`EntityHandle.Exists()` returns `false`.** It reflects liveness, not data accessibility. Guard cross-entity cleanup with `Exists()` as usual to avoid operating on already-removed entities.
+- **Set membership** is still visible for removals that empty the group — a single entity, or a whole-group [`RemoveEntitiesWithTags` / `RemoveAllEntitiesInGroup` / `RemoveAllEntities`](structural-changes.md#removing-entities-in-bulk). The entity is removed from its [sets](sets.md) only *after* the callback, mirroring component-data accessibility. For partial batch removals that leave other entities in the same group, departed entities are removed from their sets *before* the callback (the survivor swap-back rekeys set slots). After the submission completes, removed entities are gone from every set in all cases.
+
+This contract is **identical** across every removal path: a single `RemoveEntity`, a bulk `RemoveEntitiesWithTags` / `RemoveAllEntitiesInGroup`, and the full `RemoveAllEntities` (including the automatic pass during `World.Dispose()`).
 
 ## Priorities
 
@@ -172,6 +197,15 @@ sub.Dispose();
 
 The `DisposeCollection` used in the examples above is a small helper defined in the samples — Trecs core doesn't ship it. A `List<IDisposable>` walked in `Dispose()` works just as well.
 
+## Lifecycle guarantee
+
+Every entity that is successfully added and submitted fires exactly one `OnAdded`, and is guaranteed a matching `OnRemoved` no later than `World.Dispose()`. Two exceptions:
+
+- the **global singleton entity** is never removed (its lifetime is the world's), so it never fires `OnRemoved`; and
+- an `AddEntity` rejected by the **shutdown guard** — a structural add attempted after `World.Dispose()` has begun — is never added and fires neither event (it throws in debug builds and is dropped in release; see [world setup](../core/world-setup.md#disposal)).
+
+This holds even when an add and a bulk removal of the same group land in the *same* submit: the entity is added (firing `OnAdded`) and then removed by the bulk removal (firing `OnRemoved`) — both events fire, never just one. See [submission phase order](structural-changes.md#submission-phase-order) for why.
+
 ## Cascading structural changes from callbacks
 
 A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child. Trecs keeps processing the queue until empty or until `WorldSettings.MaxSubmissionIterations` (default 10) is reached. Hitting the cap throws `"possible circular submission detected"` in debug/editor builds.
@@ -185,7 +219,7 @@ Separate from the per-entity events, `World.Events` exposes lifecycle hooks for 
 | `OnVariableUpdateStarted` | At the start of every `World.Tick()`, after `VariableDeltaTime` has been updated. |
 | `OnFixedUpdateStarted` | At the start of each fixed-update step (zero or more times per `Tick()`, depending on catch-up). |
 | `OnInputsApplied` | Inside each fixed step, after queued `AddInput<T>` values have been written onto their target entities (typically the global entity, but any entity is valid). |
-| `OnSubmissionStarted` | Submission is about to run. Fires at the start of every `Submit()` call — at the end of each fixed step, at the end of `World.LateTick()`, and on any manual `World.Submit()`. |
+| `OnSubmissionStarted` | Submission is about to run. Fires at the start of every `Submit()` call — at the end of each fixed step, at the end of `World.LateTick()`, and on any manual `World.Submit()` (on the `World` class). |
 | `OnSubmissionCompleted` | Submission finished — all queued structural changes applied. Only fires when at least one structural change was processed. |
 | `OnFixedUpdateCompleted` | At the end of each fixed-update step. |
 | `OnVariableUpdateCompleted` | At the end of every `World.LateTick()`, after the final submission for the frame. |

@@ -268,7 +268,7 @@ internal static class TrecsStubs
             }
 
             // [NonCopyable] / [Copyable] — picked up by NonCopyableAnalyzer
-            // (TRECS118-120) via attribute + IEntityComponent lookup on the target.
+            // (TRECS118, TRECS120, TRECS131) via attribute + IEntityComponent lookup on the target.
             // Real types live at com.trecs.core/Scripts/SourceGen/NonCopyableAttribute.cs
             // and CopyableAttribute.cs.
             [System.AttributeUsage(System.AttributeTargets.Struct)]
@@ -276,6 +276,34 @@ internal static class TrecsStubs
 
             [System.AttributeUsage(System.AttributeTargets.Struct)]
             public sealed class CopyableAttribute : System.Attribute { }
+
+            // [CascadeRemove] / [DisposeOnRemove] feature — attributes + the
+            // runtime registration surface generated code targets. Real types
+            // at com.trecs.core/Scripts/SourceGen/{CascadeRemove,DisposeOnRemove}Attribute.cs
+            // and Scripts/Submission/RemovalHandlers.cs.
+            [System.AttributeUsage(System.AttributeTargets.Field)]
+            public sealed class CascadeRemoveAttribute : System.Attribute { }
+
+            [System.AttributeUsage(System.AttributeTargets.Field)]
+            public sealed class DisposeOnRemoveAttribute : System.Attribute { }
+
+            public delegate void RemovalFieldHandler(
+                WorldAccessor world,
+                GroupIndex group,
+                EntityRange range
+            );
+
+            public interface IComponentRemovalHandlers
+            {
+                void RegisterRemovalHandlers(RemovalHandlerCollector collector);
+            }
+
+            public sealed class RemovalHandlerCollector
+            {
+                public void AddCascadeReadHandler(RemovalFieldHandler handler) { }
+
+                public void AddDisposeHandler(RemovalFieldHandler handler) { }
+            }
 
             // EntityIndex — handle used by aspect / iteration plumbing.
             // Real type lives at com.trecs.core/Scripts/Entities/EntityIndex.cs in the
@@ -326,6 +354,10 @@ internal static class TrecsStubs
                 // Aspect WorldAccessor+EntityHandle ctor delegates via `entityHandle.ToIndex(world)`.
                 public EntityIndex ToIndex(WorldAccessor world) => default;
                 public EntityIndex ToIndex(NativeWorldAccessor world) => default;
+
+                // Used by generated [CascadeRemove] handlers.
+                public bool Exists(WorldAccessor world) => false;
+                public void Remove(WorldAccessor world) { }
             }
 
             public readonly struct Tag { }
@@ -944,15 +976,41 @@ internal static class TrecsStubs
             // InputUniquePtr,InputSharedPtr,TrecsList}.cs — only the type symbol
             // (name + namespace + single type-argument) is what TemplateValidator
             // pattern-matches on.
-            public readonly struct NativeUniquePtr<T> where T : unmanaged { }
-            public readonly struct NativeSharedPtr<T> where T : unmanaged { }
-            public readonly struct UniquePtr<T> where T : class { }
-            public readonly struct SharedPtr<T> where T : class { }
+            // Dispose(WorldAccessor) on these is what generated [DisposeOnRemove]
+            // handlers call uniformly.
+            public readonly struct NativeUniquePtr<T> where T : unmanaged { public void Dispose(WorldAccessor world) { } }
+            public readonly struct NativeSharedPtr<T> where T : unmanaged { public void Dispose(WorldAccessor world) { } }
+            public readonly struct UniquePtr<T> where T : class { public void Dispose(WorldAccessor world) { } }
+            public readonly struct SharedPtr<T> where T : class { public void Dispose(WorldAccessor world) { } }
             public readonly struct InputNativeUniquePtr<T> where T : unmanaged { }
             public readonly struct InputNativeSharedPtr<T> where T : unmanaged { }
             public readonly struct InputUniquePtr<T> where T : class { }
             public readonly struct InputSharedPtr<T> where T : class { }
-            public readonly struct TrecsList<T> where T : unmanaged { }
+
+            // Mirrors Packages/com.trecs.core/Scripts/Heap/{SharedAnchor,NativeSharedAnchor}.cs —
+            // the ambient cache-pin handles TemplateValidator forbids in components (TRECS137).
+            public readonly struct SharedAnchor<T> where T : class { }
+            public readonly struct NativeSharedAnchor<T> where T : unmanaged { }
+
+            // TrecsListRead<T> — foreach-able read view returned by Read(world);
+            // generated [CascadeRemove] handlers iterate it. Real types at
+            // com.trecs.core/Scripts/Heap/{TrecsList,TrecsListRead}.cs.
+            public readonly ref struct TrecsListRead<T> where T : unmanaged
+            {
+                public Enumerator GetEnumerator() => default;
+
+                public ref struct Enumerator
+                {
+                    public T Current => default;
+                    public bool MoveNext() => false;
+                }
+            }
+
+            public readonly struct TrecsList<T> where T : unmanaged
+            {
+                public TrecsListRead<T> Read(WorldAccessor world) => default;
+                public void Dispose(WorldAccessor world) { }
+            }
 
             // NativeSharedRead<T> — safety-checked read view returned by NativeSharedPtr<T>.Read(...).
             // Real type at Packages/com.trecs.core/Scripts/Heap/NativeSharedRead.cs. Stubbed here

@@ -24,10 +24,32 @@ namespace Trecs
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    internal sealed class ResolvedComponentDeclaration<T> : IResolvedComponentDeclaration
+    internal sealed class ResolvedComponentDeclaration<T>
+        : IResolvedComponentDeclaration,
+            IRemovalHandlerCollectable
         where T : unmanaged, IEntityComponent
     {
         static readonly Type _componentType = typeof(T);
+
+        // The component's generated [CascadeRemove]/[DisposeOnRemove] handler
+        // implementation, or null when T carries neither attribute (the
+        // generator emits an explicit IComponentRemovalHandlers implementation
+        // only on annotated partial component structs). Resolved once per closed
+        // component type T in the static ctor — boxing default(T) here, rather
+        // than in CollectRemovalHandlers, keeps the per-(group, component)
+        // world-build precompute allocation-free. Safe to share one boxed
+        // instance: the generated handler is stateless (its lambdas are static
+        // and capture nothing), so it never reads this default(T)'s fields.
+        static readonly IComponentRemovalHandlers _removalHandlers =
+            default(T) as IComponentRemovalHandlers;
+
+        // Dispatch to the component's generated [CascadeRemove]/[DisposeOnRemove]
+        // handlers, if any. Called once per (group, component) during the
+        // world-build precompute; a no-op for non-annotated components.
+        public void CollectRemovalHandlers(RemovalHandlerCollector collector)
+        {
+            _removalHandlers?.RegisterRemovalHandlers(collector);
+        }
 
         public ResolvedComponentDeclaration(
             bool variableUpdateOnly,

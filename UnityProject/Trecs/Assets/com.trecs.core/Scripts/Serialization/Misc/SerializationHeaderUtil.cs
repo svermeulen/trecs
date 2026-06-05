@@ -21,7 +21,26 @@ namespace Trecs.Internal
         //   2: data section drops BinaryWriter/BinaryReader intermediary;
         //      strings use int32 byte-count prefix instead of 7-bit
         //      variable-length encoding.
-        public const byte FormatVersion = 2;
+        //   3: section length prefix gains an explicit int32 data-section byte
+        //      count ([bitCount][bitFieldBytes][dataBytes]); the trailing
+        //      end-of-payload sentinel is dropped — the explicit lengths plus
+        //      bounds checks now do the truncation detection it provided.
+        //   4: snapshot metadata gains a WorldSchemaFingerprint (validated on
+        //      load so schema-stale snapshots fail with an explanation). The
+        //      envelope layout itself is unchanged, but pre-fingerprint
+        //      payloads must be rejected here — without the gate they would
+        //      misparse as a fingerprint mismatch and report a misleading
+        //      "schema changed" error.
+        //   5: WorldSchemaFingerprint gains CustomSectionsHash (blit layout
+        //      grows by 8 bytes), and the world-state stream gains a trailing
+        //      CustomSections block (count + per-section name-hash-framed
+        //      payloads from ICustomWorldStateSection registrations).
+        //   6: IterableHashSet<BlobId> / IterableHashSet<EntityHandle>
+        //      (snapshot-metadata blob ids, bundle-header blob ids, entity
+        //      input queue) switch from per-element writes to the
+        //      internal-structure blit form (IterableHashSetSerializer:
+        //      nodes + buckets, like the unmanaged dictionary serializer).
+        public const byte FormatVersion = 6;
 
         // magic0 (1) + magic1 (1) + formatVersion (1) + version (4) + flags (8) + includeTypeChecks (1)
         const int HeaderSize = 16;

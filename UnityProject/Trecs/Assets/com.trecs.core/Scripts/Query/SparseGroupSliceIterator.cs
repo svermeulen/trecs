@@ -36,6 +36,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SparseGroupSliceIterator GetEnumerator() => this;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()
         {
             while (++_groupIndex < _validGroups.Count)

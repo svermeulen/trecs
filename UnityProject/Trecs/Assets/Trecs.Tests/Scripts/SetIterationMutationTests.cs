@@ -40,7 +40,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
             return a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
         }
 
@@ -139,7 +139,7 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             for (int i = 0; i < 3; i++)
                 a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(i, groupA));
@@ -175,7 +175,7 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             for (int i = 0; i < 3; i++)
                 a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(i, groupA));
@@ -220,7 +220,7 @@ namespace Trecs.Tests
             );
             NAssert.AreEqual(2, a.Set<ItMutSetA>().Read.Count);
 
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(3, a.Set<ItMutSetA>().Read.Count);
         }
 
@@ -248,7 +248,7 @@ namespace Trecs.Tests
             );
             NAssert.AreEqual(3, a.Set<ItMutSetA>().Read.Count);
 
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(0, a.Set<ItMutSetA>().Read.Count);
         }
 

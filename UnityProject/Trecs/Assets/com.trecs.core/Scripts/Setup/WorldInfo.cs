@@ -10,7 +10,7 @@ namespace Trecs
     /// <summary>
     /// Read-only metadata about all registered templates, groups, components, and tags in a world.
     /// Use to discover which groups exist, resolve tag sets to groups, and inspect component layouts.
-    /// Accessed via <see cref="WorldAccessor.WorldInfo"/> or <see cref="World.WorldInfo"/>.
+    /// Accessed via <see cref="WorldAccessor.WorldInfo"/>.
     /// </summary>
     public sealed class WorldInfo : IDisposable
     {
@@ -668,11 +668,11 @@ namespace Trecs
 #if DEBUG && TRECS_INTERNAL_CHECKS
             AssertActiveVariantIsActuallyActive(current, activeVariant);
 #endif
-            // XOR by 0 is identity, so default(Tag).Value==0 handles the
-            // "no active variant" case without a branch.
+            // A stored TagSet id equals the exact XOR of its member values — the registry
+            // never remaps, and no group's tag set can XOR to 0 (that throws at
+            // registration) — so we XOR directly against current.Id. XOR by 0 is identity,
+            // so default(Tag).Value==0 handles the "no active variant" case without a branch.
             int newId = current.Id ^ activeVariant.Value ^ replacement.Value;
-            if (newId == 0)
-                newId = 1;
             return new TagSet(newId);
         }
 
@@ -685,8 +685,6 @@ namespace Trecs
             AssertActiveVariantIsActuallyActive(current, activeVariant);
 #endif
             int newId = current.Id ^ activeVariant.Value;
-            if (newId == 0)
-                newId = 1;
             return new TagSet(newId);
         }
 

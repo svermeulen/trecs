@@ -149,7 +149,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Schedule a job that writes to the transient set
             new FlagEntitiesJob().ScheduleParallel(a);
@@ -183,7 +183,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Schedule a job that writes to the set
             new FlagAllEntitiesJob().ScheduleParallel(a);
@@ -214,7 +214,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -252,7 +252,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -291,7 +291,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -321,7 +321,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -350,7 +350,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -378,7 +378,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -407,7 +407,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Schedule a job that writes to the transient set
             new FlagAllEntitiesJob().ScheduleParallel(a);
@@ -438,7 +438,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<TFJTestTransientSet>();
@@ -469,7 +469,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Job calls Add then Clear on each entity. Clear supersedes regardless of order.
             new AddThenClearJob().ScheduleParallel(a);
@@ -491,7 +491,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Even when Clear is called BEFORE Add on each thread, semantics are
             // order-insensitive (matching deferred-clear semantics): Clear wins,
@@ -515,7 +515,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<TFJTestTransientSet>();
@@ -551,7 +551,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             new AddByHandleJob().ScheduleParallel(a);
 
@@ -576,7 +576,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             // Pre-populate via main thread
             var set = a.Set<TFJTestTransientSet>();
@@ -605,7 +605,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<TFJTestTransientSet>();

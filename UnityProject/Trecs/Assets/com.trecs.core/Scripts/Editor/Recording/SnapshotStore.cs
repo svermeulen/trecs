@@ -6,17 +6,19 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// In-memory store for the four collections the editor recorder
-    /// maintains during a session: persisted anchors, user-placed bookmarks,
+    /// maintains during a session: persisted keyframes, user-placed bookmarks,
     /// the transient scrub cache, and per-frame desync-detection checksums.
-    /// Centralises payload-pool return discipline, byte accounting, and
+    /// Centralises snapshot release discipline, byte accounting, and
     /// capacity enforcement so callers don't have to remember the
-    /// "every remove must <see cref="SnapshotSerializer.ReturnPayloadBuffer"/>
-    /// the displaced payload" rule at each site.
+    /// "every remove must release the displaced snapshot's resources"
+    /// rule at each site.
     ///
-    /// Owns the lifetime of every <see cref="WorldSnapshot.Payload"/> it
-    /// holds — payloads handed in via Append/Insert/Set are released back
-    /// to the pool on remove / trim / cap-eviction / Clear / Dispose. Read-
-    /// only callers can iterate the exposed lists freely; they must NOT
+    /// Owns the lifetime of every snapshot it holds — snapshots handed in
+    /// via Append/Insert/Set are released on remove / trim / cap-eviction /
+    /// Clear / Dispose: retained data despawns to the
+    /// <see cref="SerializationDataPool"/>, blob pins are released, and
+    /// loaded-bundle contiguous payloads just become garbage. Read-only
+    /// callers can iterate the exposed lists freely; they must NOT
     /// mutate the payload memory or hold a slice past the corresponding
     /// remove call.
     ///
@@ -25,12 +27,19 @@ namespace Trecs.Internal
     /// </summary>
     internal sealed class SnapshotStore : IDisposable
     {
-        readonly SnapshotPayloadPool _pool;
+        // Pool for RetainedData-backed snapshots (the live capture path); see ReturnSnapshot.
+        readonly SerializationDataPool _serDataPool;
+
+        // Releases the cache pins a snapshot holds on its opaque blobs, invoked from the single
+        // ReturnSnapshot choke point so every remove / trim / cap / clear / replace site unpins in
+        // lockstep with returning the payload buffer. Supplied by TrecsRewindBuffer, which guards
+        // against a disposed world (the cache is gone by then). No-op for pin-less (loaded) snapshots.
+        readonly Action<List<BlobPin>> _releasePins;
 
         // Sparse, capacity-capped (drop-oldest). Sorted by FixedFrame
         // ascending. Doubles as the desync-recovery + scrub backbone for
         // BundleReplayer-style playback.
-        readonly List<WorldSnapshot> _anchors = new();
+        readonly List<WorldSnapshot> _keyframes = new();
 
         // User-placed labelled markers. Sorted by FixedFrame ascending.
         // Never auto-evicted.
@@ -49,26 +58,40 @@ namespace Trecs.Internal
         // overhead is single-digit bytes per recorder.
         readonly IterableDictionary<int, ulong> _checksums = new();
 
-        long _totalAnchorBytes;
+        long _totalKeyframeBytes;
         long _scrubCacheBytes;
         bool _disposed;
 
-        public SnapshotStore(SnapshotPayloadPool pool)
+        public SnapshotStore(SerializationDataPool serDataPool, Action<List<BlobPin>> releasePins)
         {
-            _pool = pool ?? throw new ArgumentNullException(nameof(pool));
+            _serDataPool = serDataPool ?? throw new ArgumentNullException(nameof(serDataPool));
+            _releasePins = releasePins ?? throw new ArgumentNullException(nameof(releasePins));
         }
 
-        public IReadOnlyList<WorldSnapshot> Anchors => _anchors;
+        // Release a dropped snapshot's resources: despawn retained data to its pool and release
+        // any opaque-blob cache pins it held. Both must happen at every drop site — hence the
+        // single choke point. Loaded-bundle contiguous payloads have nothing to release — the
+        // byte[] just becomes garbage (cold, user-initiated path; no pooling).
+        void ReturnSnapshot(WorldSnapshot snapshot)
+        {
+            _releasePins(snapshot.PinnedBlobs);
+            if (snapshot.RetainedData != null)
+            {
+                _serDataPool.Despawn(snapshot.RetainedData);
+            }
+        }
+
+        public IReadOnlyList<WorldSnapshot> Keyframes => _keyframes;
         public IReadOnlyList<WorldSnapshot> Bookmarks => _bookmarks;
         public IReadOnlyList<WorldSnapshot> ScrubCache => _scrubCache;
 
         public IterableDictionary<int, ulong> Checksums => _checksums;
 
-        public long TotalAnchorBytes => _totalAnchorBytes;
+        public long TotalKeyframeBytes => _totalKeyframeBytes;
         public long ScrubCacheBytes => _scrubCacheBytes;
 
         public bool IsEmpty =>
-            _anchors.Count == 0 && _bookmarks.Count == 0 && _scrubCache.Count == 0;
+            _keyframes.Count == 0 && _bookmarks.Count == 0 && _scrubCache.Count == 0;
 
         /// <summary>
         /// Earliest captured frame across all three lists, or null if the
@@ -80,8 +103,8 @@ namespace Trecs.Internal
             get
             {
                 int earliest = int.MaxValue;
-                if (_anchors.Count > 0)
-                    earliest = _anchors[0].FixedFrame;
+                if (_keyframes.Count > 0)
+                    earliest = _keyframes[0].FixedFrame;
                 if (_bookmarks.Count > 0 && _bookmarks[0].FixedFrame < earliest)
                     earliest = _bookmarks[0].FixedFrame;
                 if (_scrubCache.Count > 0 && _scrubCache[0].FixedFrame < earliest)
@@ -99,8 +122,8 @@ namespace Trecs.Internal
             get
             {
                 int latest = int.MinValue;
-                if (_anchors.Count > 0)
-                    latest = _anchors[_anchors.Count - 1].FixedFrame;
+                if (_keyframes.Count > 0)
+                    latest = _keyframes[_keyframes.Count - 1].FixedFrame;
                 if (_bookmarks.Count > 0 && _bookmarks[_bookmarks.Count - 1].FixedFrame > latest)
                     latest = _bookmarks[_bookmarks.Count - 1].FixedFrame;
                 if (_scrubCache.Count > 0 && _scrubCache[_scrubCache.Count - 1].FixedFrame > latest)
@@ -112,20 +135,20 @@ namespace Trecs.Internal
         // ---- Add ------------------------------------------------------------
 
         /// <summary>
-        /// Append an anchor whose frame is strictly greater than every
-        /// existing anchor's frame. Asserts in debug builds that the list
-        /// stays sorted. Use <see cref="InsertOrReplaceAnchorAt"/> for
+        /// Append a keyframe whose frame is strictly greater than every
+        /// existing keyframe's frame. Asserts in debug builds that the list
+        /// stays sorted. Use <see cref="InsertOrReplaceKeyframeAt"/> for
         /// manual at-current-frame captures that can land anywhere.
         /// </summary>
-        public void AppendAnchor(WorldSnapshot snapshot)
+        public void AppendKeyframe(WorldSnapshot snapshot)
         {
             TrecsDebugAssert.That(
-                _anchors.Count == 0
-                    || _anchors[_anchors.Count - 1].FixedFrame < snapshot.FixedFrame,
-                "AppendAnchor expects strictly increasing frames"
+                _keyframes.Count == 0
+                    || _keyframes[_keyframes.Count - 1].FixedFrame < snapshot.FixedFrame,
+                "AppendKeyframe expects strictly increasing frames"
             );
-            _anchors.Add(snapshot);
-            _totalAnchorBytes += snapshot.Payload.Length;
+            _keyframes.Add(snapshot);
+            _totalKeyframeBytes += snapshot.PayloadByteSize;
         }
 
         /// <summary>
@@ -140,35 +163,37 @@ namespace Trecs.Internal
                 "AppendScrubCacheEntry expects strictly increasing frames"
             );
             _scrubCache.Add(snapshot);
-            _scrubCacheBytes += snapshot.Payload.Length;
+            _scrubCacheBytes += snapshot.PayloadByteSize;
         }
 
         /// <summary>
-        /// Insert <paramref name="snapshot"/> into the anchor list at the
-        /// position dictated by its frame, or replace an existing anchor at
-        /// that frame. Used for manual at-current-frame anchor captures
+        /// Insert <paramref name="snapshot"/> into the keyframe list at the
+        /// position dictated by its frame, or replace an existing keyframe at
+        /// that frame. Used for manual at-current-frame keyframe captures
         /// which can land at any frame (paused after a scrub, etc.).
         /// </summary>
-        public void InsertOrReplaceAnchorAt(WorldSnapshot snapshot)
+        public void InsertOrReplaceKeyframeAt(WorldSnapshot snapshot)
         {
-            for (int i = 0; i < _anchors.Count; i++)
+            for (int i = 0; i < _keyframes.Count; i++)
             {
-                if (_anchors[i].FixedFrame == snapshot.FixedFrame)
+                if (_keyframes[i].FixedFrame == snapshot.FixedFrame)
                 {
-                    _totalAnchorBytes -= _anchors[i].Payload.Length;
-                    _pool.Return(_anchors[i].Payload);
-                    _anchors[i] = snapshot;
-                    _totalAnchorBytes += snapshot.Payload.Length;
+                    _totalKeyframeBytes -= _keyframes[i].PayloadByteSize;
+                    ReturnSnapshot(_keyframes[i]);
+                    _keyframes[i] = snapshot;
+                    _totalKeyframeBytes += snapshot.PayloadByteSize;
                     return;
                 }
             }
             int insertAt = 0;
-            while (insertAt < _anchors.Count && _anchors[insertAt].FixedFrame < snapshot.FixedFrame)
+            while (
+                insertAt < _keyframes.Count && _keyframes[insertAt].FixedFrame < snapshot.FixedFrame
+            )
             {
                 insertAt++;
             }
-            _anchors.Insert(insertAt, snapshot);
-            _totalAnchorBytes += snapshot.Payload.Length;
+            _keyframes.Insert(insertAt, snapshot);
+            _totalKeyframeBytes += snapshot.PayloadByteSize;
         }
 
         /// <summary>
@@ -181,7 +206,7 @@ namespace Trecs.Internal
             {
                 if (_bookmarks[i].FixedFrame == snapshot.FixedFrame)
                 {
-                    _pool.Return(_bookmarks[i].Payload);
+                    ReturnSnapshot(_bookmarks[i]);
                     _bookmarks[i] = snapshot;
                     return;
                 }
@@ -220,7 +245,7 @@ namespace Trecs.Internal
             {
                 if (_bookmarks[i].FixedFrame == frame)
                 {
-                    _pool.Return(_bookmarks[i].Payload);
+                    ReturnSnapshot(_bookmarks[i]);
                     _bookmarks.RemoveAt(i);
                     return true;
                 }
@@ -229,43 +254,43 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Drop anchors whose frame &gt; <paramref name="frame"/>. Returns
-        /// the number of anchors dropped.
+        /// Drop keyframes whose frame &gt; <paramref name="frame"/>. Returns
+        /// the number of keyframes dropped.
         /// </summary>
-        public int TrimAnchorsAfter(int frame)
+        public int TrimKeyframesAfter(int frame)
         {
             int dropped = 0;
-            while (_anchors.Count > 0 && _anchors[_anchors.Count - 1].FixedFrame > frame)
+            while (_keyframes.Count > 0 && _keyframes[_keyframes.Count - 1].FixedFrame > frame)
             {
-                var last = _anchors[_anchors.Count - 1];
-                _totalAnchorBytes -= last.Payload.Length;
-                _pool.Return(last.Payload);
-                _anchors.RemoveAt(_anchors.Count - 1);
+                var last = _keyframes[_keyframes.Count - 1];
+                _totalKeyframeBytes -= last.PayloadByteSize;
+                ReturnSnapshot(last);
+                _keyframes.RemoveAt(_keyframes.Count - 1);
                 dropped++;
             }
             return dropped;
         }
 
         /// <summary>
-        /// Drop anchors whose frame is strictly less than the anchor closest
+        /// Drop keyframes whose frame is strictly less than the keyframe closest
         /// to <paramref name="frame"/> from below. The closest at-or-before
-        /// anchor is preserved (so a JumpToFrame at the trim point still
-        /// works). Returns the number of anchors dropped (0 if nothing
+        /// keyframe is preserved (so a JumpToFrame at the trim point still
+        /// works). Returns the number of keyframes dropped (0 if nothing
         /// could be trimmed).
         /// </summary>
-        public int TrimAnchorsBefore(int frame)
+        public int TrimKeyframesBefore(int frame)
         {
-            int keepFrom = FindAnchorIndexAtOrBefore(frame);
+            int keepFrom = FindKeyframeIndexAtOrBefore(frame);
             if (keepFrom <= 0)
             {
                 return 0;
             }
             for (int i = 0; i < keepFrom; i++)
             {
-                _totalAnchorBytes -= _anchors[i].Payload.Length;
-                _pool.Return(_anchors[i].Payload);
+                _totalKeyframeBytes -= _keyframes[i].PayloadByteSize;
+                ReturnSnapshot(_keyframes[i]);
             }
-            _anchors.RemoveRange(0, keepFrom);
+            _keyframes.RemoveRange(0, keepFrom);
             return keepFrom;
         }
 
@@ -273,7 +298,7 @@ namespace Trecs.Internal
         {
             while (_bookmarks.Count > 0 && _bookmarks[_bookmarks.Count - 1].FixedFrame > frame)
             {
-                _pool.Return(_bookmarks[_bookmarks.Count - 1].Payload);
+                ReturnSnapshot(_bookmarks[_bookmarks.Count - 1]);
                 _bookmarks.RemoveAt(_bookmarks.Count - 1);
             }
         }
@@ -283,7 +308,7 @@ namespace Trecs.Internal
             int removeCount = 0;
             while (removeCount < _bookmarks.Count && _bookmarks[removeCount].FixedFrame < frame)
             {
-                _pool.Return(_bookmarks[removeCount].Payload);
+                ReturnSnapshot(_bookmarks[removeCount]);
                 removeCount++;
             }
             if (removeCount > 0)
@@ -297,8 +322,12 @@ namespace Trecs.Internal
             while (_scrubCache.Count > 0 && _scrubCache[_scrubCache.Count - 1].FixedFrame > frame)
             {
                 var last = _scrubCache[_scrubCache.Count - 1];
-                _scrubCacheBytes -= last.Payload.Length;
-                _pool.Return(last.Payload);
+                // Use the polymorphic size + release (like TrimScrubCacheBefore): live-captured
+                // scrub entries are RetainedData-backed, so the contiguous Payload is empty for
+                // them — .Payload.Length would mis-account 0 bytes, and skipping ReturnSnapshot
+                // would leak the SerializationData instead of despawning it to _serDataPool.
+                _scrubCacheBytes -= last.PayloadByteSize;
+                ReturnSnapshot(last);
                 _scrubCache.RemoveAt(_scrubCache.Count - 1);
             }
         }
@@ -308,8 +337,8 @@ namespace Trecs.Internal
             int removeCount = 0;
             while (removeCount < _scrubCache.Count && _scrubCache[removeCount].FixedFrame < frame)
             {
-                _scrubCacheBytes -= _scrubCache[removeCount].Payload.Length;
-                _pool.Return(_scrubCache[removeCount].Payload);
+                _scrubCacheBytes -= _scrubCache[removeCount].PayloadByteSize;
+                ReturnSnapshot(_scrubCache[removeCount]);
                 removeCount++;
             }
             if (removeCount > 0)
@@ -381,35 +410,35 @@ namespace Trecs.Internal
         /// </summary>
         public void Clear()
         {
-            ReturnPayloadsAndClear(_anchors);
+            ReturnPayloadsAndClear(_keyframes);
             ReturnPayloadsAndClear(_bookmarks);
             ReturnPayloadsAndClear(_scrubCache);
             ClearChecksums();
-            _totalAnchorBytes = 0;
+            _totalKeyframeBytes = 0;
             _scrubCacheBytes = 0;
         }
 
         // ---- Capacity ------------------------------------------------------
 
         /// <summary>
-        /// Drop oldest anchors until the count is &lt;= <paramref name="max"/>.
+        /// Drop oldest keyframes until the count is &lt;= <paramref name="max"/>.
         /// <paramref name="max"/> == 0 means "unbounded" (no-op). Returns
-        /// the number of anchors evicted; the caller may want to refresh
+        /// the number of keyframes evicted; the caller may want to refresh
         /// any cached earliest-frame state if non-zero.
         /// </summary>
-        public int EnforceAnchorCountCap(int max)
+        public int EnforceKeyframeCountCap(int max)
         {
             if (max <= 0)
             {
                 return 0;
             }
             int evicted = 0;
-            while (_anchors.Count > max)
+            while (_keyframes.Count > max)
             {
-                var oldest = _anchors[0];
-                _totalAnchorBytes -= oldest.Payload.Length;
-                _pool.Return(oldest.Payload);
-                _anchors.RemoveAt(0);
+                var oldest = _keyframes[0];
+                _totalKeyframeBytes -= oldest.PayloadByteSize;
+                ReturnSnapshot(oldest);
+                _keyframes.RemoveAt(0);
                 evicted++;
             }
             return evicted;
@@ -429,8 +458,8 @@ namespace Trecs.Internal
             while (_scrubCache.Count > 0 && _scrubCacheBytes > max)
             {
                 var oldest = _scrubCache[0];
-                _scrubCacheBytes -= oldest.Payload.Length;
-                _pool.Return(oldest.Payload);
+                _scrubCacheBytes -= oldest.PayloadByteSize;
+                ReturnSnapshot(oldest);
                 _scrubCache.RemoveAt(0);
             }
         }
@@ -439,26 +468,24 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Find the nearest scrubbable snapshot whose frame is
-        /// &lt;= <paramref name="target"/>, searching anchors, the scrub
+        /// &lt;= <paramref name="target"/>, searching keyframes, the scrub
         /// cache, and bookmarks. All three lists are kept sorted by frame
-        /// ascending. On a tie at the same frame, prefers anchors &gt;
-        /// scrub cache &gt; bookmarks (anchors are guaranteed-live-timeline
+        /// ascending. On a tie at the same frame, prefers keyframes &gt;
+        /// scrub cache &gt; bookmarks (keyframes are guaranteed-live-timeline
         /// bytes; scrub-cache entries reflect the same timeline up to
         /// drop-oldest eviction; bookmarks may capture an earlier divergent
         /// moment).
         /// </summary>
-        public (int frame, ReadOnlyMemory<byte> payload)? FindNearestAtOrBefore(int target)
+        public WorldSnapshot FindNearestAtOrBefore(int target)
         {
             int bestFrame = int.MinValue;
-            ReadOnlyMemory<byte> bestPayload = default;
-            bool found = false;
-            for (int i = _anchors.Count - 1; i >= 0; i--)
+            WorldSnapshot best = null;
+            for (int i = _keyframes.Count - 1; i >= 0; i--)
             {
-                if (_anchors[i].FixedFrame <= target)
+                if (_keyframes[i].FixedFrame <= target)
                 {
-                    bestFrame = _anchors[i].FixedFrame;
-                    bestPayload = _anchors[i].Payload;
-                    found = true;
+                    bestFrame = _keyframes[i].FixedFrame;
+                    best = _keyframes[i];
                     break;
                 }
             }
@@ -469,8 +496,7 @@ namespace Trecs.Internal
                     if (_scrubCache[i].FixedFrame > bestFrame)
                     {
                         bestFrame = _scrubCache[i].FixedFrame;
-                        bestPayload = _scrubCache[i].Payload;
-                        found = true;
+                        best = _scrubCache[i];
                     }
                     break;
                 }
@@ -483,13 +509,12 @@ namespace Trecs.Internal
                     if (b.FixedFrame > bestFrame)
                     {
                         bestFrame = b.FixedFrame;
-                        bestPayload = b.Payload;
-                        found = true;
+                        best = b;
                     }
                     break;
                 }
             }
-            return found ? (bestFrame, bestPayload) : null;
+            return best;
         }
 
         /// <summary>
@@ -497,38 +522,37 @@ namespace Trecs.Internal
         /// the store to be non-empty; callers should gate on
         /// <see cref="IsEmpty"/>.
         /// </summary>
-        public (int frame, ReadOnlyMemory<byte> payload) FindEarliest()
+        public WorldSnapshot FindEarliest()
         {
             TrecsAssert.That(!IsEmpty, "FindEarliest called on empty store");
             int frame = int.MaxValue;
-            ReadOnlyMemory<byte> payload = default;
-            if (_anchors.Count > 0)
+            WorldSnapshot earliest = null;
+            if (_keyframes.Count > 0)
             {
-                frame = _anchors[0].FixedFrame;
-                payload = _anchors[0].Payload;
+                frame = _keyframes[0].FixedFrame;
+                earliest = _keyframes[0];
             }
             if (_scrubCache.Count > 0 && _scrubCache[0].FixedFrame < frame)
             {
                 frame = _scrubCache[0].FixedFrame;
-                payload = _scrubCache[0].Payload;
+                earliest = _scrubCache[0];
             }
             if (_bookmarks.Count > 0 && _bookmarks[0].FixedFrame < frame)
             {
-                frame = _bookmarks[0].FixedFrame;
-                payload = _bookmarks[0].Payload;
+                earliest = _bookmarks[0];
             }
-            return (frame, payload);
+            return earliest;
         }
 
         /// <summary>
-        /// Index in <see cref="Anchors"/> of the latest anchor whose frame
-        /// is &lt;= <paramref name="frame"/>. Returns -1 if no anchor fits.
+        /// Index in <see cref="Keyframes"/> of the latest keyframe whose frame
+        /// is &lt;= <paramref name="frame"/>. Returns -1 if no keyframe fits.
         /// </summary>
-        public int FindAnchorIndexAtOrBefore(int frame)
+        public int FindKeyframeIndexAtOrBefore(int frame)
         {
-            for (int i = _anchors.Count - 1; i >= 0; i--)
+            for (int i = _keyframes.Count - 1; i >= 0; i--)
             {
-                if (_anchors[i].FixedFrame <= frame)
+                if (_keyframes[i].FixedFrame <= frame)
                 {
                     return i;
                 }
@@ -550,7 +574,7 @@ namespace Trecs.Internal
         {
             for (int i = 0; i < list.Count; i++)
             {
-                _pool.Return(list[i].Payload);
+                ReturnSnapshot(list[i]);
             }
             list.Clear();
         }

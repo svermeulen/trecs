@@ -286,5 +286,86 @@ namespace Trecs.Tests
         }
 
         #endregion
+
+        #region Wrap-Around Growth (regression)
+
+        // Regression for a heap-overflow / data-loss bug in UnsafeBlob.Grow. When the
+        // buffer grew while the live region was wrapped AND _readIndex % newCapacity
+        // landed in the upper part of the new buffer, the relocation copied the wrapped
+        // head segment past the end of the freshly-allocated buffer — overflowing the
+        // heap and dropping an element (it read back as zero). Reproducing it requires a
+        // grow that fires while the queue is NOT fully drained: a full drain resets both
+        // heads to 0, which hides the wrapped-relocation path.
+        [Test]
+        public void Grow_WhileLiveDataWrapped_DeterministicRepro_PreservesValues()
+        {
+            // This sequence is hand-tuned against the growth constants
+            // (newCapacity = (oldCapacity + sizeOf) << 1): the first long grows capacity
+            // to 16 bytes; five enqueue/dequeue cycles advance the (unwrapped) read head
+            // to 40 while keeping capacity pinned at 16; we then fill and force a grow to
+            // 48 bytes. At that grow oldReaderHead == oldWriterHead == 8 (wrapped) and
+            // newReaderHead = 40 % 48 = 40, so relocating the 16 live bytes runs to
+            // offset 56 — 8 bytes past the 48-byte buffer.
+            var bag = NativeBag.Create(Allocator.Persistent);
+
+            bag.Enqueue(0L); // first enqueue grows capacity 0 -> 16
+
+            // Five cycles: each enqueues one long (filling to capacity) then dequeues one,
+            // advancing the read head by 8 bytes per cycle without ever fully draining.
+            for (long i = 1; i <= 5; i++)
+            {
+                bag.Enqueue(i);
+                NAssert.AreEqual(i - 1, bag.Dequeue<long>());
+            }
+
+            // Read head is now at unwrapped index 40, backlog holds {5}. Fill, then grow.
+            bag.Enqueue(6L); // fills capacity (backlog {5, 6})
+            bag.Enqueue(7L); // triggers the wrapped grow (backlog {5, 6, 7})
+
+            // All three survivors must come back in FIFO order.
+            NAssert.AreEqual(5L, bag.Dequeue<long>());
+            NAssert.AreEqual(6L, bag.Dequeue<long>());
+            NAssert.AreEqual(7L, bag.Dequeue<long>());
+
+            NAssert.IsTrue(bag.IsEmpty);
+
+            bag.Dispose();
+        }
+
+        [Test]
+        public void Grow_WithSteadilyGrowingBacklog_PreservesFifoOrder()
+        {
+            // Broader coverage: enqueue two, dequeue one each cycle so the backlog keeps
+            // growing (the buffer grows repeatedly) while the read head keeps advancing
+            // and wrapping — exercising many grow-while-wrapped states with varied
+            // read-head offsets. Never fully drains until the final sweep.
+            var bag = NativeBag.Create(Allocator.Persistent);
+
+            long nextToEnqueue = 0;
+            long nextExpected = 0;
+            int backlog = 0;
+
+            for (int cycle = 0; cycle < 500; cycle++)
+            {
+                bag.Enqueue(nextToEnqueue++);
+                bag.Enqueue(nextToEnqueue++);
+                backlog += 2;
+
+                NAssert.AreEqual(nextExpected++, bag.Dequeue<long>());
+                backlog -= 1;
+            }
+
+            while (backlog > 0)
+            {
+                NAssert.AreEqual(nextExpected++, bag.Dequeue<long>());
+                backlog -= 1;
+            }
+
+            NAssert.IsTrue(bag.IsEmpty);
+
+            bag.Dispose();
+        }
+
+        #endregion
     }
 }

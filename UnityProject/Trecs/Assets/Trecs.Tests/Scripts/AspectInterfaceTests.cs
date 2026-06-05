@@ -72,7 +72,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 42 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var values = new List<int>();
             foreach (var v in AiCascadeSingle.Query(a).WithTags<QCatA>())
@@ -96,7 +96,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 7 })
                 .Set(new TestFloat { Value = 3.5f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             int intSum = 0;
             float floatSum = 0f;
@@ -122,7 +122,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 11 })
                 .Set(new TestFloat { Value = 1.25f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var pairs = new List<(int i, float f)>();
             foreach (var v in AiCascadeMerge.Query(a).WithTags<QCatA>())
@@ -147,7 +147,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 99 })
                 .Set(new TestFloat { Value = 1f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             int seen = 0;
             foreach (var v in AiCascadeSingle.Query(a).WithTags<QCatA>())
@@ -176,7 +176,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .Set(new TestFloat { Value = 2.5f })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             foreach (var v in AiWritableFloat.Query(a).WithTags<QCatA>())
             {

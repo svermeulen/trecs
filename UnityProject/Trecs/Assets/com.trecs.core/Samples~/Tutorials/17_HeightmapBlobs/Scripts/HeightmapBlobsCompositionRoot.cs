@@ -20,16 +20,14 @@ namespace Trecs.Samples.HeightmapBlobs
     ///   <see cref="NativeSharedPtr{T}"/>, sampled inside a Burst-compiled
     ///   <c>[WrapAsJob]</c> static method that resolves the handle via
     ///   <see cref="NativeWorldAccessor.SharedPtrResolver"/>. Heights live
-    ///   inline in a <c>FixedArray256{float}</c>; seeded by
-    ///   <c>NativeSharedPtr.Alloc(in value)</c> with the by-value copy
-    ///   that implies.</item>
+    ///   inline in a <c>FixedArray256{float}</c>; built by an inline-value
+    ///   interner factory, with the by-value copy that implies.</item>
     /// <item><see cref="HeightmapFlavor.NativeSharedPtrTakingOwnership"/> —
     ///   header struct <see cref="NativeHeightmapDataLarge"/> behind a
     ///   <see cref="NativeSharedPtr{T}"/>, with heights living in the
-    ///   trailing region of the same allocation. Seeded by
-    ///   <c>NativeSharedPtr.AllocTakingOwnership</c>: the seed site builds
-    ///   directly into the heap slot, with no intermediate copies and no
-    ///   inline-storage cap.</item>
+    ///   trailing region of the same allocation. Built by a taking-ownership
+    ///   interner factory: the builder writes directly into the allocation,
+    ///   with no intermediate copies and no inline-storage cap.</item>
     /// <item><see cref="HeightmapFlavor.ManagedSharedPtrInterface"/> —
     ///   <see cref="MutableHeightmapData"/> behind a
     ///   <see cref="SharedPtr{T}"/> parameterised on the
@@ -41,9 +39,12 @@ namespace Trecs.Samples.HeightmapBlobs
     ///
     /// All four paths derive the heightmap's <see cref="BlobId"/> from the
     /// same <see cref="HeightmapDescriptor"/> (resolution, world size, max
-    /// height, seed, frequency) using <see cref="UniqueHashGenerator"/> — so the same
-    /// recipe always lands the same id, the cache hit is automatic, and
-    /// the expensive heightmap build only runs on cold start.
+    /// height, seed, frequency) by acquiring a handle straight from the
+    /// descriptor (<see cref="SharedPtr.Acquire{TDesc,T}(WorldAccessor, in TDesc)"/>
+    /// / <see cref="NativeSharedPtr.Acquire{TDesc,T}(WorldAccessor, in TDesc)"/>),
+    /// which hashes it to a content-derived id — so the same recipe always lands
+    /// the same id, the cache hit is automatic, and the expensive heightmap build
+    /// only runs on cold start.
     /// </summary>
     public class HeightmapBlobsCompositionRoot : CompositionRootBase
     {
@@ -65,11 +66,10 @@ namespace Trecs.Samples.HeightmapBlobs
             var flavor = FlavorOverride ?? Settings.Flavor;
             Settings.Flavor = flavor;
 
-            // Register the BlitSerializer for HeightmapDescriptor *before*
-            // we hash it via UniqueHashGenerator. UniqueHashGenerator uses
-            // the SerializerRegistry to turn the typed value into bytes;
-            // unmanaged value types like this just need a one-line blit
-            // registration.
+            // Register the BlitSerializer for HeightmapDescriptor: the descriptor
+            // interner hashes the descriptor through the SerializerRegistry to
+            // derive its BlobId, so the descriptor type must be serializable.
+            // Unmanaged value types like this just need a one-line blit registration.
             var worldBuilder = new WorldBuilder().RegisterSerializer(
                 new BlitSerializer<HeightmapDescriptor>()
             );

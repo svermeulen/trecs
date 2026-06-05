@@ -1,7 +1,7 @@
 # BlobBuilder
 
 !!! warning "Experimental"
-    `BlobBuilder`, `BlobArray<T>`, and the surrounding `NativeSharedPtr.AllocTakingOwnership` flow are experimental and may change in future 0.x releases.
+    `BlobBuilder`, `BlobArray<T>`, and the surrounding `NativeSharedPtr.Register` flow are experimental and may change in future 0.x releases.
 
 `BlobBuilder` builds a *relocatable blob*: a single contiguous native allocation whose internal references are stored as **offsets relative to each offset field's own address**, not relative to the root or as absolute pointers. That single design choice gives the blob three properties for free:
 
@@ -9,7 +9,7 @@
 2. **Type-honest.** The relative-pointer field types (`BlobArray<T>`) declare exactly the storage they use (8 bytes for an array — offset + length). No "the type lies about its actual size" trick where `sizeof(T)` understates the real allocation.
 3. **No call-site `unsafe` for typical flows.** Authoring a blob with indexer-based fills is a pure-managed `using` block; the unsafe layout work lives inside `BlobBuilder`. Bulk fills via `BlobBuilderArray<T>.GetUnsafePtr()` still require `unsafe`, but most call sites don't need that.
 
-The output is a `NativeBlobAllocation` ready for `NativeSharedPtr.AllocTakingOwnership` — same component-storage and snapshot story as any other native shared blob. See [Shared Heap Data](shared-heap-data.md) for the surrounding seeder / `BlobId` patterns.
+The output is a `NativeBlobAllocation` ready for `NativeSharedPtr.Register` — same component-storage and snapshot story as any other native shared blob. See [Shared Heap Data](shared-heap-data.md) for the surrounding seeder / `BlobId` patterns.
 
 ## When to reach for it
 
@@ -19,7 +19,7 @@ When a native shared blob contains variable-length data and the inline-storage o
 - The size can exceed inline-storage caps (`FixedArray256<T>` is the largest inline-array).
 - You want a single allocation per blob — not an outer `NativeSharedPtr<T>` plus a separate `TrecsArray<T>` for the payload with two lifecycles to manage.
 
-If your blob fits inline, prefer the simpler `NativeSharedPtr.Alloc(in value)` flow — no builder, just declare a fixed-size struct and let the heap memcpy the value in.
+If your blob fits inline, prefer the simpler `NativeSharedPtr.Register(World, blobId, in value)` + `Acquire` flow — no builder, just declare a fixed-size struct and let the heap memcpy the value in.
 
 ## The pieces
 
@@ -116,7 +116,7 @@ Maximum alignment is 16 — the builder caps it so chunks (always 16-aligned) su
 `BlobBuilder` and the blob it produces have **independent lifecycles**:
 
 - The builder's working chunks are allocated in the allocator you pass to the constructor (typically `Allocator.Temp`) and freed by `Dispose`.
-- `Build` allocates a separate `Allocator.Persistent` buffer, copies the working chunks into it with offsets patched, and hands it to `NativeSharedPtr.AllocTakingOwnership`. The heap now owns the buffer and frees it when the refcount hits zero.
+- `Build` allocates a separate `Allocator.Persistent` buffer, copies the working chunks into it with offsets patched, and hands it to `NativeSharedPtr.Register`. The heap now owns the buffer and frees it when the refcount hits zero.
 
 The standard `using` pattern reflects this cleanly: the builder's working state cleans up at end-of-scope; the produced blob lives independently behind the `NativeSharedPtr<T>` you got back.
 
@@ -152,7 +152,7 @@ AllocatorManager.Free(Allocator.Persistent, copy, original.AllocSize, original.A
 AllocatorManager.Free(Allocator.Persistent, (void*)original.Ptr, original.AllocSize, original.Alignment, items: 1);
 ```
 
-In real code you'd hand `original` to `NativeSharedPtr.AllocTakingOwnership` (which is what `Build<T>` does for you) and let the heap manage freeing. This snippet just shows that the bytes themselves are self-contained.
+In real code you'd hand `original` to `NativeSharedPtr.Register` (which is what `Build<T>` does for you) and let the heap manage freeing. This snippet just shows that the bytes themselves are self-contained.
 
 This same property is what lets a blob round-trip through serialization or asset bundles without pointer fixup — write the bytes, load them back into any address, dereference normally.
 
@@ -160,8 +160,8 @@ This same property is what lets a blob round-trip through serialization or asset
 
 | Pattern | When to use | Notes |
 |---|---|---|
-| `NativeSharedPtr.Alloc(in T value)` | T is a fixed-size struct (with or without `FixedArray256<T>` etc. inline). | Simplest. One memcpy of T into the heap. Capped at whatever inline storage T provides. |
-| `BlobBuilder` + `NativeSharedPtr.AllocTakingOwnership` | T contains variable-length data that doesn't fit inline. | This page. Single allocation, type-honest, relocatable. |
+| `NativeSharedPtr.Register(in T value)` + `Acquire` | T is a fixed-size struct (with or without `FixedArray256<T>` etc. inline). | Simplest. One memcpy of T into the heap. Capped at whatever inline storage T provides. |
+| `BlobBuilder` + `NativeSharedPtr.Register` | T contains variable-length data that doesn't fit inline. | This page. Single allocation, type-honest, relocatable. |
 | Separate `TrecsArray<float>` field on the component | Per-entity variable-length data (not shared between entities). | Outside the shared-blob story entirely. See [Dynamic Collections](dynamic-collections.md). |
 
 ## `BlobRef<T>` — single-T relative pointer
@@ -172,7 +172,7 @@ This same property is what lets a blob round-trip through serialization or asset
 - **Optional sub-structures** — `BlobRef<T>.IsValid` distinguishes "not allocated" from "allocated"; leave the field at `default` to mark it absent and skip the `Allocate` call.
 - **In-blob cross-references** — multiple `BlobRef<T>` fields can target the same payload, or different parts of the blob can hold pointers into a shared region.
 
-The DOTS equivalent is `BlobPtr<T>`, but that name is already taken in Trecs for a heap-pin type, so this ships as `Trecs.BlobRef<T>`.
+The DOTS equivalent is `BlobPtr<T>`; Trecs ships this as `Trecs.BlobRef<T>` (the `Ref` suffix keeps it distinct from the heap-pin pointer family — `SharedPtr` / `SharedAnchor`).
 
 ```csharp
 public struct PathSegment

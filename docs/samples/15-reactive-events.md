@@ -13,7 +13,7 @@ This sample focuses on the observer side: how application code subscribes to ent
 ## The three pieces
 
 ```csharp
-public partial class GameStatsUpdater : IDisposable
+public partial class GameStatsUpdater
 {
     readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
@@ -26,6 +26,10 @@ public partial class GameStatsUpdater : IDisposable
             .OnAdded(OnBubbleAdded)                         // 2. handlers
             .OnRemoved(OnBubbleRemoved)
             .AddTo(_disposables);                           // 3. lifetime
+
+        // Dispose from OnShutdown so we stay subscribed for the final
+        // OnRemoved pass during world.Dispose() (see note below).
+        World.Events.OnShutdown(() => _disposables.Dispose()).AddTo(_disposables);
     }
 
     WorldAccessor World { get; }
@@ -45,8 +49,6 @@ public partial class GameStatsUpdater : IDisposable
         stats.AliveCount--;
         stats.TotalRemoved++;
     }
-
-    public void Dispose() => _disposables.Dispose();
 }
 ```
 
@@ -56,7 +58,7 @@ GameObject destruction is handled separately by `RenderableGameObjectManager` (i
 
 **2. Handlers** — `OnAdded`, `OnRemoved`, `OnMoved` attach `[ForEachEntity]` methods. The source generator emits per-entity iteration and reads the requested components from the entity's component buffers. The handler sees one entity at a time.
 
-**3. Lifetime** — the subscription returns an `IDisposable`. `.AddTo(_disposables)` parks it in a collection disposed when the handler class is disposed.
+**3. Lifetime** — the subscription returns an `IDisposable`. `.AddTo(_disposables)` parks it in a collection, and that collection is disposed from `World.Events.OnShutdown(...)`. `OnShutdown` fires during `world.Dispose()` *after* the final `OnRemoved` pass (`RemoveAllEntities`), so the handler stays subscribed for that last batch. Disposing earlier — e.g. from a composition root's disposables list before `world.Dispose()` — would unsubscribe before that batch and silently skip its cleanup. Invisible here (the stats live on a global that's torn down anyway) but a real leak when `OnRemoved` frees resources outside the world, such as destroying GameObjects. See [Entity Events → Handlers](../entity-management/entity-events.md#handlers).
 
 ## Reading components in `OnRemoved`
 

@@ -9,7 +9,7 @@ namespace Trecs.Internal
     /// <see cref="QueryBuilder.TrySingleHandle"/> /
     /// <see cref="QueryBuilder.Handles"/> overloads instead.
     /// </summary>
-    public static class QueryBuilderInternalExtensions
+    internal static class QueryBuilderInternalExtensions
     {
         // ── QueryBuilder ──────────────────────────────────────────────────
 

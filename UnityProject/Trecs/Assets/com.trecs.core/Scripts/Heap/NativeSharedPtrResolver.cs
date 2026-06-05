@@ -36,7 +36,7 @@ namespace Trecs.Internal
     /// Uses a chunked side-table directory identical in structure to <see cref="NativeHeapResolver"/>,
     /// enabling main-thread allocations concurrent with job reads.
     /// </summary>
-    public readonly unsafe struct NativeSharedPtrResolver
+    internal readonly unsafe struct NativeSharedPtrResolver
     {
         [NativeDisableContainerSafetyRestriction]
         readonly NativeArray<IntPtr> _chunkDirectory;

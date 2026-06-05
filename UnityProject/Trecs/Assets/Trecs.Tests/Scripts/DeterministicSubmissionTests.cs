@@ -46,12 +46,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 nativeEcs.RemoveEntity(handles[0].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[2].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[4].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 survivorValuesForward = CollectValues(a, PartitionA);
             }
@@ -71,12 +71,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 nativeEcs.RemoveEntity(handles[4].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[2].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[0].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 survivorValuesReverse = CollectValues(a, PartitionA);
             }
@@ -113,14 +113,14 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 // Remove 7, 1, 5, 3 (scattered)
                 nativeEcs.RemoveEntity(handles[7].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[3].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 valuesScattered = CollectValues(a, PartitionA);
             }
@@ -140,14 +140,14 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 // Remove 1, 3, 5, 7 (sorted)
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[3].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[7].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 valuesSorted = CollectValues(a, PartitionA);
             }
@@ -190,12 +190,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[2].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[4].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 stateAForward = CollectValues(a, PartitionA);
                 stateBForward = CollectValues(a, PartitionB);
@@ -216,12 +216,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 nativeEcs.SetTag<TestPartitionB>(handles[4].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[2].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 stateAReverse = CollectValues(a, PartitionA);
                 stateBReverse = CollectValues(a, PartitionB);
@@ -271,13 +271,13 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[3].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 stateA1 = CollectValues(a, PartitionA);
                 stateB1 = CollectValues(a, PartitionB);
@@ -298,13 +298,13 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.Submit();
+                a.World.Submit();
 
                 nativeEcs.SetTag<TestPartitionB>(handles[3].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
-                a.Submit();
+                a.World.Submit();
 
                 stateA2 = CollectValues(a, PartitionA);
                 stateB2 = CollectValues(a, PartitionB);

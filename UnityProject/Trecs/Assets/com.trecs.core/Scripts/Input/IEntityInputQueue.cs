@@ -14,8 +14,19 @@ namespace Trecs.Internal
         void ClearFutureInputsAfterOrAt(int frame);
         void ClearInputsBeforeOrAt(int frame);
         void ClearAllInputs();
-        void Serialize(ISerializationWriter writer);
-        void Deserialize(ISerializationReader reader);
+
+        // opaqueBlobStore/opaqueBaker carry opaque (eager) input-blob bytes for recording
+        // persistence; null (the default) leaves such blobs unpersisted, as before.
+        void Serialize(
+            ISerializationWriter writer,
+            IOpaqueBlobStore opaqueBlobStore = null,
+            OpaqueBlobBaker opaqueBaker = null
+        );
+        void Deserialize(
+            ISerializationReader reader,
+            IOpaqueBlobStore opaqueBlobStore = null,
+            OpaqueBlobBaker opaqueBaker = null
+        );
         void AddHistoryLocker(IInputHistoryLocker locker);
         void RemoveHistoryLocker(IInputHistoryLocker locker);
         bool HasInputFrame<T>(int frame, EntityHandle entityHandle)

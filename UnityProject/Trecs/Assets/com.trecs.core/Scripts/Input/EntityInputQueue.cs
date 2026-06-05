@@ -18,20 +18,23 @@ namespace Trecs.Internal
         readonly InputUniqueHeap _inputUniqueHeap;
         readonly InputNativeSharedHeap _inputNativeSharedHeap;
         readonly InputNativeUniqueHeap _inputNativeUniqueHeap;
+        readonly BlobFactory _blobFactory;
         readonly IterableDictionary<TypeId, ComponentTypeInfo> _componentTypeHelpersMap = new();
         readonly List<int> _frameTempRemoveBuffer = new();
         readonly List<EntityHandle> _removeQueueBuffer = new();
+        readonly IterableHashSet<BlobId> _liveInputBlobIdsBuffer = new();
 
         SimpleSubject _systemRegistryInputsAppliedEvent;
         WorldAccessor _accessor;
         int _maxClearFrame = -1;
 
-        public EntityInputQueue(
+        internal EntityInputQueue(
             TrecsLog log,
             InputSharedHeap inputSharedHeap,
             InputNativeSharedHeap inputNativeSharedHeap,
             InputUniqueHeap inputUniqueHeap,
             InputNativeUniqueHeap inputNativeUniqueHeap,
+            BlobFactory blobFactory,
             WorldInfo worldDef
         )
         {
@@ -40,6 +43,7 @@ namespace Trecs.Internal
             _inputNativeSharedHeap = inputNativeSharedHeap;
             _inputUniqueHeap = inputUniqueHeap;
             _inputNativeUniqueHeap = inputNativeUniqueHeap;
+            _blobFactory = blobFactory;
             _resetGroups = new();
 
             foreach (var group in worldDef.AllGroups)
@@ -314,6 +318,24 @@ namespace Trecs.Internal
             _inputSharedHeap.ClearAtOrBeforeFrame(frame);
             _inputNativeSharedHeap.ClearAtOrBeforeFrame(frame);
             _inputNativeUniqueHeap.ClearAtOrBeforeFrame(frame);
+
+            // Amortized GC for descriptor-acquired input blobs: once enough descriptor churn has
+            // accumulated (new ids + released entries — churn-triggered, so a bounded, stable
+            // descriptor space never sweeps), forget every one that no live input frame references
+            // and the sim never justified — source, journal entry, and bytes. Hooked here because
+            // every before-or-at trim shrinks input references — the steady-state
+            // advancing-max-clear-frame call from ApplyInputs, but also the recorder/rewind trims
+            // (BundleRecorder, TrecsRewindBuffer); liveness is recomputed per sweep, so any caller
+            // is a safe trigger. The rollback-side ClearFutureInputsAfterOrAt doesn't sweep
+            // (cleared frames are about to be re-acquired) and just gets collected here on the
+            // next trim.
+            if (_blobFactory.InputDescriptorSweepDue)
+            {
+                _liveInputBlobIdsBuffer.Clear();
+                _inputSharedHeap.AddReferencedBlobIds(_liveInputBlobIdsBuffer);
+                _inputNativeSharedHeap.AddReferencedBlobIds(_liveInputBlobIdsBuffer);
+                _blobFactory.SweepInputDescriptors(_liveInputBlobIdsBuffer);
+            }
         }
 
         // Note: these Serialize/Deserialize methods are used by the recording system
@@ -321,7 +343,11 @@ namespace Trecs.Internal
         // input queue state because the component values themselves (which include the
         // last-applied input for Retain components) are already captured in the
         // WorldStateSerializer snapshot.
-        public void Serialize(ISerializationWriter writer)
+        public void Serialize(
+            ISerializationWriter writer,
+            IOpaqueBlobStore opaqueBlobStore = null,
+            OpaqueBlobBaker opaqueBaker = null
+        )
         {
             writer.Write("NumHelpers", _componentTypeHelpersMap.Count);
             long bytesStart;
@@ -358,14 +384,14 @@ namespace Trecs.Internal
             );
 
             bytesStart = writer.NumBytesWritten;
-            _inputSharedHeap.Serialize(writer);
+            _inputSharedHeap.Serialize(writer, opaqueBlobStore, opaqueBaker);
             _log.Debug(
                 "Serialized {0:0.00} kb for InputSharedHeap",
                 (writer.NumBytesWritten - bytesStart) / 1024f
             );
 
             bytesStart = writer.NumBytesWritten;
-            _inputNativeSharedHeap.Serialize(writer);
+            _inputNativeSharedHeap.Serialize(writer, opaqueBlobStore, opaqueBaker);
             _log.Debug(
                 "Serialized {0:0.00} kb for InputNativeSharedHeap",
                 (writer.NumBytesWritten - bytesStart) / 1024f
@@ -379,7 +405,11 @@ namespace Trecs.Internal
             );
         }
 
-        public void Deserialize(ISerializationReader reader)
+        public void Deserialize(
+            ISerializationReader reader,
+            IOpaqueBlobStore opaqueBlobStore = null,
+            OpaqueBlobBaker opaqueBaker = null
+        )
         {
             _log.Trace("Deserializing EntityInputQueue");
 
@@ -428,8 +458,8 @@ namespace Trecs.Internal
             }
 
             _inputUniqueHeap.Deserialize(reader);
-            _inputSharedHeap.Deserialize(reader);
-            _inputNativeSharedHeap.Deserialize(reader);
+            _inputSharedHeap.Deserialize(reader, opaqueBlobStore, opaqueBaker);
+            _inputNativeSharedHeap.Deserialize(reader, opaqueBlobStore, opaqueBaker);
             _inputNativeUniqueHeap.Deserialize(reader);
         }
 
@@ -457,7 +487,17 @@ namespace Trecs.Internal
             {
                 if (!entityHandle.Exists(world))
                 {
-                    _log.Warning(
+                    // This should be impossible under normal operation: inputs
+                    // are applied just-in-time before the fixed tick, and there
+                    // is no Submit() between the input systems running and here
+                    // (only SyncJobsAndFlushWrites, which doesn't process the
+                    // entity add/remove/move queue). So a removal requested this
+                    // frame can't take effect before ApplyInputs. Hitting this
+                    // branch therefore indicates a framework bug, hence the
+                    // debug assert. In release we strip the assert and silently
+                    // drop the input to avoid crashing on a live build.
+                    TrecsDebugAssert.That(
+                        false,
                         "Attempted to apply input for non-existing entity {0}",
                         entityHandle
                     );

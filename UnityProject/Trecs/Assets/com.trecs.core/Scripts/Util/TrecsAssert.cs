@@ -17,7 +17,7 @@ namespace Trecs.Internal
     /// <see cref="BurstDiscardAttribute"/> and a plain fallback throw fires
     /// instead.
     /// </summary>
-    public static class TrecsAssert
+    internal static class TrecsAssert
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void That(bool condition)

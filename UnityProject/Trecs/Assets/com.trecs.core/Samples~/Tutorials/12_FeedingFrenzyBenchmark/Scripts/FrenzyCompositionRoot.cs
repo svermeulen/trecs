@@ -52,7 +52,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     new WorldSettings
                     {
                         RandomSeed = config.Deterministic ? 42 : (ulong)DateTime.Now.Ticks,
-                        WarnOnFixedUpdateFallingBehind = false,
                     }
                 )
                 .AddTemplates(GetTemplates(config));
@@ -67,7 +66,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             var subsetApproachDynamicSwitcher = new SubsetApproachDynamicSwitcher(world);
 
             var fishSetInitializer = new InitialSetsApplier(config, world);
-            var removeCleanupHandler = new RemoveCleanupHandler(world);
+            // Cross-entity cleanup (fish↔meal) is declarative via [CascadeRemove]
+            // on TargetMeal.Value / ApproachingFish.Value (see Schema/Components.cs).
             var configInput = new ConfigInputSystem();
             var presetInput = new FishCountPresetInputSystem(fishCountPresets);
             var configUpdate = new FrenzyConfigUpdateSystem();
@@ -144,13 +144,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             // Bridge holds subscriptions on the world's EventsManager; must
             // dispose before world or the EventsManager leak-check warns.
-            disposables = new()
-            {
-                fishSetInitializer.Dispose,
-                removeCleanupHandler.Dispose,
-                perfStats.Dispose,
-                world.Dispose,
-            };
+            disposables = new() { fishSetInitializer.Dispose, perfStats.Dispose, world.Dispose };
         }
 
         public static int[] ComputePresetFishCounts(int min, int max)

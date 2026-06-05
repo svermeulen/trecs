@@ -9,58 +9,50 @@ namespace Trecs.Tests
     public class NullSerializationTests
     {
         SerializerRegistry _serializerRegistry;
-        SerializationBuffer _cacheHelper;
+        SerializationHelper _helper;
+        SerializationData _data;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
         public void TestNullString()
         {
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.WriteString("NullString", null);
-            _cacheHelper.WriteString("EmptyString", "");
-            _cacheHelper.WriteString("NormalString", "test");
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.WriteString("NullString", null);
+            _helper.Writer.WriteString("EmptyString", "");
+            _helper.Writer.WriteString("NormalString", "test");
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
-            TrecsDebugAssert.That(_cacheHelper.ReadString("NullString") == null);
-            TrecsDebugAssert.That(_cacheHelper.ReadString("EmptyString") == "");
-            TrecsDebugAssert.That(_cacheHelper.ReadString("NormalString") == "test");
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Start(_data);
+            TrecsDebugAssert.That(_helper.Reader.ReadString("NullString") == null);
+            TrecsDebugAssert.That(_helper.Reader.ReadString("EmptyString") == "");
+            TrecsDebugAssert.That(_helper.Reader.ReadString("NormalString") == "test");
+            _helper.Reader.Complete();
         }
 
         [Test]
         public void TestNullObject()
         {
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.WriteObject("NullObject", null);
-            _cacheHelper.WriteObject("StringObject", "test");
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.WriteObject("NullObject", null);
+            _helper.Writer.WriteObject("StringObject", "test");
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
+            _helper.Reader.Start(_data);
             object nullObj = new object(); // Initialize to non-null
-            _cacheHelper.ReadObject("NullObject", ref nullObj);
+            _helper.Reader.ReadObject("NullObject", ref nullObj);
             TrecsDebugAssert.That(nullObj == null);
 
             object stringObj = null;
-            _cacheHelper.ReadObject("StringObject", ref stringObj);
+            _helper.Reader.ReadObject("StringObject", ref stringObj);
             TrecsDebugAssert.That(stringObj.Equals("test"));
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Complete();
         }
 
         [Test]
@@ -69,24 +61,22 @@ namespace Trecs.Tests
             TestClass nullRef = null;
             TestClass normalRef = new TestClass { Value = 42, Name = "Test" };
 
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.Write("NullRef", nullRef);
-            _cacheHelper.Write("NormalRef", normalRef);
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.Write("NullRef", nullRef);
+            _helper.Writer.Write("NormalRef", normalRef);
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
+            _helper.Reader.Start(_data);
             TestClass readNullRef = new TestClass(); // Initialize to non-null
-            _cacheHelper.Read("NullRef", ref readNullRef);
+            _helper.Reader.Read("NullRef", ref readNullRef);
             TrecsDebugAssert.That(readNullRef == null);
 
             TestClass readNormalRef = null;
-            _cacheHelper.Read("NormalRef", ref readNormalRef);
+            _helper.Reader.Read("NormalRef", ref readNormalRef);
             TrecsDebugAssert.That(readNormalRef != null);
             TrecsDebugAssert.That(readNormalRef.Value == 42);
             TrecsDebugAssert.That(readNormalRef.Name == "Test");
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Complete();
         }
 
         [Test]
@@ -94,15 +84,13 @@ namespace Trecs.Tests
         {
             var list = new List<string> { "first", null, "third", null, "fifth" };
 
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.Write("List", list);
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.Write("List", list);
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
+            _helper.Reader.Start(_data);
             List<string> readList = null;
-            _cacheHelper.Read("List", ref readList);
+            _helper.Reader.Read("List", ref readList);
             TrecsDebugAssert.That(readList != null);
             TrecsDebugAssert.That(readList.Count == 5);
             TrecsDebugAssert.That(readList[0] == "first");
@@ -110,7 +98,7 @@ namespace Trecs.Tests
             TrecsDebugAssert.That(readList[2] == "third");
             TrecsDebugAssert.That(readList[3] == null);
             TrecsDebugAssert.That(readList[4] == "fifth");
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Complete();
         }
 
         [Test]
@@ -118,15 +106,13 @@ namespace Trecs.Tests
         {
             var array = new string[] { "first", null, "third", null, "fifth" };
 
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.Write("Array", array);
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.Write("Array", array);
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
+            _helper.Reader.Start(_data);
             string[] readArray = null;
-            _cacheHelper.Read("Array", ref readArray);
+            _helper.Reader.Read("Array", ref readArray);
             TrecsDebugAssert.That(readArray != null);
             TrecsDebugAssert.That(readArray.Length == 5);
             TrecsDebugAssert.That(readArray[0] == "first");
@@ -134,7 +120,7 @@ namespace Trecs.Tests
             TrecsDebugAssert.That(readArray[2] == "third");
             TrecsDebugAssert.That(readArray[3] == null);
             TrecsDebugAssert.That(readArray[4] == "fifth");
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Complete();
         }
 
         [Test]
@@ -143,52 +129,50 @@ namespace Trecs.Tests
             List<string> nullList = null;
             string[] nullArray = null;
 
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.Write("NullList", nullList);
-            _cacheHelper.Write("NullArray", nullArray);
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.Write("NullList", nullList);
+            _helper.Writer.Write("NullArray", nullArray);
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
+            _helper.Reader.Start(_data);
             List<string> readList = new List<string>();
-            _cacheHelper.Read("NullList", ref readList);
+            _helper.Reader.Read("NullList", ref readList);
             TrecsDebugAssert.That(readList == null);
 
             string[] readArray = new string[0];
-            _cacheHelper.Read("NullArray", ref readArray);
+            _helper.Reader.Read("NullArray", ref readArray);
             TrecsDebugAssert.That(readArray == null);
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Complete();
         }
 
         [Test]
         public void TestDeltaSerializationWithNullsThrows()
         {
             // Test that delta serialization properly rejects nulls
-            _cacheHelper.StartWrite(1, true);
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
 
             try
             {
                 // These should throw
                 TrecsDebugAssert.Throws<TrecsException>(() =>
-                    _cacheHelper.WriteStringDelta("Test", null, "base")
+                    _helper.Writer.WriteStringDelta("Test", null, "base")
                 );
                 TrecsDebugAssert.Throws<TrecsException>(() =>
-                    _cacheHelper.WriteStringDelta("Test", "value", null)
+                    _helper.Writer.WriteStringDelta("Test", "value", null)
                 );
 
                 string nullString = null;
                 TrecsDebugAssert.Throws<TrecsException>(() =>
-                    _cacheHelper.WriteDelta("Test", nullString, "base")
+                    _helper.Writer.WriteDelta("Test", nullString, "base")
                 );
                 TrecsDebugAssert.Throws<TrecsException>(() =>
-                    _cacheHelper.WriteDelta("Test", "value", nullString)
+                    _helper.Writer.WriteDelta("Test", "value", nullString)
                 );
             }
             finally
             {
                 // Ensure we end the write to return to idle state
-                _cacheHelper.EndWrite();
+                _helper.Writer.Complete();
             }
         }
 
@@ -200,27 +184,25 @@ namespace Trecs.Tests
             float floatValue = 3.14f;
             bool boolValue = true;
 
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.Write("Int", intValue);
-            _cacheHelper.Write("Float", floatValue);
-            _cacheHelper.Write("Bool", boolValue);
-            _cacheHelper.EndWrite();
+            _helper.Writer.Start(_data, version: 1, includeTypeChecks: true);
+            _helper.Writer.Write("Int", intValue);
+            _helper.Writer.Write("Float", floatValue);
+            _helper.Writer.Write("Bool", boolValue);
+            _helper.Writer.Complete();
 
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
+            _helper.Reader.Start(_data);
             int readInt = 0;
-            _cacheHelper.Read("Int", ref readInt);
+            _helper.Reader.Read("Int", ref readInt);
             TrecsDebugAssert.That(readInt == 42);
 
             float readFloat = 0f;
-            _cacheHelper.Read("Float", ref readFloat);
+            _helper.Reader.Read("Float", ref readFloat);
             TrecsDebugAssert.That(Math.Abs(readFloat - 3.14f) < 0.001f);
 
             bool readBool = false;
-            _cacheHelper.Read("Bool", ref readBool);
+            _helper.Reader.Read("Bool", ref readBool);
             TrecsDebugAssert.That(readBool);
-            _cacheHelper.StopRead(true);
+            _helper.Reader.Complete();
         }
 
         public class TestClass

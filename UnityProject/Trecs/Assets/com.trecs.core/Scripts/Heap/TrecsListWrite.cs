@@ -29,6 +29,7 @@ namespace Trecs
     /// op, gated only by the chunk-store side-table generation byte (not by
     /// <c>ENABLE_UNITY_COLLECTIONS_CHECKS</c>).</para>
     /// </summary>
+    [NonCopyable]
     public unsafe ref struct TrecsListWrite<T>
         where T : unmanaged
     {

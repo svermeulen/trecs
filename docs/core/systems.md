@@ -296,6 +296,7 @@ Just before the first `OnShutdown` hook runs, the world removes every non-global
 - **Non-global queries are empty** — `Count()`, `[ForEachEntity]`, etc. see zero entities.
 - **The global entity is still alive** — `World.GlobalComponent<T>()` still works.
 - **`OnRemoved` observers already fired** for everything else, so cleanup keyed off entity removal has happened. Release any resources you allocated in `OnReady` here.
+- **The [shutdown guard](world-setup.md#the-shutdown-guard) is active** — adding entities here throws in debug / no-ops in release (a shutdown-time add could never be cleaned up), and redundant removes are ignored. Writing to the global entity is fine.
 
 ## Registering systems
 

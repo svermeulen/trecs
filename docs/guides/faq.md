@@ -38,6 +38,10 @@ No. Components are locked to the entity's template at creation. This is a delibe
 - **[Sets](../entity-management/sets.md)** — sparse membership flags, independent of component storage.
 - **Child entity** — when the conditional shape needs *different* components, spawn a separate entity and reference it via an `EntityHandle` on a parent component.
 
+## Can I use world snapshots as my save-game format?
+
+Within a single build, yes — snapshots are fast, exact, and great for quicksaves, autosaves, and crash recovery. Across game patches, no: a snapshot is a raw image of your world schema, so any patch that changes a component, template, tag, or set invalidates existing files (loads fail up front with a schema-fingerprint error rather than corrupting). Games that need patch-durable saves should author their own domain-level save format — save the logical facts, rebuild the world through normal gameplay paths on load. See [Save games and game patches](../experimental/serialization.md#save-games-and-game-patches).
+
 ## Where do I report bugs / request features?
 
 [GitHub Issues](https://github.com/svermeulen/trecs/issues) for bugs and concrete feature requests. For open-ended questions, design discussion, or sharing what you're building, use [GitHub Discussions](https://github.com/svermeulen/trecs/discussions).

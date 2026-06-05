@@ -116,7 +116,7 @@ To catch this at compile time, Trecs makes **all `IEntityComponent` structs non-
 | Diagnostic | What it catches |
 |---|---|
 | **TRECS118** | Copying to a by-value local from an existing variable (field, local, parameter, property). Initializing from `new`, `default`, or a method return is allowed. |
-| **TRECS119** | Passing as a by-value method parameter. Must use `ref`, `in`, or `out`. |
+| **TRECS131** | Passing as a by-value method parameter. Must use `ref`, `in`, or `out`. |
 
 ```csharp
 public partial struct Health : IEntityComponent
@@ -125,9 +125,9 @@ public partial struct Health : IEntityComponent
     public float Max;
 }
 
-// These trigger TRECS118 / TRECS119:
+// These trigger TRECS118 / TRECS131:
 var copy = someEntity.Health;          // TRECS118 — by-value local from field
-void TakeDamage(Health hp) { ... }     // TRECS119 — by-value parameter
+void TakeDamage(Health hp) { ... }     // TRECS131 — by-value parameter
 
 // These are fine:
 ref readonly var hp = ref aspect.Health;  // ref alias — no copy

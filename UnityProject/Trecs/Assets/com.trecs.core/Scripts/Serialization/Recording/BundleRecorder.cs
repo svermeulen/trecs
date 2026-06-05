@@ -8,9 +8,9 @@ namespace Trecs.Internal
     /// Runtime recorder that captures a Trecs <see cref="World"/> session into
     /// a self-contained <see cref="RecordingBundle"/>: the initial world
     /// snapshot, the EntityInputQueue, sparse desync-detection checksums, and
-    /// optional auto-anchors and user snapshots.
+    /// optional auto-keyframes and user snapshots.
     ///
-    /// Lifecycle: Initialize → Start → (per-frame capture happens automatically
+    /// Lifecycle: Start → (per-frame capture happens automatically
     /// while the simulation runs) → Stop → returned bundle is handed to
     /// <see cref="RecordingBundleSerializer.Save(RecordingBundle, System.IO.Stream)"/>
     /// for persistence. The recorder is reusable: Stop produces a bundle and
@@ -24,14 +24,21 @@ namespace Trecs.Internal
 
         // Lifecycle / IO primitives (accessor + checksum calculator + reusable
         // buffers + queue serialization + locker registration) live on this
-        // shared collaborator. The editor recorder (TrecsRewindBuffer) also
-        // owns one — see RecorderEngine docs for the split rationale.
-        readonly RecorderEngine _core;
+        // shared collaborator. BundleReplayer and the editor recorder
+        // (TrecsRewindBuffer) also own one — see RecordingEngine docs for the
+        // split rationale.
+        readonly RecordingEngine _core;
         readonly BundleRecorderSettings _settings;
 
         readonly IterableDictionary<int, ulong> _checksums = new();
-        readonly List<WorldSnapshot> _anchors = new();
+        readonly List<WorldSnapshot> _keyframes = new();
         readonly List<WorldSnapshot> _bookmarks = new();
+
+        // Contiguous-byte[] capture buffer: the serializer fills _captureScratch (its two
+        // sections), then we copy the contiguous form into a freshly allocated byte[] that
+        // becomes a bundle payload. The allocation is deliberate — the buffer is ceded to the
+        // bundle (which can outlive this recorder), so there is nothing to recycle.
+        readonly SerializationData _captureScratch = new();
 
         IDisposable _frameSubscription;
 
@@ -39,7 +46,7 @@ namespace Trecs.Internal
         bool _disposed;
         bool _lockerRegistered;
         int _startFrame;
-        int _lastAnchorFrame;
+        int _lastKeyframeFrame;
         ReadOnlyMemory<byte> _initialSnapshot;
 
         public BundleRecorder(
@@ -56,7 +63,10 @@ namespace Trecs.Internal
 
             _log = world.Log;
             _settings = settings;
-            _core = new RecorderEngine(
+            // No OpaqueBlobPersistence: this runtime recorder never persists
+            // opaque (eager) blob bytes — SaveSnapshot asserts its snapshots
+            // reference none (see CapturePayload).
+            _core = new RecordingEngine(
                 world,
                 serializerRegistry,
                 snapshotSerializer,
@@ -66,7 +76,7 @@ namespace Trecs.Internal
 
         public bool IsRecording => _isRecording;
         public int StartFrame => _startFrame;
-        public IReadOnlyList<WorldSnapshot> Anchors => _anchors;
+        public IReadOnlyList<WorldSnapshot> Keyframes => _keyframes;
         public IReadOnlyList<WorldSnapshot> Bookmarks => _bookmarks;
 
         /// <summary>
@@ -110,23 +120,15 @@ namespace Trecs.Internal
             }
 
             _checksums.Clear();
-            _anchors.Clear();
+            _keyframes.Clear();
             _bookmarks.Clear();
 
             _startFrame = _core.Accessor.FixedFrame;
-            _lastAnchorFrame = _startFrame;
+            _lastKeyframeFrame = _startFrame;
 
             // Capture the initial snapshot bytes + checksum so the produced
-            // bundle is self-contained. The serializer's pool may hand us an
-            // oversized buffer; the returned ReadOnlyMemory<byte> is the
-            // exact valid slice. We don't return the buffer to the pool on
-            // Stop — the bundle's caller may hold the payload past Stop, so
-            // ceding ownership is the safe choice.
-            _core.CaptureInitialState(
-                _settings.Version,
-                out _initialSnapshot,
-                out var initialChecksum
-            );
+            // bundle is self-contained.
+            _initialSnapshot = CapturePayload(_settings.Version, out var initialChecksum);
 
             // Start frame's checksum goes in the dict so playback can verify
             // the post-LoadInitialState world matches the recorded initial
@@ -165,78 +167,65 @@ namespace Trecs.Internal
             }
 
             var endFrame = _core.Accessor.FixedFrame;
-            var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
 
-            // Drop the history lock before serializing the queue so the queue
-            // is in its post-recording state (the queue's own Serialize
-            // captures whatever is currently held).
+            // Drop the history lock before assembling (which serializes the
+            // queue) so the queue is in its post-recording state (the queue's
+            // own Serialize captures whatever is currently held).
             _frameSubscription?.Dispose();
             _frameSubscription = null;
             EnsureLockerRegistered(false);
             _isRecording = false;
 
-            var queueBytes = _core.SerializeEntityInputQueue(_settings.Version);
-
-            var blobs = new IterableHashSet<BlobId>();
-            _core.World.BlobCache.GetAllActiveBlobIds(blobs);
-
-            var bundle = new RecordingBundle
-            {
-                Header = new BundleHeader
-                {
-                    Version = _settings.Version,
-                    StartFixedFrame = _startFrame,
-                    EndFixedFrame = endFrame,
-                    FixedDeltaTime = fixedDeltaTime,
-                    BlobIds = blobs,
-                },
-                InitialSnapshot = _initialSnapshot,
-                InputQueue = queueBytes,
-                Checksums = WorldSnapshotListUtil.CopyChecksums(_checksums),
-                Anchors = _anchors.ToArray(),
-                Bookmarks = _bookmarks.ToArray(),
-            };
+            var bundle = _core.AssembleBundle(
+                _settings.Version,
+                _startFrame,
+                endFrame,
+                _core.CreateBundleBlobRootSet(),
+                _initialSnapshot,
+                _keyframes.ToArray(),
+                _bookmarks.ToArray(),
+                WorldSnapshotListUtil.CopyChecksums(_checksums)
+            );
 
             _log.Debug(
-                "Recording stopped: {0} frames, {1} anchors, {2} bookmarks, {3} checksums, {4} bytes input queue",
+                "Recording stopped: {0} frames, {1} keyframes, {2} bookmarks, {3} checksums, {4} bytes input queue",
                 endFrame - _startFrame,
-                _anchors.Count,
+                _keyframes.Count,
                 _bookmarks.Count,
                 _checksums.Count,
-                queueBytes.Length
+                bundle.InputQueue.Length
             );
 
             // Reset internal state so the recorder can be Started again. The
             // bundle owns its payload memory now; clearing here just detaches
-            // our local reference — the pool buffer (if any) stays alive via
-            // the bundle's ReadOnlyMemory<byte> until the caller releases it.
+            // our local references to the same buffers.
             _initialSnapshot = default;
             _checksums.Clear();
-            _anchors.Clear();
+            _keyframes.Clear();
             _bookmarks.Clear();
 
             return bundle;
         }
 
         /// <summary>
-        /// Capture an unlabeled full-state anchor at the current fixed frame,
-        /// outside the normal <see cref="BundleRecorderSettings.AnchorIntervalSeconds"/>
+        /// Capture an unlabeled full-state keyframe at the current fixed frame,
+        /// outside the normal <see cref="BundleRecorderSettings.KeyframeIntervalSeconds"/>
         /// cadence. Useful for runtime-driven "this is an interesting moment"
         /// checkpoints (e.g. just before launching a network request, at level
         /// boundaries) without waiting for the next auto-cadence tick. Replaces
-        /// any existing anchor at the same frame, and resets the auto-anchor
+        /// any existing keyframe at the same frame, and resets the auto-keyframe
         /// cadence timer so the next auto-capture fires a full interval from
         /// here rather than redundantly moments later. Use
         /// <see cref="CaptureBookmarkAtCurrentFrame"/> instead when the marker
         /// needs a user-visible label.
         /// </summary>
-        /// <returns>True iff the anchor was captured.</returns>
-        public bool CaptureAnchorAtCurrentFrame()
+        /// <returns>True iff the keyframe was captured.</returns>
+        public bool CaptureKeyframeAtCurrentFrame()
         {
             ThrowIfDisposed();
             if (!_isRecording)
             {
-                _log.Warning("CaptureAnchorAtCurrentFrame called while not recording");
+                _log.Warning("CaptureKeyframeAtCurrentFrame called while not recording");
                 return false;
             }
             if (_core.World.IsDisposed)
@@ -245,17 +234,17 @@ namespace Trecs.Internal
             }
 
             var frame = _core.Accessor.FixedFrame;
-            CaptureAnchorAt(frame);
-            // Reset the auto-anchor cadence timer so we don't emit a redundant
-            // auto-anchor moments after this manual one.
-            _lastAnchorFrame = frame;
+            CaptureKeyframeAt(frame);
+            // Reset the auto-keyframe cadence timer so we don't emit a redundant
+            // auto-keyframe moments after this manual one.
+            _lastKeyframeFrame = frame;
             return true;
         }
 
         /// <summary>
         /// Capture a labelled full-state bookmark at the current fixed frame.
         /// Replaces any existing bookmark at the same frame. Bookmarks
-        /// survive Save/Load and are independent of auto-anchors and
+        /// survive Save/Load and are independent of auto-keyframes and
         /// checksums.
         /// </summary>
         /// <returns>True iff the bookmark was captured.</returns>
@@ -303,8 +292,6 @@ namespace Trecs.Internal
                 EnsureLockerRegistered(false);
                 _isRecording = false;
             }
-
-            _core.Dispose();
         }
 
         void OnFixedUpdateCompleted()
@@ -315,45 +302,51 @@ namespace Trecs.Internal
             }
             var frame = _core.Accessor.FixedFrame;
 
-            // Anchor cadence — full state snapshot captured at long intervals.
+            // Keyframe cadence — full state snapshot captured at long intervals.
             var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
-            var anchorElapsed = (frame - _lastAnchorFrame) * fixedDeltaTime;
-            if (anchorElapsed >= _settings.AnchorIntervalSeconds)
+            var keyframeElapsed = (frame - _lastKeyframeFrame) * fixedDeltaTime;
+            if (keyframeElapsed >= _settings.KeyframeIntervalSeconds)
             {
-                CaptureAnchorAt(frame);
-                _lastAnchorFrame = frame;
+                CaptureKeyframeAt(frame);
+                _lastKeyframeFrame = frame;
             }
         }
 
-        void CaptureAnchorAt(int frame)
+        void CaptureKeyframeAt(int frame)
         {
-            var anchor = CaptureSnapshotPayload(frame, SnapshotKind.Anchor, label: "");
+            var keyframe = CaptureSnapshotPayload(frame, SnapshotKind.Keyframe, label: "");
             // Auto-cadence captures always run at strictly increasing frames so
-            // they would naturally append. CaptureAnchorAtCurrentFrame can land
-            // on the same frame as the most recent auto-anchor though (manual
+            // they would naturally append. CaptureKeyframeAtCurrentFrame can land
+            // on the same frame as the most recent auto-keyframe though (manual
             // call right after the cadence tick), so replace-if-present rather
             // than emit a duplicate entry at the same frame.
-            if (_anchors.Count > 0 && _anchors[_anchors.Count - 1].FixedFrame == frame)
+            if (_keyframes.Count > 0 && _keyframes[_keyframes.Count - 1].FixedFrame == frame)
             {
-                _anchors[_anchors.Count - 1] = anchor;
+                _keyframes[_keyframes.Count - 1] = keyframe;
                 return;
             }
-            _anchors.Add(anchor);
+            _keyframes.Add(keyframe);
+        }
+
+        // Capture the current world state into a freshly allocated contiguous byte[] payload,
+        // plus its checksum. The serializer fills the reused _captureScratch SerializationData;
+        // we copy the contiguous form into a buffer sized exactly to it. The buffer is ceded to
+        // the bundle (it can outlive this recorder), so the allocation is deliberate — there is
+        // nothing to recycle.
+        ReadOnlyMemory<byte> CapturePayload(int version, out ulong checksum)
+        {
+            // No opaqueBlobIdsOut: this runtime recorder doesn't persist opaque (eager) blob
+            // bytes, so SaveSnapshot asserts the snapshot references none.
+            _core.SaveSnapshot(version, _captureScratch);
+            var buffer = new byte[_captureScratch.ContiguousSize];
+            _captureScratch.CopyContiguousTo(buffer);
+            checksum = _captureScratch.ComputeContiguousChecksum();
+            return buffer;
         }
 
         WorldSnapshot CaptureSnapshotPayload(int frame, SnapshotKind kind, string label)
         {
-            // The pool may hand back an oversized buffer; the returned
-            // ReadOnlyMemory<byte> is the exact valid slice. Buffers are not
-            // returned to the pool here — the bundle returned by Stop() can
-            // outlive this recorder, so ceding ownership of the buffer to
-            // the bundle is the only safe choice.
-            _core.SnapshotSerializer.SaveSnapshot(
-                _settings.Version,
-                out var payload,
-                out var checksum,
-                includeTypeChecks: true
-            );
+            var payload = CapturePayload(_settings.Version, out var checksum);
             // Single source of truth for every captured frame's checksum.
             // Idempotent with the cadence-driven write in OnFixedUpdateCompleted
             // when the two align on the same frame.

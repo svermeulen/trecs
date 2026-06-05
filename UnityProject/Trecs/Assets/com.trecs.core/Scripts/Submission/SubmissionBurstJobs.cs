@@ -343,6 +343,57 @@ namespace Trecs.Internal
         }
     }
 
+    /// <summary>
+    /// Burst-compiled whole-group handle free. For a removal that empties a group
+    /// there is no swap-back, so each removed entity's reverse-map slot still holds
+    /// its (untouched) handle id. This one sequential pass walks slots <c>[0, Count)</c>
+    /// and, for each: bumps the forward-map entry's version (invalidating stale
+    /// handles), links the freed slot into the free list, and zeros the reverse-map
+    /// slot. Single-threaded (<see cref="IJob"/>, not parallel) because the free list
+    /// is a linked chain rooted at <c>_nextFreeIndex</c>; walking in ascending slot
+    /// order keeps the push order — and therefore the serialization checksum —
+    /// identical to the per-entity removal path. Replaces the capture/relocate/managed-
+    /// finalize sequence the per-entity path needs, which is redundant when nothing
+    /// swaps back.
+    /// </summary>
+    [BurstCompile]
+    unsafe struct FullGroupFreeHandlesJob : IJob
+    {
+        public UnsafeList<int> GroupList;
+        public NativeList<EntityHandleMapElement> EntityHandleMap;
+
+        [NativeDisableUnsafePtrRestriction]
+        public long NextFreeIndexPtr;
+        public int Count;
+
+        public void Execute()
+        {
+            var nextFreePtr = (int*)NextFreeIndexPtr;
+            int nextFree = *nextFreePtr;
+            for (int i = 0; i < Count; i++)
+            {
+                int id = GroupList[i];
+                // Whole-group invariant: every slot in [0, Count) is live, so id != 0.
+                // Guard anyway — without it a null slot would index ElementAt(-1), a
+                // silent OOB write under Burst (no bounds checks). The format args are
+                // dropped because TrecsDebugAssert's formatter is [BurstDiscard]; from
+                // a Burst job only the bare "Assert hit!" is observable, and the assert
+                // is stripped entirely in release.
+                TrecsDebugAssert.That(
+                    id != 0,
+                    "FullGroupFreeHandlesJob: null EntityHandle in groupList (whole-group invariant broken)"
+                );
+                ref var element = ref EntityHandleMap.ElementAt(id - 1);
+                element.Index = nextFree; // free-list link
+                element.GroupIndex = default;
+                element.BumpVersion();
+                nextFree = id - 1;
+                GroupList[i] = 0;
+            }
+            *nextFreePtr = nextFree;
+        }
+    }
+
     [BurstCompile]
     struct SortIntsDescendingJob : IJob
     {

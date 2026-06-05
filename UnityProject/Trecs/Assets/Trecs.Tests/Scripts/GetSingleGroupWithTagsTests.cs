@@ -136,7 +136,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity<ResolverBall>().Set(new TestInt { Value = 1 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(
                 1,
@@ -388,7 +388,7 @@ namespace Trecs.Tests
             a.AddEntity<ResolverBall, ResolverActive>()
                 .Set(new TestInt { Value = 2 })
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(
                 1,
@@ -464,7 +464,7 @@ namespace Trecs.Tests
 
             a.AddEntity<ResolverPlayer>().Set(new TestInt { Value = 1 }).AssertComplete();
             a.AddEntity<ResolverEnemy>().Set(new TestInt { Value = 2 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.Query().WithTags<ResolverPlayer>().Count());
             NAssert.AreEqual(1, a.Query().WithTags<ResolverEnemy>().Count());
@@ -501,7 +501,7 @@ namespace Trecs.Tests
 
             var a = env.Accessor;
             a.AddEntity<ResolverBall>().Set(new TestInt { Value = 1 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
         }
     }
 }

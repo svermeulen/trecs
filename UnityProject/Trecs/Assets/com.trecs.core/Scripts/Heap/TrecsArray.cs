@@ -159,7 +159,11 @@ namespace Trecs
         // lives on TrecsArrayExtensions as a `this ref TrecsArray<T>` extension method,
         // which requires writable access to the handle struct — the compile-time gate
         // against mutation through an IRead aspect field or an `in` parameter.
-        public readonly void Dispose(WorldAccessor world) => Dispose(world.NativeUniqueChunkStore);
+        public readonly void Dispose(WorldAccessor world)
+        {
+            world.AssertCanMutateHeap();
+            Dispose(world.NativeUniqueChunkStore);
+        }
 
         internal readonly unsafe void Dispose(NativeHeap chunkStore)
         {
@@ -217,6 +221,7 @@ namespace Trecs
 
         internal readonly unsafe TrecsArrayWrite<T> Write(in NativeHeapResolver resolver)
         {
+            resolver.AssertCanMutateHeap();
             ResolveData(in resolver, out var dataPtr, out var entry, out var slot);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             return new TrecsArrayWrite<T>(dataPtr, Length, slot, entry.Generation, entry.Safety);
@@ -228,8 +233,15 @@ namespace Trecs
         internal readonly TrecsArrayWrite<T> Write(NativeHeap chunkStore) =>
             Write(chunkStore.Resolver);
 
-        internal readonly TrecsArrayWrite<T> Write(in NativeWorldAccessor nativeWorld) =>
-            Write(nativeWorld.ChunkStoreResolver);
+        // Both the world-flag check and the resolver-flag check pass through —
+        // belt-and-suspenders, since either alone would catch a Variable-role
+        // caller, but the world-side flag gives a clearer error message before
+        // the resolver-side fallback fires. Mirrors TrecsList.Write(in NativeWorldAccessor).
+        internal readonly TrecsArrayWrite<T> Write(in NativeWorldAccessor nativeWorld)
+        {
+            nativeWorld.AssertCanMutateHeap();
+            return Write(nativeWorld.ChunkStoreResolver);
+        }
 
         // Resolves the single data slot and validates its TypeId. Used by both Read
         // and Write opening paths so the resolve + typecheck pattern lives in one
@@ -303,7 +315,11 @@ namespace Trecs
     public static class TrecsArrayExtensions
     {
         public static TrecsArrayWrite<T> Write<T>(this ref TrecsArray<T> array, WorldAccessor world)
-            where T : unmanaged => array.Write(world.NativeUniqueChunkStore);
+            where T : unmanaged
+        {
+            world.AssertCanMutateHeap();
+            return array.Write(world.NativeUniqueChunkStore);
+        }
 
         /// <summary>
         /// Convenience overload that pulls the resolver out of

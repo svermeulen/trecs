@@ -10,7 +10,7 @@ A 6×6 grid of cubes cycles through one of two colour palettes. Each palette is 
 
 ## Why stable BlobIds?
 
-Every `SharedPtr.Alloc` / `NativeSharedPtr.Alloc` requires a caller-supplied `BlobId`. Shared blobs are addressed by stable identifier so independent call sites resolve to the same allocation, and so the same identity survives snapshots, recordings, and re-load. Hand-author the IDs as named constants:
+Shared blobs are addressed by a `BlobId`. For content-pipeline assets like these palettes — where the id is the contract between the seeder and every spawner, and must survive snapshots, recordings, and reload — hand-author stable ids as named constants so independent call sites resolve to the same allocation:
 
 ```csharp
 public static class PaletteIds
@@ -24,30 +24,35 @@ For the "allocate and go" pattern where IDs are auto-minted, see [Sample 10 — 
 
 ## The seeder pattern
 
-A long-lived seeder allocates each blob once at startup under its stable ID and **holds the resulting `BlobPtr<T>` as a member field**. Without that anchor, the cache could evict the blob between init and the first entity spawn.
+A long-lived seeder registers each palette once at startup under its stable id and **holds a pinning `SharedAnchor<T>` as a member field**. `SharedAnchor<T>` keeps blob bytes resident *outside* the entity refcount layer — without it, the cache could evict the blob between init and the first entity spawn. Because the seeder is setup code, not a system, it makes its own `Unrestricted` accessor.
 
 ```csharp
 public class PaletteSeeder
 {
-    readonly BlobCache _blobCache;
-    BlobPtr<ColorPalette> _warm;
-    BlobPtr<ColorPalette> _cool;
+    readonly World _world;
+    WorldAccessor _accessor;
+    SharedAnchor<ColorPalette> _warm;
+    SharedAnchor<ColorPalette> _cool;
 
-    public PaletteSeeder(BlobCache blobCache) => _blobCache = blobCache;
+    public PaletteSeeder(World world) => _world = world;
 
     public void Initialize()
     {
-        // BlobPtr.Alloc(cache, stableId, blob) seeds the blob under a caller-chosen
-        // BlobId and returns a pinning handle. Later SharedPtr.Acquire(heap, stableId)
-        // calls find the seeded blob and hand out ECS-refcounted handles to it.
-        _warm = BlobPtr.Alloc(_blobCache, PaletteIds.Warm, BuildWarm());
-        _cool = BlobPtr.Alloc(_blobCache, PaletteIds.Cool, BuildCool());
+        _accessor = _world.CreateAccessor(AccessorRole.Unrestricted);
+
+        // Register a builder for each palette under its stable BlobId, then acquire a
+        // pinning SharedAnchor so the bytes stay resident. Later SharedPtr.Acquire(world,
+        // stableId) calls find the registered blob and hand out ECS-refcounted handles to it.
+        SharedAnchor.Register(_accessor, PaletteIds.Warm, BuildWarm);
+        SharedAnchor.Register(_accessor, PaletteIds.Cool, BuildCool);
+        _warm = SharedAnchor.Acquire<ColorPalette>(_accessor, PaletteIds.Warm);
+        _cool = SharedAnchor.Acquire<ColorPalette>(_accessor, PaletteIds.Cool);
     }
 
     public void Dispose()
     {
-        _warm.Dispose(_blobCache);
-        _cool.Dispose(_blobCache);
+        _warm.Dispose(_accessor);
+        _cool.Dispose(_accessor);
     }
 }
 ```
@@ -125,6 +130,6 @@ For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Samp
 ## Concepts introduced
 
 - **Stable `BlobId`** — caller-authored identifiers that keep the same identity across runs, independent of init-time ordering
-- **Seeder pattern** — a long-lived object allocates shared blobs at startup via `BlobPtr.Alloc(cache, id, value)` and anchors their lifetime
-- **`BlobPtr.Alloc(cache, id, value)` vs `SharedPtr.Acquire(world, id)`** — seeding (creates the blob and returns a pinning handle) vs lookup (acquires an ECS-refcounted handle to an already-seeded blob)
+- **Seeder pattern** — a long-lived object registers shared blobs at startup and holds a pinning `SharedAnchor<T>` to keep them resident before any entity references them
+- **`SharedAnchor` (seed/pin) vs `SharedPtr` (entity handle)** — the anchor keeps the blob resident outside the ECS refcount layer; entities acquire ECS-refcounted `SharedPtr` handles by the same id
 - **Cleanup ownership** — pointers on components must be disposed explicitly; an `OnRemoved` observer is the canonical place

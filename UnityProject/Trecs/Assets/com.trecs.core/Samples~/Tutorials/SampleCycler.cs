@@ -1,4 +1,7 @@
+using System;
 using System.Linq;
+using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -26,7 +29,7 @@ namespace Trecs.Samples
     {
 #if UNITY_EDITOR
         [SerializeField]
-        UnityEditor.SceneAsset[] _sceneAssets;
+        SceneAsset[] _sceneAssets;
 #endif
 
         [SerializeField, HideInInspector]
@@ -63,11 +66,9 @@ namespace Trecs.Samples
 #if UNITY_EDITOR
         void OnValidate()
         {
-            var assets =
-                _sceneAssets?.Where(s => s != null).ToArray()
-                ?? System.Array.Empty<UnityEditor.SceneAsset>();
+            var assets = _sceneAssets?.Where(s => s != null).ToArray() ?? Array.Empty<SceneAsset>();
             _sceneNames = assets.Select(s => s.name).ToArray();
-            _scenePaths = assets.Select(UnityEditor.AssetDatabase.GetAssetPath).ToArray();
+            _scenePaths = assets.Select(AssetDatabase.GetAssetPath).ToArray();
         }
 #endif
 
@@ -134,7 +135,7 @@ namespace Trecs.Samples
                 && !string.IsNullOrEmpty(_scenePaths[index])
             )
             {
-                UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
+                EditorSceneManager.LoadSceneInPlayMode(
                     _scenePaths[index],
                     new LoadSceneParameters(LoadSceneMode.Single)
                 );

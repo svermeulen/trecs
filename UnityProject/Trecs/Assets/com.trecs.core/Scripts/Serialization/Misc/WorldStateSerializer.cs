@@ -1,34 +1,49 @@
+using Trecs.Collections;
 using Trecs.Internal;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
     /// <summary>
-    /// Serializes or deserializes the full game state. Implemented by
-    /// <see cref="WorldStateSerializer"/>; game code that needs to add its
-    /// own data (e.g. scripting VM state) can implement this interface via
-    /// composition around a <see cref="WorldStateSerializer"/>.
-    /// </summary>
-    public interface IWorldStateSerializer
-    {
-        void SerializeFullState(ISerializationWriter writer);
-        void DeserializeState(ISerializationReader reader);
-    }
-
-    /// <summary>
     /// Serializes/deserializes the entire game state of a <see cref="World"/>.
+    /// Orchestration only: this class owns section ordering, section guards,
+    /// and the deserialize lifecycle events. The wire format of each section
+    /// lives with the subsystem that owns the data (e.g.
+    /// <see cref="Internal.ComponentStore"/>, <see cref="EntityHandleMap"/>,
+    /// <see cref="Internal.SetStore"/>, the heaps).
     /// To override how a particular component type's array is serialized
     /// (e.g. to skip transient state or reset a runtime handle on load),
     /// register an <see cref="IComponentArraySerializer{T}"/> via
     /// <see cref="World.ComponentArraySerializerRegistry"/>.
+    /// To include deterministic game state that lives outside the ECS (e.g.
+    /// a scripting VM's state), register an
+    /// <see cref="ICustomWorldStateSection"/> via
+    /// <see cref="World.CustomWorldStateSections"/> — it is appended after
+    /// the built-in sections on every serialize/deserialize.
     /// </summary>
-    public sealed class WorldStateSerializer : IWorldStateSerializer
+    public sealed class WorldStateSerializer
     {
         readonly TrecsLog _log;
 
         readonly World _world;
         readonly WorldInfo _worldDef;
+
+        // Reusable buffers for the active-blob descriptor journal section, so the recording hot
+        // path doesn't allocate a set + dictionary per snapshot.
+        readonly IterableHashSet<BlobId> _activeBlobIdsBuffer = new();
+        readonly IterableDictionary<BlobId, object> _blobJournalBuffer = new();
+
+        // The two shared heaps' BlobMembershipVersions captured immediately after the heaps
+        // section of the most recent deserialize — the moment heap blob membership provably
+        // equals the stream's blob set. SnapshotSerializer stamps its metadata's BlobIds from
+        // these (not from versions read after DeserializeState returns) because custom sections,
+        // OnEcsDeserializeCompleted, and DeserializeCompleted listeners all run after the heaps
+        // load and may legitimately mutate blob membership; stamping with post-listener versions
+        // would mark the wire set as current when it no longer is, and the next save would skip
+        // its rebuild and emit metadata/journal sections that disagree with the heaps. With the
+        // capture taken at the heaps boundary, any later mutation bumps the live version past
+        // the captured one and the stamp simply fails to match — falling back to a rebuild.
+        internal long LastHeapLoadSharedBlobVersion { get; private set; }
+        internal long LastHeapLoadNativeBlobVersion { get; private set; }
 
         public WorldStateSerializer(World world)
         {
@@ -55,77 +70,22 @@ namespace Trecs
         }
 #endif
 
-        void WriteComponentArray(IComponentArray array, ISerializationWriter writer)
-        {
-            var count = array.Count;
-            writer.Write("Count", count);
-
-            if (
-                _world.ComponentArraySerializerRegistry.TryGetDispatcher(
-                    array.ComponentType,
-                    out var dispatcher
-                )
-            )
-            {
-                writer.WriteBit(true);
-                dispatcher.Serialize(array, writer);
-                return;
-            }
-
-            writer.WriteBit(false);
-            if (count > 0)
-            {
-                unsafe
-                {
-                    writer.BlitWriteRawBytes(
-                        "Values",
-                        array.GetUnsafePtr(),
-                        array.ElementSize * count
-                    );
-                }
-            }
-        }
-
-        void ReadComponentArray(IComponentArray array, ISerializationReader reader)
-        {
-            var count = reader.Read<int>("Count");
-            bool isCustom = reader.ReadBit();
-            if (isCustom)
-            {
-                var ok = _world.ComponentArraySerializerRegistry.TryGetDispatcher(
-                    array.ComponentType,
-                    out var dispatcher
-                );
-                TrecsDebugAssert.That(
-                    ok,
-                    "Stream marks a custom serializer for component type {0} but none is registered on this world",
-                    array.ComponentType
-                );
-                dispatcher.Deserialize(array, count, reader);
-                return;
-            }
-
-            array.Clear();
-            if (count > 0)
-            {
-                array.EnsureCapacity(count);
-                unsafe
-                {
-                    reader.BlitReadRawBytes(
-                        "Values",
-                        array.GetUnsafePtr(),
-                        array.ElementSize * count
-                    );
-                }
-            }
-            array.SetCount(count);
-        }
-
-        public void SerializeFullState(ISerializationWriter writer)
+        /// <summary>
+        /// Serializes the full world state. <paramref name="preCollectedBlobIds"/> optionally
+        /// supplies the state-referenced blob set (<c>World.AddSerializedStateBlobIds</c> into a
+        /// cleared buffer, with no world mutation since) so the blob-journal section can reuse it
+        /// instead of re-walking the heaps — the snapshot path collects the same set moments
+        /// earlier for its metadata, and rebuilding it costs a heap walk plus one hash-set insert
+        /// per referenced blob on the per-frame rollback save. Pass null to collect internally.
+        /// </summary>
+        public void SerializeFullState(
+            ISerializationWriter writer,
+            IterableHashSet<BlobId> preCollectedBlobIds = null
+        )
         {
             using (TrecsProfiling.Start("Serializing game state"))
             {
-                SerializeImpl(writer);
+                SerializeImpl(writer, preCollectedBlobIds);
             }
         }
 
@@ -140,7 +100,10 @@ namespace Trecs
 
             _world.GetUniqueHeap().ClearAll(warnUndisposed: false);
             _world.GetSharedHeap().ClearAll(warnUndisposed: false);
-            _world.GetNativeSharedHeap().ClearAll(warnUndisposed: false);
+            // NativeSharedHeap is deliberately NOT cleared here: its Deserialize
+            // reconciles the incoming entries against the live ones (keeping the
+            // blob-cache handle for every unchanged slot — the hot rollback path),
+            // which requires the pre-load state to survive until it runs.
             // Persistent NativeUniquePtr / TrecsList allocations live entirely in
             // the chunk store. The chunk-store wipe inside
             // NativeHeap.Deserialize is sufficient to reset their state
@@ -158,6 +121,13 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Restores the full game state from <paramref name="reader"/>. There is no
+        /// rollback on failure: deserialization wipes the heaps before repopulating
+        /// them, so if this throws (e.g. <see cref="SerializationException"/> on a
+        /// corrupt or incompatible stream) the world is left half-restored and must
+        /// be discarded — do not catch the exception and keep ticking the world.
+        /// </summary>
         public void DeserializeState(ISerializationReader reader)
         {
             using (TrecsProfiling.Start("State Deserialization"))
@@ -166,158 +136,84 @@ namespace Trecs
             }
         }
 
-        void WriteSets(SetStore setStore, ISerializationWriter writer)
-        {
-            var setIds = setStore.SetIds;
-            var sets = setStore.EntitySets;
-            var numSets = setIds.Length;
-            writer.Write("NumSets", numSets);
-
-            for (int i = 0; i < numSets; i++)
-            {
-                writer.PushScope("Set{0}", i);
-                writer.Write("SetId", setIds[i]);
-
-                var set = sets[setIds[i]];
-                var registeredGroups = set._registeredGroups;
-                var entriesPerGroup = set._entriesPerGroup;
-
-                var numGroups = registeredGroups.Length;
-                writer.Write("NumGroups", numGroups);
-
-                for (int k = 0; k < numGroups; k++)
-                {
-                    writer.PushScope("Group{0}", k);
-                    var group = registeredGroups[k];
-                    writer.Write("Group", _worldDef.ToTagSet(group));
-
-                    var groupEntities = entriesPerGroup[group.Index];
-
-                    writer.Write("EntityIdToDenseIndex", groupEntities._entityIdToDenseIndex);
-                    writer.PopScope();
-                }
-                writer.PopScope();
-            }
-        }
-
-        void WriteEntityIndexToReferenceMap(
-            in NativeList<UnsafeList<int>> entityIndexToReferenceMap,
-            ISerializationWriter writer
+        // The descriptor journal for the blobs this state references: for each state-referenced blob
+        // that was interned from a descriptor, persist (id, descriptor) so a fresh-process load can
+        // re-register the blob's source and re-derive it before the heaps pin it by id. The
+        // referenced set comes from the heaps that hold the blobs (AddSerializedStateBlobIds), NOT
+        // from BlobCache's global active set: heap-derived ids are limited to serialized state and
+        // their order is deterministic (so the wire form is stable for checksums), whereas the cache
+        // active set also counts non-ECS pins (e.g. rewind-buffer keyframes) whose presence and
+        // ordering are not a deterministic function of world state. Written/read before the heaps.
+        void WriteBlobJournal(
+            ISerializationWriter writer,
+            IterableHashSet<BlobId> preCollectedBlobIds
         )
         {
-            var count = entityIndexToReferenceMap.Length;
+            var activeIds = preCollectedBlobIds;
+            if (activeIds == null)
+            {
+                _activeBlobIdsBuffer.Clear();
+                _world.AddSerializedStateBlobIds(_activeBlobIdsBuffer);
+                activeIds = _activeBlobIdsBuffer;
+            }
+#if DEBUG && !TRECS_IS_PROFILING
+            else
+            {
+                // The caller vouched that its set matches what a fresh collection would produce
+                // (same heaps, no mutation since). The journal's wire form iterates this set, so
+                // a stale or reordered one wouldn't just be slow — it would change the bytes.
+                // Verify membership AND insertion order in debug. (!TRECS_IS_PROFILING: the
+                // re-collect would put the cost the reuse removes right back into editor-backend
+                // bench numbers.)
+                _activeBlobIdsBuffer.Clear();
+                _world.AddSerializedStateBlobIds(_activeBlobIdsBuffer);
+                TrecsDebugAssert.That(
+                    _activeBlobIdsBuffer.Count == activeIds.Count,
+                    "preCollectedBlobIds is stale: {0} ids passed but the heaps reference {1}",
+                    activeIds.Count,
+                    _activeBlobIdsBuffer.Count
+                );
+                int expectedIndex = 0;
+                foreach (var id in _activeBlobIdsBuffer)
+                {
+                    TrecsDebugAssert.That(
+                        activeIds.TryGetIndex(id, out var actualIndex)
+                            && actualIndex == expectedIndex,
+                        "preCollectedBlobIds is stale: heap-referenced blob {0} missing or out "
+                            + "of order (expected insertion index {1})",
+                        id,
+                        expectedIndex
+                    );
+                    expectedIndex++;
+                }
+            }
+#endif
+            _blobJournalBuffer.Clear();
+            _world.BlobFactory.CollectJournaledDescriptors(activeIds, _blobJournalBuffer);
 
-            writer.Write("Count", count);
+            writer.Write("Count", _blobJournalBuffer.Count);
+            foreach (var (id, descriptor) in _blobJournalBuffer)
+            {
+                writer.Write("Id", id);
+                writer.WriteObject("Descriptor", descriptor);
+            }
+        }
 
+        void ReadBlobJournal(ISerializationReader reader)
+        {
+            _blobJournalBuffer.Clear();
+            var count = reader.Read<int>("Count");
             for (int i = 0; i < count; i++)
             {
-                writer.PushScope("Ref{0}", i);
-                var tagSet = _worldDef.ToTagSet(GroupIndex.FromIndex(i));
-                writer.Write("Group", tagSet);
-
-                writer.Write("Refs", entityIndexToReferenceMap[i]);
-                writer.PopScope();
+                var id = reader.Read<BlobId>("Id");
+                object descriptor = null;
+                reader.ReadObject("Descriptor", ref descriptor);
+                _blobJournalBuffer.Add(id, descriptor);
             }
+            _world.BlobFactory.RestoreJournaledDescriptors(_blobJournalBuffer);
         }
 
-        void WriteEntityHandlesMap(ISerializationWriter writer)
-        {
-            ref var entityHandlesMap = ref _world.GetEntityQuerier()._entityLocator;
-
-            writer.Write("EntityIdMap", in entityHandlesMap._entityHandleMap);
-
-            writer.PushScope("ReferenceMap");
-            WriteEntityIndexToReferenceMap(entityHandlesMap._entityIndexToReferenceMap, writer);
-            writer.PopScope();
-
-            int nextFreeIndex = entityHandlesMap._nextFreeIndex;
-            writer.Write("NextFreeIndex", nextFreeIndex);
-        }
-
-        bool ShouldSkip(GroupIndex group, TypeId componentId)
-        {
-            var componentType = TypeId.ToType(new TypeId(componentId.Value));
-            var template = _worldDef.GetResolvedTemplateForGroup(group);
-            var componentDec = template.GetComponentDeclaration(componentType);
-            return template.IsVariableUpdateOnly(componentDec);
-        }
-
-        void WriteGroupEntityComponentsDB(ISerializationWriter writer)
-        {
-            var groupEntityComponentsDB = _world.ComponentStore.GroupEntityComponentsDB;
-
-            var numItems = groupEntityComponentsDB.Length;
-
-            writer.Write("Count", numItems);
-
-            for (int i = 0; i < numItems; i++)
-            {
-                writer.PushScope("Group{0}", i);
-                var bytesBefore = writer.NumBytesWritten;
-
-                var group = GroupIndex.FromIndex(i);
-                writer.Write("Group", _worldDef.ToTagSet(group));
-
-                var subMap = groupEntityComponentsDB[i];
-
-                var numComponents = subMap.Count;
-
-                // Component-array slots are materialized lazily on first
-                // entity. A group can end up with populated slots but zero
-                // entities (e.g. after deserialization preallocates the
-                // schema). This materialization state is a non-observable
-                // implementation detail — treat an all-empty group
-                // identically to a never-materialized one so serialized
-                // bytes stay stable across recording/playback.
-                if (numComponents > 0)
-                {
-                    var allEmpty = true;
-                    for (int k = 0; k < numComponents; k++)
-                    {
-                        if (subMap.UnsafeValues[k].Count > 0)
-                        {
-                            allEmpty = false;
-                            break;
-                        }
-                    }
-
-                    if (allEmpty)
-                    {
-                        numComponents = 0;
-                    }
-                }
-
-                writer.Write("NumComponents", numComponents);
-
-                for (int k = 0; k < numComponents; k++)
-                {
-                    writer.PushScope("Component{0}", k);
-                    TypeId componentId = subMap.UnsafeKeys[k].Key;
-                    writer.Write("TypeId", componentId);
-
-                    IComponentArray componentArray = subMap.UnsafeValues[k];
-
-                    if (ShouldSkip(group, componentId))
-                    {
-                        writer.Write("Count", componentArray.Count);
-                    }
-                    else
-                    {
-                        WriteComponentArray(componentArray, writer);
-                    }
-                    writer.PopScope();
-                }
-
-                _log.Trace(
-                    "GroupIndex {0} serialized in {1} kb",
-                    group,
-                    (writer.NumBytesWritten - bytesBefore) / 1024f
-                );
-                writer.PopScope();
-            }
-        }
-
-        void SerializeImpl(ISerializationWriter writer)
+        void SerializeImpl(ISerializationWriter writer, IterableHashSet<BlobId> preCollectedBlobIds)
         {
             writer.PushScope("World");
 
@@ -331,7 +227,11 @@ namespace Trecs
             writer.PushScope("ComponentArrays");
             using (TrecsProfiling.Start("Writing component arrays"))
             {
-                WriteGroupEntityComponentsDB(writer);
+                _world.ComponentStore.Serialize(
+                    writer,
+                    _worldDef,
+                    _world.ComponentArraySerializerRegistry
+                );
             }
             writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterComponentArrays, writer);
@@ -345,7 +245,7 @@ namespace Trecs
             writer.PushScope("EntityHandles");
             using (TrecsProfiling.Start("Writing entity references map"))
             {
-                WriteEntityHandlesMap(writer);
+                _world.GetEntityQuerier()._entityLocator.Serialize(writer, _worldDef);
             }
             writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterEntityHandles, writer);
@@ -359,10 +259,7 @@ namespace Trecs
             writer.PushScope("EntitySets");
             using (TrecsProfiling.Start("Writing entity sets"))
             {
-                var setStore = _world.GetSetStore();
-
-                WriteSets(setStore, writer);
-                WriteSetRoutingIndex(setStore.SetIdsByGroup, writer);
+                _world.GetSetStore().Serialize(writer, _worldDef);
             }
             writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterEntitySets, writer);
@@ -370,6 +267,14 @@ namespace Trecs
                 "Entity sets serialized in {0} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
+
+            writer.PushScope("BlobJournal");
+            using (TrecsProfiling.Start("Writing blob journal"))
+            {
+                WriteBlobJournal(writer, preCollectedBlobIds);
+            }
+            writer.PopScope();
+            WriteSectionGuard(WorldStateSection.AfterBlobJournal, writer);
 
             bytesBefore = writer.NumBytesWritten;
 
@@ -405,199 +310,87 @@ namespace Trecs
             writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterSystemEnable, writer);
 
+            writer.PushScope("CustomSections");
+            using (TrecsProfiling.Start("Writing custom sections"))
+            {
+                WriteCustomSections(writer);
+            }
+            writer.PopScope();
+            WriteSectionGuard(WorldStateSection.AfterCustomSections, writer);
+
             writer.PopScope();
         }
 
-        void WriteSetRoutingIndex(
-            in NativeList<UnsafeList<SetId>> routingIndex,
-            ISerializationWriter writer
-        )
+        // Game-defined sections (World.CustomWorldStateSections), appended
+        // after the built-in sections in registration order. Each entry is
+        // framed by its name hash (so a registration mismatch is reported by
+        // name) and a per-entry guard (so wire drift inside one section is
+        // pinned to that section instead of cascading into the next).
+        void WriteCustomSections(ISerializationWriter writer)
         {
-            writer.PushScope("RoutingIndex");
-            // Emit only non-empty slots, keeping the wire format sparse.
-            int nonEmptyCount = 0;
-            for (int i = 0; i < routingIndex.Length; i++)
+            var sections = _world.CustomWorldStateSections;
+            writer.Write("Count", sections.Count);
+            for (int i = 0; i < sections.Count; i++)
             {
-                if (routingIndex[i].Length > 0)
-                    nonEmptyCount++;
-            }
-            writer.Write("NumRoutingEntries", nonEmptyCount);
-
-            int entryIndex = 0;
-            for (int i = 0; i < routingIndex.Length; i++)
-            {
-                var list = routingIndex[i];
-                if (list.Length == 0)
-                    continue;
-                writer.PushScope("Entry{0}", entryIndex);
-                writer.Write("Group", _worldDef.ToTagSet(GroupIndex.FromIndex(i)));
-                writer.Write("SetIds", in list);
+                var entry = sections.GetEntry(i);
+                writer.BlitWrite("NameHash", entry.NameHash);
+                writer.PushScope(entry.Name);
+                entry.Section.Serialize(writer);
                 writer.PopScope();
-                entryIndex++;
-            }
-            writer.PopScope();
-        }
-
-        void ReadSetRoutingIndex(
-            NativeList<UnsafeList<SetId>> routingIndex,
-            ISerializationReader reader
-        )
-        {
-            var numEntries = reader.Read<int>("NumRoutingEntries");
-
-            // Clear existing contents of every slot (reset to empty). Slots
-            // present in the snapshot are overwritten by the Resize inside
-            // UnsafeListSerializer; this pass handles the sparse slots that
-            // the snapshot omits entirely.
-            for (int i = 0; i < routingIndex.Length; i++)
-            {
-                routingIndex.ElementAt(i).Clear();
-            }
-
-            for (int i = 0; i < numEntries; i++)
-            {
-                var tagSet = reader.Read<TagSet>("Group");
-                var group = _worldDef.ToGroupIndex(tagSet);
-                ref var list = ref routingIndex.ElementAt(group.Index);
-                reader.Read("SetIds", ref list);
+                WriteSectionGuard(WorldStateSection.AfterCustomSectionEntry, writer);
             }
         }
 
-        void ReadSets(SetStore setStore, ISerializationReader reader)
+        void ReadCustomSections(ISerializationReader reader)
         {
-            var setIds = setStore.SetIds;
-            var sets = setStore.EntitySets;
-            var numSets = reader.Read<int>("NumSets");
-            TrecsDebugAssert.That(numSets >= 0);
-
-            TrecsDebugAssert.IsEqual(setIds.Length, numSets);
-
-            for (int i = 0; i < numSets; i++)
-            {
-                var setId = reader.Read<SetId>("SetId");
-
-                var currentSetId = setIds[i];
-                TrecsDebugAssert.IsEqual(setId, currentSetId);
-
-                var groupMap = sets[setId];
-
-                var numGroups = reader.Read<int>("NumGroups");
-                groupMap.Clear();
-
-                for (int k = 0; k < numGroups; k++)
-                {
-                    var tagSet = reader.Read<TagSet>("Group");
-                    var group = _worldDef.ToGroupIndex(tagSet);
-
-                    var groupEntry = groupMap.GetSetGroupEntry(group);
-
-                    reader.Read("EntityIdToDenseIndex", ref groupEntry._entityIdToDenseIndex);
-                }
-            }
-        }
-
-        void ReadEntityIndexToReferenceMap(
-            NativeList<UnsafeList<int>> entityIndexToReferenceMap,
-            ISerializationReader reader
-        )
-        {
+            var sections = _world.CustomWorldStateSections;
             var count = reader.Read<int>("Count");
-            TrecsDebugAssert.That(count >= 0);
-
-            TrecsDebugAssert.IsEqual(count, entityIndexToReferenceMap.Length);
+            if (count != sections.Count)
+            {
+                // SerializationException rather than an assert for the same
+                // reason as the section guards: a section-set mismatch in a
+                // release build must fail loudly here, not cascade as a
+                // misaligned binary read. The schema fingerprint normally
+                // rejects such payloads earlier, but raw world-state streams
+                // (no snapshot metadata) skip that gate.
+                throw new SerializationException(
+                    $"World-state stream contains {count} custom section(s) but the world has "
+                        + $"{sections.Count} registered. The set of registered "
+                        + "ICustomWorldStateSections must match the one the stream was "
+                        + "written with."
+                );
+            }
 
             for (int i = 0; i < count; i++)
             {
-                var tagSet = reader.Read<TagSet>("Group");
-                var group = _worldDef.ToGroupIndex(tagSet);
-
-                ref var groupList = ref entityIndexToReferenceMap.ElementAt(group.Index);
-                reader.Read("Refs", ref groupList);
-            }
-        }
-
-        void ReadEntityHandlesMap(ISerializationReader reader)
-        {
-            ref var entityHandlesMap = ref _world.GetEntityQuerier()._entityLocator;
-
-            reader.Read("EntityIdMap", ref entityHandlesMap._entityHandleMap);
-            ReadEntityIndexToReferenceMap(entityHandlesMap._entityIndexToReferenceMap, reader);
-
-            var nextFreeIndex = reader.Read<int>("NextFreeIndex");
-            TrecsDebugAssert.That(nextFreeIndex >= 0);
-
-            entityHandlesMap._nextFreeIndex = nextFreeIndex;
-        }
-
-        void ReadGroupEntityComponentsDB(ISerializationReader reader)
-        {
-            var groupEntityComponentsDB = _world.ComponentStore.GroupEntityComponentsDB;
-
-            var numItems = reader.Read<int>("Count");
-            TrecsDebugAssert.That(numItems >= 0);
-
-            TrecsDebugAssert.IsEqual(groupEntityComponentsDB.Length, numItems);
-
-            for (int i = 0; i < numItems; i++)
-            {
-                var tagSet = reader.Read<TagSet>("Group");
-                var group = _worldDef.ToGroupIndex(tagSet);
-
-                TrecsDebugAssert.IsEqual(GroupIndex.FromIndex(i), group);
-
-                var subMap = groupEntityComponentsDB[i];
-
-                var numComponents = reader.Read<int>("NumComponents");
-
-                // Per-group component slots are normally lazy (created on
-                // first entity). Snapshot/recording reads need them in place
-                // so the wire-format walk lines up with the in-memory map —
-                // materialize them eagerly here for the group we're about
-                // to populate.
-                if (numComponents > 0 && subMap.Count == 0)
+                var entry = sections.GetEntry(i);
+                ulong nameHash = 0;
+                reader.BlitRead("NameHash", ref nameHash);
+                if (nameHash != entry.NameHash)
                 {
-                    var template = _worldDef.GetResolvedTemplateForGroup(group);
-                    _world.ComponentStore.PreallocateDBGroup(group, 0, template.ComponentBuilders);
+                    throw new SerializationException(
+                        $"Custom world-state section #{i} mismatch: the stream was written "
+                            + $"with a different section than the registered '{entry.Name}'. "
+                            + "Registration names and order must match the stream."
+                    );
                 }
-                else if (numComponents == 0 && subMap.Count > 0)
+                entry.Section.Deserialize(reader);
+
+                // Inline guard check (not ReadSectionGuard) so the error names
+                // the specific custom section that drifted — with several
+                // registered sections, "AfterCustomSectionEntry" alone doesn't
+                // say whose Serialize/Deserialize pair is out of sync.
+                byte guard = 0;
+                reader.BlitRead("SectionGuard", ref guard);
+                if (guard != (byte)WorldStateSection.AfterCustomSectionEntry)
                 {
-                    // Snapshot pre-dates this group's first entity, but the
-                    // live world has since materialized it. Empty the arrays
-                    // so the group is logically empty at the restored frame.
-                    // Slots themselves stay (queries iterate Count, so an
-                    // empty-arrays group is observationally identical to a
-                    // never-materialized one) and there's nothing more to
-                    // read for this group on the wire.
-                    for (int k = 0; k < subMap.Count; k++)
-                    {
-                        subMap.UnsafeValues[k].Clear();
-                        subMap.UnsafeValues[k].SetCount(0);
-                    }
-                    continue;
-                }
-
-                TrecsDebugAssert.That(
-                    subMap.Count == numComponents,
-                    "Unexpected number of components for group {0}. Expected {1} (from snapshot), got {2} (in memory)",
-                    group,
-                    numComponents,
-                    subMap.Count
-                );
-
-                for (int k = 0; k < numComponents; k++)
-                {
-                    var componentId = reader.Read<TypeId>("TypeId");
-                    TrecsDebugAssert.IsEqual(subMap.UnsafeKeys[k].Key, componentId);
-
-                    if (ShouldSkip(group, componentId))
-                    {
-                        var count = reader.Read<int>("Count");
-                        var arr = subMap.UnsafeValues[k];
-                        arr.ResetToDefaultValuesWithCount(count);
-                        continue;
-                    }
-
-                    ReadComponentArray(subMap.UnsafeValues[k], reader);
+                    throw new SerializationException(
+                        $"Custom world-state section '{entry.Name}' stream drift: expected "
+                            + $"its trailing guard byte "
+                            + $"0x{(byte)WorldStateSection.AfterCustomSectionEntry:X2} but got "
+                            + $"0x{guard:X2}. The section's Serialize and Deserialize do not "
+                            + "consume mirrored wire data."
+                    );
                 }
             }
         }
@@ -611,24 +404,31 @@ namespace Trecs
 
             using (TrecsProfiling.Start("Reading component arrays"))
             {
-                ReadGroupEntityComponentsDB(reader);
+                _world.ComponentStore.Deserialize(
+                    reader,
+                    _worldDef,
+                    _world.ComponentArraySerializerRegistry
+                );
             }
             ReadSectionGuard(WorldStateSection.AfterComponentArrays, reader);
 
             using (TrecsProfiling.Start("Reading entity references map"))
             {
-                ReadEntityHandlesMap(reader);
+                _world.GetEntityQuerier()._entityLocator.Deserialize(reader, _worldDef);
             }
             ReadSectionGuard(WorldStateSection.AfterEntityHandles, reader);
 
             using (TrecsProfiling.Start("Reading entity sets"))
             {
-                var setStore = _world.GetSetStore();
-
-                ReadSets(setStore, reader);
-                ReadSetRoutingIndex(setStore.SetIdsByGroup, reader);
+                _world.GetSetStore().Deserialize(reader, _worldDef);
             }
             ReadSectionGuard(WorldStateSection.AfterEntitySets, reader);
+
+            using (TrecsProfiling.Start("Reading blob journal"))
+            {
+                ReadBlobJournal(reader);
+            }
+            ReadSectionGuard(WorldStateSection.AfterBlobJournal, reader);
 
             using (TrecsProfiling.Start("Reading heap memory"))
             {
@@ -644,28 +444,46 @@ namespace Trecs
             }
             ReadSectionGuard(WorldStateSection.AfterHeaps, reader);
 
+            // Capture here — see the property docs. Heap blob membership equals the stream's
+            // blob set exactly at this boundary; later sections and listeners may change it.
+            LastHeapLoadSharedBlobVersion = _world.GetSharedHeap().BlobMembershipVersion;
+            LastHeapLoadNativeBlobVersion = _world.GetNativeSharedHeap().BlobMembershipVersion;
+
             using (TrecsProfiling.Start("Reading system enable state"))
             {
                 _world.SystemEnableState.Deserialize(reader);
             }
             ReadSectionGuard(WorldStateSection.AfterSystemEnable, reader);
+
+            using (TrecsProfiling.Start("Reading custom sections"))
+            {
+                ReadCustomSections(reader);
+            }
+            ReadSectionGuard(WorldStateSection.AfterCustomSections, reader);
         }
 
         // Section markers written between major blocks of the world-state
-        // stream. Drift between a Serialize* and its Deserialize* counterpart
-        // is caught at the section boundary instead of cascading as garbage
-        // into the next block, and the assert message pinpoints which section
-        // diverged. One byte each — total cost is six bytes per snapshot.
-        // Values are chosen out of the natural range of small ints/lengths
-        // that surround them, so they're obvious in a hex dump.
+        // stream. Drift between a subsystem's Serialize and its Deserialize
+        // counterpart is caught at the section boundary instead of cascading
+        // as garbage into the next block, and the assert message pinpoints
+        // which section diverged. One byte each — total cost is a handful of
+        // bytes per snapshot. Values are chosen out of the natural range of
+        // small ints/lengths that surround them, so they're obvious in a hex
+        // dump.
         enum WorldStateSection : byte
         {
             AfterTimingFields = 0xA1,
             AfterComponentArrays = 0xA2,
             AfterEntityHandles = 0xA3,
             AfterEntitySets = 0xA4,
+            AfterBlobJournal = 0xA7,
             AfterHeaps = 0xA5,
             AfterSystemEnable = 0xA6,
+
+            // Written after each registered ICustomWorldStateSection's
+            // payload, and once after the whole custom-sections block.
+            AfterCustomSectionEntry = 0xA8,
+            AfterCustomSections = 0xA9,
         }
 
         static void WriteSectionGuard(WorldStateSection section, ISerializationWriter writer)
@@ -687,8 +505,8 @@ namespace Trecs
                 throw new SerializationException(
                     $"WorldStateSerializer stream drift: expected section guard "
                         + $"{expected} (0x{(byte)expected:X2}) but got 0x{actual:X2}. "
-                        + "A SerializeImpl section's wire format does not match its "
-                        + "DeserializeImpl counterpart."
+                        + "A section's wire format does not match its "
+                        + "deserialize counterpart."
                 );
             }
         }

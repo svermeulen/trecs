@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using NUnit.Framework;
 using Trecs.Internal;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -12,26 +12,17 @@ namespace Trecs.Tests
     public class CorruptedDataTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
+        private SerializationReadBuffer _readBuffer;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            try
-            {
-                _cacheHelper?.Dispose();
-            }
-            catch
-            {
-                // Ignore dispose errors from corrupted state
-            }
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
+            _readBuffer = new SerializationReadBuffer();
         }
 
         [Test]
@@ -48,13 +39,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<int>();
+                _helper.ReadAll<int>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -79,13 +66,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<List<int>>();
+                _helper.ReadAll<List<int>>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -110,13 +93,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<List<int>>();
+                _helper.ReadAll<List<int>>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -127,35 +106,23 @@ namespace Trecs.Tests
             var originalData = new List<int> { 1, 2, 3, 4, 5 };
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalData,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            var fullData = _cacheHelper.MemoryStream.ToArray();
+            var fullData = _data.ToContiguousBytes();
 
             // Truncate the stream (remove last 50% of data)
             var truncatedData = new byte[fullData.Length / 2];
             Array.Copy(fullData, truncatedData, truncatedData.Length);
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                var newCacheHelper = new SerializationBuffer(_serializerRegistry);
-                try
-                {
-                    newCacheHelper.LoadMemoryStreamFromArraySegment(
-                        new ArraySegment<byte>(truncatedData),
-                        truncatedData.Length
-                    );
-                    newCacheHelper.ReadAll<List<int>>();
-                }
-                finally
-                {
-                    newCacheHelper.Dispose();
-                }
+                _helper.ReadAll<List<int>>(_readBuffer.Wrap(truncatedData));
             });
         }
 
@@ -176,13 +143,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<int>();
+                _helper.ReadAll<int>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -216,13 +179,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<Dictionary<string, int>>();
+                _helper.ReadAll<Dictionary<string, int>>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -247,13 +206,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<string>();
+                _helper.ReadAll<string>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -280,15 +235,11 @@ namespace Trecs.Tests
             // Act - This might not throw but could produce unexpected results
             try
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                var result = _cacheHelper.ReadAll<bool>();
+                var result = _helper.ReadAll<bool>(_readBuffer.Wrap(memoryStream.ToArray()));
 
                 // Assert - Invalid byte values should be handled consistently
                 // Note: .NET typically treats non-zero as true, but this could be framework dependent
-                Assert.That(result == true || result == false); // Should always be a valid bool
+                NAssert.That(result == true || result == false); // Should always be a valid bool
             }
             catch (Exception)
             {
@@ -305,10 +256,9 @@ namespace Trecs.Tests
             var emptyData = new byte[0];
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(new ArraySegment<byte>(emptyData), 0);
-                _cacheHelper.ReadAll<int>();
+                _helper.ReadAll<int>(_readBuffer.Wrap(emptyData));
             });
         }
 
@@ -325,13 +275,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // Act & Assert
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ReadAll<int>();
+                _helper.ReadAll<int>(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -350,9 +296,8 @@ namespace Trecs.Tests
             // Let's try to serialize a string first to see what ID is used
             try
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll("test", TestConstants.Version, includeTypeChecks: true, 0L);
-                var data = _cacheHelper.MemoryStream.ToArray();
+                _helper.WriteAll(_data, "test", TestConstants.Version, includeTypeChecks: true, 0L);
+                var data = _data.ToContiguousBytes();
 
                 // Skip header (version + includesTypeChecks = 5 bytes)
                 if (data.Length >= 9)
@@ -374,9 +319,8 @@ namespace Trecs.Tests
             // Similar approach for bool type ID
             try
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(true, TestConstants.Version, includeTypeChecks: true, 0L);
-                var data = _cacheHelper.MemoryStream.ToArray();
+                _helper.WriteAll(_data, true, TestConstants.Version, includeTypeChecks: true, 0L);
+                var data = _data.ToContiguousBytes();
 
                 if (data.Length >= 9)
                 {

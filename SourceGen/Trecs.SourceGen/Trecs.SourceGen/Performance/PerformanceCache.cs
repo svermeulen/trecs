@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -8,41 +7,43 @@ using Microsoft.CodeAnalysis;
 namespace Trecs.SourceGen.Performance
 {
     /// <summary>
-    /// High-performance caching system for expensive symbol operations.
-    /// Reduces repeated symbol analysis and string generation during source generation.
+    /// Helpers for common symbol operations (display strings, attribute lookup, type
+    /// deduplication) used throughout the generators.
+    ///
+    /// Historically this type held static <c>ConcurrentDictionary&lt;ISymbol, …&gt;</c>
+    /// caches. Those were removed: keying a process-wide static on <see cref="ISymbol"/>
+    /// roots every <c>Compilation</c> the symbol came from for the lifetime of the host
+    /// process, so a long-running IDE session would leak unbounded memory. The underlying
+    /// operations (<c>ToDisplayString()</c>, <c>GetAttributes()</c>) are cheap enough that
+    /// recomputing them is preferable to that leak — and Roslyn already caches symbols and
+    /// attribute data per-Compilation internally. The class name is retained to avoid churn
+    /// across its many call sites.
     /// </summary>
     internal static class PerformanceCache
     {
-        private static readonly ConcurrentDictionary<ISymbol, string> _displayStringCache = new(
-            SymbolEqualityComparer.Default
-        );
-
-        private static readonly ConcurrentDictionary<ISymbol, AttributeData[]> _attributeCache =
-            new(SymbolEqualityComparer.Default);
-
         // Note: We cannot cache distinct types because order preservation is required
         // and the order may vary for the same set of types depending on context
 
         /// <summary>
-        /// Gets cached display string for a symbol, computing it only once.
+        /// Gets the display string for a symbol.
         /// </summary>
-        public static string GetDisplayString(ISymbol? symbol)
+        public static string GetDisplayString(ISymbol symbol)
         {
             if (symbol == null)
                 return string.Empty;
 
-            return _displayStringCache.GetOrAdd(symbol, s => s.ToDisplayString());
+            return symbol.ToDisplayString();
         }
 
         /// <summary>
-        /// Gets cached attributes for a symbol, computing them only once.
+        /// Gets the attributes applied to a symbol.
         /// </summary>
         public static AttributeData[] GetAttributes(ISymbol symbol)
         {
             if (symbol == null)
                 return Array.Empty<AttributeData>();
 
-            return _attributeCache.GetOrAdd(symbol, s => s.GetAttributes().ToArray());
+            return symbol.GetAttributes().ToArray();
         }
 
         /// <summary>
@@ -100,7 +101,7 @@ namespace Trecs.SourceGen.Performance
         }
 
         /// <summary>
-        /// Finds attribute by name with caching for better performance.
+        /// Finds an attribute on a symbol by name.
         /// When namespaceName is provided, also verifies the attribute's containing namespace.
         /// </summary>
         public static AttributeData? FindAttributeByName(
@@ -127,7 +128,7 @@ namespace Trecs.SourceGen.Performance
         }
 
         /// <summary>
-        /// Checks if symbol has attribute by name with caching.
+        /// Checks if a symbol has an attribute by name.
         /// When namespaceName is provided, also verifies the attribute's containing namespace.
         /// </summary>
         public static bool HasAttributeByName(
@@ -137,42 +138,6 @@ namespace Trecs.SourceGen.Performance
         )
         {
             return FindAttributeByName(symbol, attributeName, namespaceName) != null;
-        }
-
-        /// <summary>
-        /// Clears all caches. Should be called when compilation context changes.
-        /// </summary>
-        public static void ClearCaches()
-        {
-            _displayStringCache.Clear();
-            _attributeCache.Clear();
-        }
-
-        /// <summary>
-        /// Gets cache statistics for debugging and performance monitoring.
-        /// </summary>
-        public static CacheStatistics GetStatistics()
-        {
-            return new CacheStatistics
-            {
-                DisplayStringCacheSize = _displayStringCache.Count,
-                AttributeCacheSize = _attributeCache.Count,
-            };
-        }
-    }
-
-    /// <summary>
-    /// Statistics about cache usage for performance monitoring.
-    /// </summary>
-    internal class CacheStatistics
-    {
-        public int DisplayStringCacheSize { get; set; }
-        public int AttributeCacheSize { get; set; }
-
-        public override string ToString()
-        {
-            return $"SymbolCache Stats - DisplayStrings: {DisplayStringCacheSize}, "
-                + $"Attributes: {AttributeCacheSize}";
         }
     }
 }

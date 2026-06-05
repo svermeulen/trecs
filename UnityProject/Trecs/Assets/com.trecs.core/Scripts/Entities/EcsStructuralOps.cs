@@ -10,7 +10,6 @@ namespace Trecs
 
         readonly EntitySubmitter _entitySubmitter;
         readonly WorldInfo _worldInfo;
-        readonly EntityQuerier.TrecsSets _sets;
         readonly SetStore _setStore;
 
         bool _isDisposed;
@@ -19,14 +18,12 @@ namespace Trecs
             TrecsLog log,
             EntitySubmitter entitySubmitter,
             WorldInfo worldInfo,
-            EntityQuerier.TrecsSets sets,
             SetStore setStore
         )
         {
             _log = log;
             _entitySubmitter = entitySubmitter;
             _worldInfo = worldInfo;
-            _sets = sets;
             _setStore = setStore;
         }
 
@@ -114,11 +111,11 @@ namespace Trecs
             _entitySubmitter.QueueRemoveEntityOperation(entityIndex, template.ComponentBuilders);
         }
 
-        internal void RemoveAllEntitiesInGroup(GroupIndex group, int entityCount)
+        internal void RemoveAllEntitiesInGroup(GroupIndex group)
         {
             TrecsDebugAssert.That(!_isDisposed);
 
-            _entitySubmitter.QueueRemoveAllInGroup(group, entityCount);
+            _entitySubmitter.QueueRemoveAllInGroup(group);
         }
 
         internal EntitySetStorage GetSet(EntitySet entitySet)
@@ -129,17 +126,7 @@ namespace Trecs
         internal EntitySetStorage GetSet(SetId setId)
         {
             TrecsDebugAssert.That(!_isDisposed);
-
-            var sets = _sets.EntitySets;
-
-            var found = sets.TryGetValue(setId, out var result);
-            TrecsDebugAssert.That(
-                found,
-                "Set with ID '{0}' not registered. Add it to the WorldBuilder via AddSet<T>().",
-                setId
-            );
-
-            return result;
+            return _setStore.GetSet(setId);
         }
 
         internal NativeSetDeferredQueues GetDeferredQueues(SetId setId)
@@ -150,16 +137,14 @@ namespace Trecs
         internal NativeWorldAccessor GetNativeWorldAccessor(
             int accessorId,
             bool canMutateSimulation,
-            float deltaTime,
-            float elapsedTime
+            NativeWorldTickInfo tickInfo
         )
         {
             TrecsDebugAssert.That(!_isDisposed);
             return _entitySubmitter.ProvideNativeWorldAccessor(
                 accessorId,
                 canMutateSimulation,
-                deltaTime,
-                elapsedTime
+                tickInfo
             );
         }
 

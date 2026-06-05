@@ -20,7 +20,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);
@@ -37,7 +37,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);
@@ -70,16 +70,16 @@ namespace Trecs.Tests
 
             var init1 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var originalHandle = init1.Handle;
-            a.Submit();
+            a.World.Submit();
 
             // Destroy the entity — bumps the forward-map slot's Version on removal.
             a.RemoveEntity(originalHandle);
-            a.Submit();
+            a.World.Submit();
 
             // Create a new entity; the submitter should reuse the freed slot.
             var init2 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var newHandle = init2.Handle;
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(
                 originalHandle.Id,
@@ -119,7 +119,7 @@ namespace Trecs.Tests
             var init1 = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             var init2 = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 2 }).AssertComplete();
             var init3 = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 3 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var handle1 = init1.Handle;
             var handle3 = init3.Handle;
@@ -127,7 +127,7 @@ namespace Trecs.Tests
             // Removing the middle entity triggers swap-back of #3 into index 1.
             // The reverse map's int at index 1 gets rewritten with #3's Id.
             a.RemoveEntity(init2.Handle);
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);
@@ -167,7 +167,7 @@ namespace Trecs.Tests
                 "_entityIndexToReferenceMap",
                 BindingFlags.Instance | BindingFlags.NonPublic
             );
-            NAssert.IsNotNull(field, "Expected internal field _entityIndexToReferenceMap");
+            NAssert.IsNotNull(field, "Expected field _entityIndexToReferenceMap");
 
             // The field is NativeList<UnsafeList<int>>, indexed by GroupIndex.Index.
             // Inner is UnsafeList<int> (not NativeList) so the overall type is a single

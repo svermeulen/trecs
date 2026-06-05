@@ -19,7 +19,7 @@ namespace Trecs.Internal
     /// were enqueued. The struct is copyable; copies share the underlying buffer.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct NativeBag : IDisposable
+    internal struct NativeBag : IDisposable
     {
         [NoAlias]
         [NativeDisableUnsafePtrRestriction]

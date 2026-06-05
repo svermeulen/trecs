@@ -155,32 +155,18 @@ namespace Trecs
             return _nativeSharedHeap.GetBlob<T>(blobId);
         }
 
-        internal NativeSharedPtr<T> AllocNativeShared<T>(BlobId blobId, in T blob)
-            where T : unmanaged
-        {
-            TrecsDebugAssert.That(!_isDisposed);
-            return _nativeSharedHeap.CreateBlob<T>(blobId, in blob);
-        }
-
-        internal SharedPtr<T> AllocShared<T>(BlobId blobId, T blob)
-            where T : class
-        {
-            TrecsDebugAssert.That(!_isDisposed);
-            return _sharedHeap.CreateBlob<T>(blobId, blob);
-        }
-
         internal bool TryAllocShared<T>(BlobId blobId, out SharedPtr<T> ptr)
             where T : class
         {
             TrecsDebugAssert.That(!_isDisposed);
-            return _sharedHeap.TryGetBlob<T>(blobId, out ptr);
+            return _sharedHeap.TryGetBlobById<T>(blobId, out ptr);
         }
 
         internal SharedPtr<T> AllocShared<T>(BlobId blobId)
             where T : class
         {
             TrecsDebugAssert.That(!_isDisposed);
-            return _sharedHeap.GetBlob<T>(blobId);
+            return _sharedHeap.GetBlobById<T>(blobId);
         }
 
         internal UniquePtr<T> AllocUnique<T>()

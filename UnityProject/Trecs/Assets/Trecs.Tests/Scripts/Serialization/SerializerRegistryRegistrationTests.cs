@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
 using Trecs.Serialization;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -21,73 +21,75 @@ namespace Trecs.Tests
         [Test]
         public void RegisterSerializer_Generic_AddsExpectedSerializer()
         {
-            _registry.RegisterSerializer<ListSerializer<int>>();
+            _registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
 
-            Assert.IsTrue(_registry.HasSerializer<List<int>>());
-            Assert.IsInstanceOf<ListSerializer<int>>(_registry.GetSerializer<List<int>>());
+            NAssert.IsTrue(_registry.HasSerializer<List<int>>());
+            NAssert.IsInstanceOf<ListSerializerUnmanaged<int>>(
+                _registry.GetSerializer<List<int>>()
+            );
         }
 
         [Test]
         public void RegisterSerializer_GenericTwice_SecondCallIsNoOp()
         {
-            _registry.RegisterSerializer<ListSerializer<int>>();
+            _registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
             var first = _registry.GetSerializer<List<int>>();
 
             // Same Type registered again — should be silently deduped.
-            _registry.RegisterSerializer<ListSerializer<int>>();
+            _registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
 
-            Assert.AreSame(first, _registry.GetSerializer<List<int>>());
+            NAssert.AreSame(first, _registry.GetSerializer<List<int>>());
         }
 
         [Test]
         public void RegisterSerializer_RuntimeTypeTwice_SecondCallIsNoOp()
         {
-            _registry.RegisterSerializer(typeof(ListSerializer<int>));
+            _registry.RegisterSerializer(typeof(ListSerializerUnmanaged<int>));
             var first = _registry.GetSerializer<List<int>>();
 
-            _registry.RegisterSerializer(typeof(ListSerializer<int>));
+            _registry.RegisterSerializer(typeof(ListSerializerUnmanaged<int>));
 
-            Assert.AreSame(first, _registry.GetSerializer<List<int>>());
+            NAssert.AreSame(first, _registry.GetSerializer<List<int>>());
         }
 
         [Test]
         public void RegisterSerializer_GenericAfterRuntimeType_StillDedupes()
         {
-            _registry.RegisterSerializer(typeof(ListSerializer<int>));
+            _registry.RegisterSerializer(typeof(ListSerializerUnmanaged<int>));
             var first = _registry.GetSerializer<List<int>>();
 
             // Same underlying Type via the generic path — should still dedup.
-            _registry.RegisterSerializer<ListSerializer<int>>();
+            _registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
 
-            Assert.AreSame(first, _registry.GetSerializer<List<int>>());
+            NAssert.AreSame(first, _registry.GetSerializer<List<int>>());
         }
 
         [Test]
         public void RegisterSerializer_InstanceThenGeneric_Throws()
         {
-            _registry.RegisterSerializer(new ListSerializer<int>());
+            _registry.RegisterSerializer(new ListSerializerUnmanaged<int>());
 
             // Instance registration is exclusive — even the same serializer Type
             // can't be re-registered via the generic overload afterward.
             TrecsDebugAssert.Throws<TrecsException>(() =>
-                _registry.RegisterSerializer<ListSerializer<int>>()
+                _registry.RegisterSerializer<ListSerializerUnmanaged<int>>()
             );
         }
 
         [Test]
         public void RegisterSerializer_GenericThenInstance_Throws()
         {
-            _registry.RegisterSerializer<ListSerializer<int>>();
+            _registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
 
             TrecsDebugAssert.Throws<TrecsException>(() =>
-                _registry.RegisterSerializer(new ListSerializer<int>())
+                _registry.RegisterSerializer(new ListSerializerUnmanaged<int>())
             );
         }
 
         [Test]
         public void RegisterSerializer_TwoDifferentTypesSameTarget_Throws()
         {
-            _registry.RegisterSerializer<ListSerializer<int>>();
+            _registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
 
             // Different serializer Type targeting the same object type — bug,
             // should throw rather than silently overwrite.
@@ -104,7 +106,7 @@ namespace Trecs.Tests
 
             _registry.RegisterSerializerDelta<BlitSerializer<int>>();
 
-            Assert.AreSame(first, _registry.GetSerializerDelta<int>());
+            NAssert.AreSame(first, _registry.GetSerializerDelta<int>());
         }
 
         [Test]
@@ -115,7 +117,7 @@ namespace Trecs.Tests
 
             _registry.RegisterSerializerDelta(typeof(BlitSerializer<int>));
 
-            Assert.AreSame(first, _registry.GetSerializerDelta<int>());
+            NAssert.AreSame(first, _registry.GetSerializerDelta<int>());
         }
 
         [Test]
@@ -134,7 +136,7 @@ namespace Trecs.Tests
             CountingSerializer.ConstructionCount = 0;
 
             _registry.RegisterSerializer<CountingSerializer>();
-            Assert.AreEqual(
+            NAssert.AreEqual(
                 0,
                 CountingSerializer.ConstructionCount,
                 "Type-based registration must not eagerly construct the serializer"
@@ -142,19 +144,19 @@ namespace Trecs.Tests
 
             // HasSerializer must reflect the pending registration without
             // forcing materialization.
-            Assert.IsTrue(_registry.HasSerializer<CountingTarget>());
-            Assert.AreEqual(0, CountingSerializer.ConstructionCount);
+            NAssert.IsTrue(_registry.HasSerializer<CountingTarget>());
+            NAssert.AreEqual(0, CountingSerializer.ConstructionCount);
 
             var first = _registry.GetSerializer<CountingTarget>();
-            Assert.AreEqual(1, CountingSerializer.ConstructionCount);
+            NAssert.AreEqual(1, CountingSerializer.ConstructionCount);
 
             var second = _registry.GetSerializer<CountingTarget>();
-            Assert.AreEqual(
+            NAssert.AreEqual(
                 1,
                 CountingSerializer.ConstructionCount,
                 "Materialized instance must be cached"
             );
-            Assert.AreSame(first, second);
+            NAssert.AreSame(first, second);
         }
 
         sealed class AlternateListIntSerializer : ISerializer<List<int>>

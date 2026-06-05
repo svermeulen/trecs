@@ -42,7 +42,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<NSRTestSet>();
@@ -75,7 +75,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<NSRTestSet>();

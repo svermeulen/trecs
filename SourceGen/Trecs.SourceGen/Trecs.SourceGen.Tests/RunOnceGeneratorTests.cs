@@ -429,4 +429,51 @@ public class RunOnceGeneratorTests
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
     }
+
+    [Test]
+    public void RunOnce_FromGlobalEntity_GlobalsTagUnresolvable_ReportsTRECS119()
+    {
+        // TRECS119 fires when [FromGlobalEntity] is used but the attribute's containing
+        // assembly does not expose Trecs.TrecsTags.Globals (real-world cause: the assembly
+        // uses [FromGlobalEntity] without referencing com.trecs.core). InlineTagsParser
+        // resolves Globals from FromGlobalEntityAttribute.ContainingAssembly, so to reach
+        // the failure path the compilation must define [FromGlobalEntity] but omit
+        // TrecsTags.Globals — hence a self-contained source compiled WITHOUT the default
+        // stubs (which always define TrecsTags.Globals).
+        const string source = """
+            namespace Trecs
+            {
+                public interface ITag { }
+                public interface IEntityComponent { }
+
+                [System.AttributeUsage(System.AttributeTargets.Parameter | System.AttributeTargets.Field)]
+                public sealed class FromGlobalEntityAttribute : System.Attribute { }
+
+                // NOTE: deliberately NO TrecsTags.Globals here — that is the whole point.
+            }
+
+            namespace Sample
+            {
+                public struct CScore : Trecs.IEntityComponent { public int V; }
+
+                public partial class MySystem
+                {
+                    void Execute([Trecs.FromGlobalEntity] in CScore score) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.RunWithoutDefaultStubs(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[] { new RunOnceGenerator() },
+            source
+        );
+
+        Assert.That(
+            run.GenDiagnostics.Any(d => d.Id == "TRECS119"),
+            Is.True,
+            "Expected TRECS119 ([FromGlobalEntity] could not resolve TrecsTags.Globals) "
+                + "when the attribute's assembly does not expose TrecsTags.Globals. Got: "
+                + run.Format()
+        );
+    }
 }

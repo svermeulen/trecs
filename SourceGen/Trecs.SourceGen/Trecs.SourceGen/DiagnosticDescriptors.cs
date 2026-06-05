@@ -201,6 +201,15 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
+        public static readonly DiagnosticDescriptor ComponentMustBePartial = new(
+            id: "TRECS132",
+            title: "Component must be partial",
+            messageFormat: "Component '{0}' must be marked as partial since it implements IEntityComponent — the source generator attaches Equals/GetHashCode/== /!= (and, for [Unwrap] components, a convenience constructor) to a partial half",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         // Template diagnostics (TRECS030-039)
 
         public static readonly DiagnosticDescriptor TemplateMustBePartial = new(
@@ -682,7 +691,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // ── [NonCopyable] enforcement (TRECS118-119) ──────────────────────────────
+        // ── [NonCopyable] enforcement (TRECS118, TRECS131, TRECS120, TRECS133) ─────
 
         public static readonly DiagnosticDescriptor NonCopyableByValueLocal = new(
             id: "TRECS118",
@@ -695,7 +704,7 @@ namespace Trecs.SourceGen
         );
 
         public static readonly DiagnosticDescriptor NonCopyableByValueParameter = new(
-            id: "TRECS119",
+            id: "TRECS131",
             title: "[NonCopyable] struct must not be passed by value",
             messageFormat: "Parameter '{0}' of type '{1}' is [NonCopyable] and must be declared 'ref', 'in', or 'out' — "
                 + "not by value — so mutations affect the caller's storage",
@@ -708,6 +717,18 @@ namespace Trecs.SourceGen
             id: "TRECS120",
             title: "[NonCopyable] and [Copyable] cannot both be applied",
             messageFormat: "Struct '{0}' carries both [NonCopyable] and [Copyable]; remove one — they are contradictory",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor NonCopyableReadonlyRefMemberAccess = new(
+            id: "TRECS133",
+            title: "[NonCopyable] member invoked through a read-only reference makes a silent defensive copy",
+            messageFormat: "Member '{0}' on [NonCopyable] type '{1}' is not 'readonly' and is invoked through a read-only "
+                + "reference (an 'in' parameter or a 'ref readonly' local). The compiler emits a hidden defensive copy of the "
+                + "receiver, so any mutation lands on the throwaway copy — and a pointer-backed wrapper can be left aliasing "
+                + "freed storage. Pass the receiver by 'ref', or mark '{0}' 'readonly' if it genuinely does not mutate.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -834,6 +855,60 @@ namespace Trecs.SourceGen
                 + "would point into storage that was freed when the previous input frame was retired — a silent "
                 + "use-after-free. Either switch to MissingInputBehavior.Reset, or move the pointed-to data out "
                 + "of the input component.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor CascadeRemoveInvalidFieldType = new(
+            id: "TRECS134",
+            title: "[CascadeRemove] field must be EntityHandle or TrecsList<EntityHandle>",
+            messageFormat: "Field '{0}' of component '{1}' is marked [CascadeRemove] but has type '{2}'. "
+                + "[CascadeRemove] removes referenced entities, so it is only valid on an EntityHandle "
+                + "field or a TrecsList<EntityHandle> field. Remove the attribute or change the field type.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor DisposeOnRemoveInvalidFieldType = new(
+            id: "TRECS135",
+            title: "[DisposeOnRemove] field must be a disposable Trecs heap type",
+            messageFormat: "Field '{0}' of component '{1}' is marked [DisposeOnRemove] but has type '{2}'. "
+                + "[DisposeOnRemove] frees heap-backed storage, so it is only valid on TrecsList<T>, UniquePtr<T>, "
+                + "SharedPtr<T>, NativeUniquePtr<T>, or NativeSharedPtr<T>. Remove the attribute or change the field type.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        // ── Blob determinism-domain field rules (TRECS136-137) ──────────────
+        // See trecs docs/maintainers/maintainer-docs/blob-determinism-domains.md.
+
+        public static readonly DiagnosticDescriptor PersistentComponentHasInputPtrField = new(
+            id: "TRECS136",
+            title: "Persistent component must not contain input-pointer fields",
+            messageFormat: "Field '{0}' of component '{1}' on non-[Input] template field '{2}' has input-pointer type '{3}'. "
+                + "Input pointers are frame-scoped: the input heap only guarantees the blob for the frame that "
+                + "delivered it (retention beyond that depends on attached history lockers — non-deterministic), "
+                + "so a retained {3} read later is a silent desync vector, and snapshotting one stores a bare id "
+                + "replay cannot honor. Convert the in-hand payload to a simulation-owned handle in the frame "
+                + "that delivers it — SharedPtr.Acquire(world, inputPtr) / NativeSharedPtr.Acquire(world, inputPtr) "
+                + "— and store that instead.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor ComponentHasAnchorField = new(
+            id: "TRECS137",
+            title: "Component must not contain anchor fields",
+            messageFormat: "Field '{0}' of component '{1}' on template field '{2}' has anchor type '{3}'. "
+                + "Anchors are ambient pins on the (non-snapshotted) BlobCache: their PtrHandle is a live cache "
+                + "handle, so serializing one through a snapshot or input stream resurrects a stale handle that "
+                + "can unpin an unrelated blob. Components must hold SharedPtr<T>/NativeSharedPtr<T> (the "
+                + "snapshotted, refcounted handles) instead; anchors belong in non-ECS holders (seeders, async "
+                + "loaders, editor tools).",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

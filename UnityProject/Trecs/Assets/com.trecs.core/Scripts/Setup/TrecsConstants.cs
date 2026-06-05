@@ -22,7 +22,7 @@ namespace Trecs
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static class TrecsConstants
+    internal static class TrecsConstants
     {
         public const int RecordingSentinelValue = 584488256;
 
@@ -40,6 +40,13 @@ namespace Trecs.Internal
         /// <see cref="SerializationException"/> on mismatch — failing
         /// loudly beats silently misinterpreting an older layout.
         /// </summary>
-        public const byte CurrentBundleFormatVersion = 5;
+        // 6: BundleHeader gains SchemaFingerprint (WorldSchemaFingerprint).
+        // 7: WorldSchemaFingerprint gains CustomSectionsHash (blit layout
+        //    grows by 8 bytes); world-state streams gain a trailing
+        //    CustomSections block.
+        // 8: the header's IterableHashSet<BlobId> switches from per-element
+        //    writes to the internal-structure blit form
+        //    (IterableHashSetSerializer).
+        public const byte CurrentBundleFormatVersion = 8;
     }
 }

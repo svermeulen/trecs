@@ -29,7 +29,7 @@ namespace Trecs
     /// address, producing garbage reads. Use <c>ref readonly var</c>,
     /// <c>in BlobArray&lt;T&gt;</c> parameters, or repeated field access
     /// (<c>blob.Heights[i]</c>) to keep accesses going through the original
-    /// field's address. The <c>NonCopyableAnalyzer</c> (TRECS118 / TRECS119)
+    /// field's address. The <c>NonCopyableAnalyzer</c> (TRECS118 / TRECS131)
     /// catches by-value local copies and non-<c>in</c> parameter passes at
     /// compile time; the rule propagates transitively, so blob roots
     /// containing a <see cref="BlobArray{T}"/> field must also be marked

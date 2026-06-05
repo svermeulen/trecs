@@ -1,6 +1,4 @@
-using System;
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -395,11 +393,9 @@ namespace Trecs.Tests
                 return;
             }
             _hasAllocated = true;
-            var _ = InputSharedPtr.Alloc<WritePhaseHeapPayload>(
-                World,
-                BlobIdGenerator.FromKey(1),
-                new WritePhaseHeapPayload()
-            );
+            // Content-addressed Alloc hashes (serializes) the value, so use a registry-serializable
+            // payload (string); this system only exercises the input-role frame-scoped-alloc gate.
+            var _ = InputSharedPtr.Alloc(World, "input-frame-scoped-payload");
         }
     }
 
@@ -410,9 +406,9 @@ namespace Trecs.Tests
         {
             // Persistent (non-frame-scoped) allocation must be rejected from
             // the Input role with the "use the FrameScoped variant" message.
-            var _ = SharedPtr.Alloc<WritePhaseHeapPayload>(
+            var _ = BlobTestUtil.AllocShared<WritePhaseHeapPayload>(
                 World,
-                BlobIdGenerator.FromKey(1),
+                new BlobId(1),
                 new WritePhaseHeapPayload()
             );
         }
@@ -611,65 +607,33 @@ namespace Trecs.Tests
         // all three branches of the access rules against the same entity.
         static Template MakeTemplate()
         {
-            return new Template(
-                debugName: "WritePhaseTemplate",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<WritePhaseSimComp>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(WritePhaseSimComp)
-                    ),
-                    new ComponentDeclaration<WritePhaseRenderComp>(
-                        variableUpdateOnly: true,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(WritePhaseRenderComp)
-                    ),
-                    new ComponentDeclaration<WritePhaseConstantComp>(
-                        null,
-                        null,
-                        null,
-                        isConstant: true,
-                        null,
-                        default(WritePhaseConstantComp)
-                    ),
-                    new ComponentDeclaration<WritePhaseInputComp>(
-                        null,
-                        isInput: true,
-                        inputFrameBehaviour: MissingInputBehavior.Retain,
-                        null,
-                        null,
-                        default(WritePhaseInputComp)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Alpha, Tag<WritePhaseSetTag>.Value }
-            );
+            return TestTemplate
+                .Named("WritePhaseTemplate")
+                .WithTags(TestTags.Alpha, Tag<WritePhaseSetTag>.Value)
+                .WithComponent<WritePhaseSimComp>(default(WritePhaseSimComp))
+                .WithComponent<WritePhaseRenderComp>(
+                    default(WritePhaseRenderComp),
+                    variableUpdateOnly: true
+                )
+                .WithComponent<WritePhaseConstantComp>(
+                    default(WritePhaseConstantComp),
+                    isConstant: true
+                )
+                .WithComponent<WritePhaseInputComp>(
+                    default(WritePhaseInputComp),
+                    isInput: true,
+                    missingInputBehavior: MissingInputBehavior.Retain
+                );
         }
 
         TestEnvironment CreateEnvWithSystem(ISystem system)
         {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeTemplate())
-                .AddSet<WritePhaseTestSet>()
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
-
-            var world = builder.Build();
-            world.AddSystem(system);
-            world.Initialize();
-
-            var env = new TestEnvironment(world);
+            var env = EcsTestHelper.CreateEnvironment(
+                configure: b => b.AddSet<WritePhaseTestSet>().AddSystem(system),
+                MakeTemplate()
+            );
             env.Accessor.AddEntity(TestTags.Alpha).AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
             return env;
         }
 

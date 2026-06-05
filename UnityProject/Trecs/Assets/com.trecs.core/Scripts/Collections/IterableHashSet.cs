@@ -38,6 +38,14 @@ namespace Trecs.Collections
             get => _dictionary.UnsafeKeys;
         }
 
+        // Exposes the backing dictionary so IterableHashSetSerializer can blit its
+        // internal structure directly (same shape as IterableDictionarySerializerUnmanaged).
+        internal IterableDictionary<T, HashSetEmptyValue> UnsafeInnerDictionary
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _dictionary;
+        }
+
         public int Count
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

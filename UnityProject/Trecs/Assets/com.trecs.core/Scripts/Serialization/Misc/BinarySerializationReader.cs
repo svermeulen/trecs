@@ -13,7 +13,7 @@ namespace Trecs
 
         long _flags;
         int _version;
-        bool _includesTypeChecks;
+        bool _includeTypeChecks;
 
         ReadOnlyMemory<byte> _data;
         int _offset;
@@ -48,41 +48,84 @@ namespace Trecs
             return (_flags & flag) != 0;
         }
 
-        public void Start(ReadOnlyMemory<byte> data)
+        /// <summary>
+        /// Begin reading from an <see cref="IReadOnlySerializationData"/> — a retained in-memory
+        /// <see cref="SerializationData"/>, or a <see cref="ContiguousSerializationData"/> view that
+        /// sliced the sections off a loaded blob. Zero copy of the data section. Finish with
+        /// <see cref="Complete"/> (full read) or <see cref="CompletePartial"/> (deliberate peek).
+        /// </summary>
+        public void Start(IReadOnlySerializationData data)
         {
             TrecsDebugAssert.That(!_hasStarted);
 
             _hasStarted = true;
-            _data = data;
+            _version = data.Version;
+            _flags = data.Flags;
+            _includeTypeChecks = data.IncludeTypeChecks;
+
+            _data = data.Data;
             _offset = 0;
 
-            var span = _data.Span;
-            (_version, _flags, _includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
-                span,
-                ref _offset
-            );
-
-            _log.Trace("Completed reading header at offset {0}", _offset);
-
-            var offsetBefore = _offset;
-            _bitReader.Reset(span, ref _offset);
-            _log.Trace("Bit fields read in {0} bytes", _offset - offsetBefore);
+            _bitReader.Reset(data.BitFieldBytes.Span, data.BitFieldBitCount);
         }
 
         /// <summary>
-        /// Finish reading. When <paramref name="verifySentinel"/> is true, the
-        /// sentinel is read and validated. When false, no further reads occur.
+        /// Finish a complete read, verifying the reader consumed the data section exactly. A
+        /// mismatch means a serializer read a different number of bytes than were written —
+        /// truncated/corrupt/version-mismatched data when the section was sliced off a loaded blob
+        /// (<see cref="ContiguousSerializationData"/>), or a read/write desync for a retained
+        /// in-memory snapshot. For a deliberate partial read use <see cref="CompletePartial"/>.
         /// </summary>
-        public void Stop(bool verifySentinel)
+        public void Complete()
+        {
+            TrecsDebugAssert.That(_hasStarted);
+            _hasStarted = false;
+
+            // Capture the bit-section consumption state, then release the bit reader
+            // BEFORE the integrity checks below — Complete must release it even when
+            // throwing, or a caller that catches and reuses this reader would trip
+            // BitReader.Reset's not-started assert on the next Start.
+            int consumedBits = _bitReader.ConsumedBitCount;
+            int totalBits = _bitReader.BitCount;
+            _bitReader.Complete();
+
+            if (_offset != _data.Length)
+            {
+                // Thrown (not a debug assert) because, now that the wire form carries an explicit
+                // data-section length and no end-of-payload sentinel, this is the integrity check
+                // that catches truncated/corrupt/version-mismatched payloads — in release too.
+                throw new SerializationException(
+                    $"Incomplete deserialization — consumed {_offset} of {_data.Length} "
+                        + "data-section bytes. Truncated, corrupt, or version-mismatched payload."
+                );
+            }
+
+            // The bit-field section must be fully consumed too: leftover bits mean a
+            // read/write desync in the bit stream (e.g. a null-bit or delta-changed-bit
+            // the read path skipped) even when the data-section byte counts line up.
+            if (consumedBits != totalBits)
+            {
+                throw new SerializationException(
+                    $"Incomplete deserialization — consumed {consumedBits} of "
+                        + $"{totalBits} bit-field bits. A serializer's read path "
+                        + "consumed fewer bits than its write path emitted."
+                );
+            }
+
+            _data = default;
+        }
+
+        /// <summary>
+        /// Finish a deliberately partial read (e.g. peeking only a leading
+        /// metadata field). Performs no end-of-stream validation — neither the
+        /// sentinel check nor the fully-consumed check — because the caller is
+        /// expected to stop before the end of the payload.
+        /// </summary>
+        public void CompletePartial()
         {
             TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
             _bitReader.Complete();
-
-            if (verifySentinel)
-            {
-                VerifySentinel();
-            }
             _data = default;
         }
 
@@ -93,44 +136,8 @@ namespace Trecs
             _offset = 0;
             _flags = 0;
             _version = 0;
-            _includesTypeChecks = false;
+            _includeTypeChecks = false;
             _bitReader.ResetForErrorRecovery();
-        }
-
-        /// <summary>
-        /// Verify the payload-level <see cref="SerializationConstants.EndOfPayloadMarker"/>
-        /// that <see cref="BinarySerializationWriter"/> appends to every stream.
-        /// Distinct from the ECS-state-level guard inside <c>WorldStateSerializer</c>
-        /// (<c>WorldStateStreamGuard</c>), which is checked during <c>DeserializeState</c>.
-        /// </summary>
-        void VerifySentinel()
-        {
-            // SerializationException (not TrecsDebugAssert) because the end-
-            // of-payload sentinel is the primary defense against truncated /
-            // corrupt streams and must fire in release builds too. Stripping
-            // the check in release would let downstream code silently consume
-            // an incomplete payload as if it were valid.
-            var span = _data.Span;
-            if (_offset >= span.Length)
-            {
-                throw new SerializationException(
-                    "Data corruption detected — missing end-of-payload marker. "
-                        + "This indicates truncated data or incomplete serialization."
-                );
-            }
-
-            byte sentinel = span[_offset];
-            _offset++;
-            if (sentinel != SerializationConstants.EndOfPayloadMarker)
-            {
-                throw new SerializationException(
-                    $"Data corruption detected — expected end-of-payload marker "
-                        + $"0x{SerializationConstants.EndOfPayloadMarker:X2} but found "
-                        + $"0x{sentinel:X2}. This indicates incomplete deserialization, "
-                        + "corrupted data, or version mismatch."
-                );
-            }
-            _log.Trace("Verified end-of-payload marker");
         }
 
         public bool ReadBit()
@@ -206,7 +213,7 @@ namespace Trecs
                 return;
             }
 
-            if (_includesTypeChecks)
+            if (_includeTypeChecks)
             {
                 var savedType = TypeIdSerializer.Read(_data.Span, ref _offset);
                 TrecsDebugAssert.That(
@@ -328,7 +335,7 @@ namespace Trecs
                 }
             }
 
-            if (_includesTypeChecks)
+            if (_includeTypeChecks)
             {
                 var savedType = TypeIdSerializer.Read(_data.Span, ref _offset);
                 TrecsDebugAssert.That(

@@ -94,15 +94,14 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var world = env.Accessor;
 
-            var ptr = SharedPtr.Alloc(
+            var ptr = BlobTestUtil.AllocShared(
                 world,
-                BlobIdGenerator.FromKey(1),
+                new BlobId(1),
                 new TestHeapObject { Value = 55 }
             );
-            NAssert.IsFalse(ptr.Handle.IsNull);
+            NAssert.IsFalse(ptr.IsNull);
 
-            var sharedHeap = world.SharedHeap;
-            var resolved = sharedHeap.GetBlob<TestHeapObject>(ptr.Handle);
+            var resolved = ptr.Get(world);
             NAssert.AreEqual(55, resolved.Value);
         }
 
@@ -112,18 +111,16 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var world = env.Accessor;
 
-            var ptr = SharedPtr.Alloc(
+            var ptr = BlobTestUtil.AllocShared(
                 world,
-                BlobIdGenerator.FromKey(1),
+                new BlobId(1),
                 new TestHeapObject { Value = 33 }
             );
-            var sharedHeap = world.SharedHeap;
+            NAssert.IsTrue(ptr.CanGet(world));
 
-            NAssert.IsTrue(sharedHeap.CanGetBlob(ptr.Handle));
+            ptr.Dispose(world);
 
-            sharedHeap.DisposeHandle(ptr.Handle);
-
-            NAssert.IsFalse(sharedHeap.CanGetBlob(ptr.Handle));
+            NAssert.IsFalse(ptr.CanGet(world));
         }
 
         [Test]
@@ -132,29 +129,28 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var world = env.Accessor;
 
-            var ptr1 = SharedPtr.Alloc(
+            var ptr1 = BlobTestUtil.AllocShared(
                 world,
-                BlobIdGenerator.FromKey(1),
+                new BlobId(1),
                 new TestHeapObject { Value = 10 }
             );
-            var ptr2 = SharedPtr.Alloc(
+            var ptr2 = BlobTestUtil.AllocShared(
                 world,
-                BlobIdGenerator.FromKey(2),
+                new BlobId(2),
                 new TestHeapObject { Value = 20 }
             );
 
-            NAssert.AreNotEqual(ptr1.Handle, ptr2.Handle);
+            NAssert.AreNotEqual(ptr1.Id, ptr2.Id);
 
-            var sharedHeap = world.SharedHeap;
-            NAssert.AreEqual(10, sharedHeap.GetBlob<TestHeapObject>(ptr1.Handle).Value);
-            NAssert.AreEqual(20, sharedHeap.GetBlob<TestHeapObject>(ptr2.Handle).Value);
+            NAssert.AreEqual(10, ptr1.Get(world).Value);
+            NAssert.AreEqual(20, ptr2.Get(world).Value);
 
             // Dispose first, second still valid
-            sharedHeap.DisposeHandle(ptr1.Handle);
-            NAssert.IsTrue(sharedHeap.CanGetBlob(ptr2.Handle));
-            NAssert.IsFalse(sharedHeap.CanGetBlob(ptr1.Handle));
+            ptr1.Dispose(world);
+            NAssert.IsTrue(ptr2.CanGet(world));
+            NAssert.IsFalse(ptr1.CanGet(world));
 
-            sharedHeap.DisposeHandle(ptr2.Handle);
+            ptr2.Dispose(world);
         }
 
         #endregion
@@ -168,7 +164,7 @@ namespace Trecs.Tests
             var world = env.Accessor;
 
             var data = 42;
-            var ptr = NativeSharedPtr.Alloc(world, BlobIdGenerator.FromKey(1), in data);
+            var ptr = BlobTestUtil.AllocNativeShared(world, new BlobId(1), in data);
 
             NAssert.IsFalse(
                 ptr.GetBlobId(world).IsNull,
@@ -184,9 +180,84 @@ namespace Trecs.Tests
 
             var blobId = new BlobId(99999);
             var data = 123;
-            var ptr = NativeSharedPtr.Alloc(world, blobId, in data);
+            var ptr = BlobTestUtil.AllocNativeShared(world, blobId, in data);
 
             NAssert.AreEqual(blobId, ptr.GetBlobId(world));
+        }
+
+        #endregion
+
+        #region Content-addressed Alloc (no caller-supplied id)
+
+        [Test]
+        public void NativeSharedPtr_AllocContentAddressed_EqualValuesDedup()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var world = env.Accessor;
+
+            var a = NativeSharedPtr.Alloc<int>(world, 42);
+            var b = NativeSharedPtr.Alloc<int>(world, 42);
+            var c = NativeSharedPtr.Alloc<int>(world, 99);
+
+            // Equal content -> same content-addressed id (dedup); different content -> different id.
+            NAssert.AreEqual(a.GetBlobId(world), b.GetBlobId(world));
+            NAssert.AreNotEqual(a.GetBlobId(world), c.GetBlobId(world));
+
+            a.Dispose(world);
+            b.Dispose(world);
+            c.Dispose(world);
+        }
+
+        [Test]
+        public void NativeSharedAnchor_AllocContentAddressed_EqualValuesDedup()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var world = env.Accessor;
+
+            var a = NativeSharedAnchor.Alloc<int>(world, 7);
+            var b = NativeSharedAnchor.Alloc<int>(world, 7);
+
+            NAssert.AreEqual(a.BlobId, b.BlobId);
+
+            a.Dispose(world);
+            b.Dispose(world);
+        }
+
+        [Test]
+        public void BlobIdGenerator_FromContent_IsDeterministicAndContentKeyed()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var world = env.Accessor;
+
+            var a = BlobIdGenerator.FromContent(world, 42);
+            var b = BlobIdGenerator.FromContent(world, 42);
+            var c = BlobIdGenerator.FromContent(world, 99);
+
+            // Equal values hash to the same content id; different values to different ids.
+            NAssert.AreEqual(a, b, "equal values hash to the same content id");
+            NAssert.AreNotEqual(a, c, "different values hash to different ids");
+            NAssert.IsFalse(a.IsNull, "a content id is never the null blob id");
+        }
+
+        [Test]
+        public void SharedPtr_AllocContentAddressed_EqualValuesDedup()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var world = env.Accessor;
+
+            // string is registered for serialization and on the immutable allowlist, so it exercises
+            // the managed serialize+hash content-addressing path end to end.
+            var a = SharedPtr.Alloc<string>(world, "hello");
+            var b = SharedPtr.Alloc<string>(world, "hello");
+            var c = SharedPtr.Alloc<string>(world, "world");
+
+            NAssert.AreEqual(a.Id, b.Id);
+            NAssert.AreNotEqual(a.Id, c.Id);
+            NAssert.AreEqual("hello", a.Get(world));
+
+            a.Dispose(world);
+            b.Dispose(world);
+            c.Dispose(world);
         }
 
         #endregion

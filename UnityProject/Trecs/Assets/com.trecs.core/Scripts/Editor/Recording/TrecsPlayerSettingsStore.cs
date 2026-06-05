@@ -18,9 +18,9 @@ namespace Trecs.Internal
     [InitializeOnLoad]
     static class TrecsPlayerSettingsStore
     {
-        const string AnchorIntervalKey = "Trecs.RecorderSettings.AnchorIntervalSeconds";
+        const string KeyframeIntervalKey = "Trecs.RecorderSettings.KeyframeIntervalSeconds";
         const string ScrubCacheIntervalKey = "Trecs.RecorderSettings.ScrubCacheIntervalSeconds";
-        const string MaxAnchorCountKey = "Trecs.RecorderSettings.MaxAnchorCount";
+        const string MaxKeyframeCountKey = "Trecs.RecorderSettings.MaxKeyframeCount";
 
         // long → stored as string since EditorPrefs only exposes int. Default
         // 64 MB fits in int but users may push past 2 GB on big projects.
@@ -28,9 +28,9 @@ namespace Trecs.Internal
 
         // Keep these in sync with TrecsRewindBufferSettings's field defaults
         // — used only when the EditorPref is absent (first run / fresh user).
-        const float DefaultAnchorIntervalSeconds = 30f;
+        const float DefaultKeyframeIntervalSeconds = 30f;
         const float DefaultScrubCacheIntervalSeconds = 1f;
-        const int DefaultMaxAnchorCount = 0;
+        const int DefaultMaxKeyframeCount = 0;
         const long DefaultMaxScrubCacheBytes = 64L * 1024 * 1024;
 
         static TrecsPlayerSettingsStore()
@@ -44,14 +44,14 @@ namespace Trecs.Internal
             };
         }
 
-        public static float AnchorIntervalSeconds =>
-            EditorPrefs.GetFloat(AnchorIntervalKey, DefaultAnchorIntervalSeconds);
+        public static float KeyframeIntervalSeconds =>
+            EditorPrefs.GetFloat(KeyframeIntervalKey, DefaultKeyframeIntervalSeconds);
 
         public static float ScrubCacheIntervalSeconds =>
             EditorPrefs.GetFloat(ScrubCacheIntervalKey, DefaultScrubCacheIntervalSeconds);
 
-        public static int MaxAnchorCount =>
-            EditorPrefs.GetInt(MaxAnchorCountKey, DefaultMaxAnchorCount);
+        public static int MaxKeyframeCount =>
+            EditorPrefs.GetInt(MaxKeyframeCountKey, DefaultMaxKeyframeCount);
 
         public static long MaxScrubCacheBytes =>
             long.TryParse(
@@ -67,15 +67,15 @@ namespace Trecs.Internal
                 : DefaultMaxScrubCacheBytes;
 
         public static void Save(
-            float anchorIntervalSeconds,
+            float keyframeIntervalSeconds,
             float scrubCacheIntervalSeconds,
-            int maxAnchorCount,
+            int maxKeyframeCount,
             long maxScrubCacheBytes
         )
         {
-            EditorPrefs.SetFloat(AnchorIntervalKey, anchorIntervalSeconds);
+            EditorPrefs.SetFloat(KeyframeIntervalKey, keyframeIntervalSeconds);
             EditorPrefs.SetFloat(ScrubCacheIntervalKey, scrubCacheIntervalSeconds);
-            EditorPrefs.SetInt(MaxAnchorCountKey, maxAnchorCount);
+            EditorPrefs.SetInt(MaxKeyframeCountKey, maxKeyframeCount);
             EditorPrefs.SetString(
                 MaxScrubCacheBytesKey,
                 maxScrubCacheBytes.ToString(CultureInfo.InvariantCulture)
@@ -92,9 +92,9 @@ namespace Trecs.Internal
         {
             if (recorder == null)
                 return;
-            recorder.AnchorIntervalSeconds = AnchorIntervalSeconds;
+            recorder.KeyframeIntervalSeconds = KeyframeIntervalSeconds;
             recorder.ScrubCacheIntervalSeconds = ScrubCacheIntervalSeconds;
-            recorder.MaxAnchorCount = MaxAnchorCount;
+            recorder.MaxKeyframeCount = MaxKeyframeCount;
             recorder.MaxScrubCacheBytes = MaxScrubCacheBytes;
         }
 

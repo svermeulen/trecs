@@ -33,23 +33,8 @@ namespace Trecs.Tests
     [TestFixture]
     public class SystemEnableStateTests
     {
-        TestEnvironment CreateEnv(params ISystem[] systems)
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
-
-            var world = builder.Build();
-
-            foreach (var system in systems)
-            {
-                world.AddSystem(system);
-            }
-
-            world.Initialize();
-            return new TestEnvironment(world);
-        }
+        TestEnvironment CreateEnv(params ISystem[] systems) =>
+            EcsTestHelper.CreateEnvironment(configure: b => b.AddSystems(systems));
 
         int FindSystemIndex(World world, Type systemType)
         {

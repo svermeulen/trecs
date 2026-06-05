@@ -1,6 +1,6 @@
 namespace Trecs.Internal
 {
-    public static class HashUtil
+    internal static class HashUtil
     {
         // Boost hash_combine — uses the golden ratio constant (0x9e3779b9) for mixing.
         // See boost::hash_combine in boost/container_hash/hash.hpp

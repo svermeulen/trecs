@@ -405,7 +405,7 @@ namespace Trecs
             get
             {
                 CheckReadAccess();
-                return new KeyEnumerable(_nodes, _header->Count);
+                return new KeyEnumerable(_header, _nodes);
             }
         }
 
@@ -413,7 +413,7 @@ namespace Trecs
         public Enumerator GetEnumerator()
         {
             CheckReadAccess();
-            return new Enumerator(_nodes, _values, _header->Count);
+            return new Enumerator(_header, _nodes, _values);
         }
 
         // ─── Internal ────────────────────────────────────────────────
@@ -462,6 +462,18 @@ namespace Trecs
             }
 
             indexSet = _header->Count - 1;
+            // AppendEntry may have grown the table, rebuilding every bucket chain under
+            // a new BucketCount / FastModMultiplier. The bucketIndex computed above was
+            // derived from the pre-grow bucket count, so it can now point at the wrong
+            // slot — installing the new head there would both orphan the just-added
+            // entry (lookups would never find it) and clobber an unrelated bucket.
+            // Recompute against the current header before writing the head. (When no
+            // grow happened this recomputes the same index, so it is always safe.)
+            bucketIndex = TrecsDictionary.Reduce(
+                (uint)hash,
+                (uint)_header->BucketCount,
+                _header->FastModMultiplier
+            );
             _buckets[bucketIndex] = indexSet + 1;
 
             if (_header->Collisions > _header->BucketCount)
@@ -594,28 +606,36 @@ namespace Trecs
 
         public readonly ref struct KeyEnumerable
         {
+            readonly TrecsDictionaryHeader* _header;
             readonly IterableDictionaryNode<TKey>* _nodes;
-            readonly int _count;
 
-            internal KeyEnumerable(IterableDictionaryNode<TKey>* nodes, int count)
+            internal KeyEnumerable(
+                TrecsDictionaryHeader* header,
+                IterableDictionaryNode<TKey>* nodes
+            )
             {
+                _header = header;
                 _nodes = nodes;
-                _count = count;
             }
 
-            public KeyEnumerator GetEnumerator() => new KeyEnumerator(_nodes, _count);
+            public KeyEnumerator GetEnumerator() => new KeyEnumerator(_header, _nodes);
         }
 
         public ref struct KeyEnumerator
         {
+            readonly TrecsDictionaryHeader* _header;
             readonly IterableDictionaryNode<TKey>* _nodes;
             readonly int _count;
             int _index;
 
-            internal KeyEnumerator(IterableDictionaryNode<TKey>* nodes, int count)
+            internal KeyEnumerator(
+                TrecsDictionaryHeader* header,
+                IterableDictionaryNode<TKey>* nodes
+            )
             {
+                _header = header;
                 _nodes = nodes;
-                _count = count;
+                _count = header->Count;
                 _index = -1;
             }
 
@@ -628,6 +648,7 @@ namespace Trecs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
+                CheckNotMutated(_header, _count);
                 _index++;
                 return _index < _count;
             }
@@ -635,16 +656,22 @@ namespace Trecs
 
         public ref struct Enumerator
         {
+            readonly TrecsDictionaryHeader* _header;
             readonly IterableDictionaryNode<TKey>* _nodes;
             readonly TValue* _values;
             readonly int _count;
             int _index;
 
-            internal Enumerator(IterableDictionaryNode<TKey>* nodes, TValue* values, int count)
+            internal Enumerator(
+                TrecsDictionaryHeader* header,
+                IterableDictionaryNode<TKey>* nodes,
+                TValue* values
+            )
             {
+                _header = header;
                 _nodes = nodes;
                 _values = values;
-                _count = count;
+                _count = header->Count;
                 _index = -1;
             }
 
@@ -657,9 +684,27 @@ namespace Trecs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
+                CheckNotMutated(_header, _count);
                 _index++;
                 return _index < _count;
             }
+        }
+
+        // Unconditional (release-included) mutation guard, matching TrecsListRead's
+        // per-MoveNext version check. A sibling mutation (Add/Remove/Clear, or a
+        // mutating method on this same wrapper) changes the live Count; iterating on
+        // the stale captured count would read corrupted or out-of-range entries, so
+        // fail fast instead.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void CheckNotMutated(TrecsDictionaryHeader* header, int capturedCount)
+        {
+            TrecsAssert.That(
+                header->Count == capturedCount,
+                "TrecsDictionary was mutated while it was being iterated (captured "
+                    + "count {0}, current {1}). Don't Add/Remove/Clear during a foreach.",
+                capturedCount,
+                header->Count
+            );
         }
 
         public readonly ref struct KeyValuePair

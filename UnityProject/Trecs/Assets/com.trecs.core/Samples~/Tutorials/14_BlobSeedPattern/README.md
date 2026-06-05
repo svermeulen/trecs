@@ -30,37 +30,41 @@ order things were loaded.
 
 ## The seeder pattern
 
-A long-lived "seeder" class allocates each blob once at startup using
-`BlobPtr.Alloc(cache, stableId, blob)` and **holds the resulting
-`BlobPtr<T>` as a member field**. `BlobPtr<T>` is the lower-level pinning
-handle that lives at the `BlobCache` layer — it keeps blob bytes in the
-cache without participating in the ECS-side refcount that `SharedPtr<T>`
-adds on top. That's the right shape for an anchor that has to outlive
-"no entities reference this yet"; without it the cache could evict the
-blob between init and the first entity spawn.
+A long-lived "seeder" class registers each blob once at startup with a
+stable `BlobId`, acquires a pinning `BlobPtr<T>`, and **holds it as a
+member field**. `BlobPtr<T>` is the lower-level pinning handle — it keeps
+blob bytes resident without participating in the ECS-side refcount that
+`SharedPtr<T>` adds on top. That's the right shape for an anchor that has
+to outlive "no entities reference this yet"; without it the cache could
+evict the blob between init and the first entity spawn.
 
 ```csharp
 public class PaletteSeeder
 {
-    readonly BlobCache _blobCache;
+    readonly World _world;
+    WorldAccessor _accessor;
     BlobPtr<ColorPalette> _warm;
     BlobPtr<ColorPalette> _cool;
 
-    public PaletteSeeder(BlobCache blobCache) { _blobCache = blobCache; }
+    public PaletteSeeder(World world) { _world = world; }
 
     public void Initialize()
     {
-        _warm = BlobPtr.Alloc(_blobCache, PaletteIds.Warm, BuildWarm());
-        _cool = BlobPtr.Alloc(_blobCache, PaletteIds.Cool, BuildCool());
+        // Setup code, not a system, so it makes its own Unrestricted accessor.
+        _accessor = _world.CreateAccessor(AccessorRole.Unrestricted);
+        BlobPtr.Register(_accessor, PaletteIds.Warm, BuildWarm);
+        BlobPtr.Register(_accessor, PaletteIds.Cool, BuildCool);
+        _warm = BlobPtr.Acquire<ColorPalette>(_accessor, PaletteIds.Warm);
+        _cool = BlobPtr.Acquire<ColorPalette>(_accessor, PaletteIds.Cool);
     }
     // Dispose releases the seeder's pins; entity-owned SharedPtrs keep
     // the blob alive until those are disposed too.
 }
 ```
 
-Note the deliberate asymmetry: the seeder takes a `BlobCache` (not a
-`World` or `WorldAccessor`) because it isn't an ECS participant — it's a
-cache-level pin whose only job is to keep the data resident.
+Both layers go through `WorldAccessor`: the seeder pins with `BlobPtr`
+(no ECS refcount) while entities reference the same blob with `SharedPtr`
+(refcounted). The difference is the *layer*, not the entry point.
 
 Entity spawners then look up the blob by stable ID via the ECS-side
 `SharedPtr` API:

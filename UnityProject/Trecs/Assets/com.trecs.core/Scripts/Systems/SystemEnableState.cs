@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
@@ -37,10 +37,15 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// Owns per-system enable state used by <c>SystemRunner</c> to skip systems.
-    /// Two independent layers, both keyed by stable system index:
+    /// Two independent layers, both keyed by stable system index at runtime:
     /// <list type="bullet">
     /// <item>Channels (<see cref="EnableChannel"/>): non-deterministic, ephemeral, not serialized.</item>
-    /// <item>Paused: deterministic, included in world snapshot/recording state.</item>
+    /// <item>Paused: deterministic, included in world snapshot/recording state.
+    /// Serialized sparse and by system <i>identity</i> (64-bit hash of the
+    /// debug name + same-name ordinal) rather than by index, so adding/
+    /// removing/reordering systems does not invalidate snapshots — a pause
+    /// follows its system, and a pause for a system that no longer exists is
+    /// dropped with a warning.</item>
     /// </list>
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -62,14 +67,62 @@ namespace Trecs.Internal
         bool _isInitialized;
         bool _isDisposed;
 
-        public void Initialize(int systemCount)
+        // Identity tables for serialization (see class docs): the wire format
+        // identifies each paused system by a 64-bit xxHash of its debug name
+        // (not the full string — fixed 12 bytes per entry and no string
+        // allocation on load) so restores survive system list changes.
+        // _systemNameOrdinals[i] is system i's occurrence index among systems
+        // sharing its name hash (registration order), disambiguating
+        // duplicate registrations of the same system type.
+        TrecsLog _log;
+        ulong[] _systemNameHashes;
+        int[] _systemNameOrdinals;
+        Dictionary<ulong, List<int>> _systemIndicesByNameHash;
+
+        public void Initialize(IReadOnlyList<SystemEntry> systems, TrecsLog log)
         {
             TrecsDebugAssert.That(!_isInitialized);
             TrecsDebugAssert.That(!_isDisposed);
-            TrecsDebugAssert.That(systemCount >= 0);
+            TrecsDebugAssert.IsNotNull(systems);
+            TrecsDebugAssert.IsNotNull(log);
 
+            _log = log;
+            var systemCount = systems.Count;
             _systemCount = systemCount;
             _channelMasks = new int[systemCount];
+
+            _systemNameHashes = new ulong[systemCount];
+            _systemNameOrdinals = new int[systemCount];
+            _systemIndicesByNameHash = new Dictionary<ulong, List<int>>(systemCount);
+            for (int i = 0; i < systemCount; i++)
+            {
+                // Name-derived and stable across sessions/platforms.
+                var nameHash = CollisionResistantHashCalculator.ComputeXxHash64(
+                    systems[i].DebugName
+                );
+                if (!_systemIndicesByNameHash.TryGetValue(nameHash, out var indices))
+                {
+                    indices = new List<int>(1);
+                    _systemIndicesByNameHash.Add(nameHash, indices);
+                }
+                else
+                {
+                    // A hash match is expected to mean "same name, later
+                    // occurrence". A cross-name collision (~2^-64 per pair)
+                    // would silently merge two systems' ordinal spaces and
+                    // let a restored pause land on the wrong system — catch
+                    // it in debug builds.
+                    TrecsDebugAssert.That(
+                        systems[indices[0]].DebugName == systems[i].DebugName,
+                        "xxHash64 collision between system debug names {0} and {1}",
+                        systems[indices[0]].DebugName,
+                        systems[i].DebugName
+                    );
+                }
+                _systemNameOrdinals[i] = indices.Count;
+                indices.Add(i);
+                _systemNameHashes[i] = nameHash;
+            }
 
             // Always allocate at least one word so the buffer is valid even
             // for empty worlds.
@@ -180,7 +233,7 @@ namespace Trecs.Internal
             return !ShouldSkipSystem(systemIndex);
         }
 
-        public unsafe void Serialize(ISerializationWriter writer)
+        public void Serialize(ISerializationWriter writer)
         {
             TrecsDebugAssert.That(_isInitialized);
 
@@ -188,36 +241,92 @@ namespace Trecs.Internal
             // and reapplied by their respective owners (BundleReplayer for
             // EnableChannel.Playback, the editor for EnableChannel.Editor,
             // and application code for EnableChannel.User) on each session.
-            writer.Write("SystemCount", _systemCount);
-            writer.Write("WordCount", _wordCount);
-
-            if (_wordCount > 0)
+            //
+            // Paused state is written sparse, by identity (name hash +
+            // same-name ordinal), in ascending system index order
+            // (deterministic — same state always produces the same bytes).
+            // The common case is zero paused systems, so this is typically a
+            // single int — cheaper than the index-keyed bit-blit it replaced,
+            // and it keeps snapshots loadable across system
+            // add/remove/reorder.
+            int pausedCount = 0;
+            for (int w = 0; w < _wordCount; w++)
             {
-                writer.BlitWriteRawBytes(
-                    "PausedBits",
-                    NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(_pausedWords),
-                    _wordCount * sizeof(ulong)
-                );
+                var word = _pausedWords[w];
+                while (word != 0)
+                {
+                    word &= word - 1;
+                    pausedCount++;
+                }
+            }
+
+            writer.Write("PausedCount", pausedCount);
+
+            if (pausedCount == 0)
+            {
+                return;
+            }
+
+            for (int w = 0; w < _wordCount; w++)
+            {
+                var word = _pausedWords[w];
+                if (word == 0)
+                {
+                    continue;
+                }
+                int baseIndex = w * BitsPerWord;
+                for (int b = 0; b < BitsPerWord; b++)
+                {
+                    if ((word & (1ul << b)) == 0)
+                    {
+                        continue;
+                    }
+                    int systemIndex = baseIndex + b;
+                    writer.Write("NameHash", _systemNameHashes[systemIndex]);
+                    writer.Write("Ordinal", _systemNameOrdinals[systemIndex]);
+                }
             }
         }
 
-        public unsafe void Deserialize(ISerializationReader reader)
+        public void Deserialize(ISerializationReader reader)
         {
             TrecsDebugAssert.That(_isInitialized);
 
-            var serializedSystemCount = reader.Read<int>("SystemCount");
-            var serializedWordCount = reader.Read<int>("WordCount");
-
-            TrecsDebugAssert.IsEqual(serializedSystemCount, _systemCount);
-            TrecsDebugAssert.IsEqual(serializedWordCount, _wordCount);
-
-            if (_wordCount > 0)
+            for (int w = 0; w < _wordCount; w++)
             {
-                reader.BlitReadRawBytes(
-                    "PausedBits",
-                    NativeArrayUnsafeUtility.GetUnsafePtr(_pausedWords),
-                    _wordCount * sizeof(ulong)
-                );
+                _pausedWords[w] = 0;
+            }
+
+            var pausedCount = reader.Read<int>("PausedCount");
+            TrecsDebugAssert.That(pausedCount >= 0);
+
+            for (int i = 0; i < pausedCount; i++)
+            {
+                var nameHash = reader.Read<ulong>("NameHash");
+                var ordinal = reader.Read<int>("Ordinal");
+
+                if (
+                    _systemIndicesByNameHash.TryGetValue(nameHash, out var indices)
+                    && ordinal < indices.Count
+                )
+                {
+                    SetSystemPaused(indices[ordinal], true);
+                }
+                else
+                {
+                    // The snapshot paused a system this world doesn't have
+                    // (removed or renamed since save). Dropping the pause is
+                    // the only sensible restore; warn so the divergence from
+                    // the saved state isn't silent. Only the name hash is
+                    // available — the wire deliberately doesn't carry the
+                    // name string (see the identity-table comment above).
+                    _log.Warning(
+                        "Snapshot pauses a system (debug-name hash {0:X16}, occurrence {1}) "
+                            + "which does not exist in this world — dropping that pause.",
+                        nameHash,
+                        ordinal
+                    );
+                }
             }
         }
 

@@ -11,7 +11,7 @@ namespace Trecs
     /// Builds a relocatable blob: a single contiguous allocation containing a
     /// root <typeparamref name="T"/> plus any trailing data referenced from
     /// the root via <see cref="BlobArray{T}"/> fields. The output is suitable
-    /// for <see cref="NativeSharedPtr.AllocTakingOwnership{T}"/> — the heap
+    /// for <see cref="Build{T}(WorldAccessor, BlobId)"/> — the heap
     /// takes ownership and frees the allocation when the refcount hits zero.
     ///
     /// <para><b>Why relocatable.</b> Every internal reference inside the blob
@@ -315,22 +315,23 @@ namespace Trecs
         /// <summary>
         /// Finalizes the blob into a single Allocator.Persistent allocation
         /// owned by the heap, returning a fresh <see cref="NativeSharedPtr{T}"/>
-        /// for the seeded entry. Convenience over
-        /// <see cref="BuildNativeBlobAllocation"/> +
-        /// <see cref="NativeSharedPtr.AllocTakingOwnership{T}(WorldAccessor, BlobId, NativeBlobAllocation)"/>.
+        /// for the seeded entry. The blob's bytes are produced up front here (not from a
+        /// registered source), so it lives until its last reference is dropped and it is
+        /// LRU-evicted.
         /// </summary>
         public NativeSharedPtr<T> Build<T>(WorldAccessor world, BlobId blobId)
             where T : unmanaged
         {
+            world.AssertCanMutateHeap();
             var alloc = BuildNativeBlobAllocation();
             // Hand-off must be exception-safe: BuildNativeBlobAllocation has
-            // already produced the persistent buffer, so any throw from
-            // AllocTakingOwnership (heap-state asserts, duplicate-id checks,
-            // generic type-mismatch in the underlying store) would otherwise
-            // drop the only reference to it and leak.
+            // already produced the persistent buffer, so any throw from the
+            // taking-ownership path (heap-state asserts, duplicate-id checks,
+            // generic type-mismatch) would otherwise drop the only reference to
+            // it and leak.
             try
             {
-                return NativeSharedPtr.AllocTakingOwnership<T>(world, blobId, alloc);
+                return world.NativeSharedHeap.CreateBlobTakingOwnership<T>(blobId, alloc);
             }
             catch
             {
@@ -350,7 +351,7 @@ namespace Trecs
         /// <see cref="Allocator.Persistent"/> allocation, resolves every
         /// offset-pointer patch, and returns the resulting <see cref="NativeBlobAllocation"/>.
         /// The caller is responsible for handing it to a taking-ownership API
-        /// (<see cref="NativeSharedPtr.AllocTakingOwnership{T}(WorldAccessor, BlobId, NativeBlobAllocation)"/>
+        /// (<see cref="Build{T}(WorldAccessor, BlobId)"/>
         /// or <see cref="NativeUniquePtr.AllocTakingOwnership{T}"/>) — whichever
         /// takes it on will free it via <c>AllocatorManager.Free</c> at end-of-life.
         /// </summary>

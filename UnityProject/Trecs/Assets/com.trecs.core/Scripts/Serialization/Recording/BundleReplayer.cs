@@ -14,9 +14,9 @@ namespace Trecs.Internal
     /// <summary>
     /// Replays a <see cref="RecordingBundle"/> against a live world: restores
     /// the bundle's initial snapshot, feeds its captured input queue, and
-    /// verifies per-frame checksums to surface desyncs. Anchors are exposed
+    /// verifies per-frame checksums to surface desyncs. Keyframes are exposed
     /// for callers that want to recover from a desync by jumping to the
-    /// nearest anchor frame.
+    /// nearest keyframe frame.
     ///
     /// Main-thread only.
     /// </summary>
@@ -24,17 +24,12 @@ namespace Trecs.Internal
     {
         readonly TrecsLog _log;
 
-        readonly SnapshotSerializer _snapshotSerializer;
+        // Lifecycle / IO primitives (accessor + checksum calculator + reusable
+        // snapshot/queue buffers + locker registration) live on this shared
+        // collaborator that the recorders (BundleRecorder, TrecsRewindBuffer)
+        // also own — see RecordingEngine docs for the split rationale.
+        readonly RecordingEngine _core;
 
-        // Reused across Start() calls to deserialize the bundle's input-queue
-        // payload. Kept as a field rather than `using var` per-call so the
-        // backing MemoryStream / writer buffers (which can grow to the input
-        // queue's full size) survive across timeline switches and don't churn
-        // LOH on each playback start.
-        readonly SerializationBuffer _queueBuffer;
-        readonly World _worldOwner;
-
-        WorldAccessor _world;
         BundlePlaybackState _state = BundlePlaybackState.Idle;
         RecordingBundle _bundle;
         int? _desyncedFrame;
@@ -43,26 +38,25 @@ namespace Trecs.Internal
         public BundleReplayer(
             World world,
             SerializerRegistry registry,
-            SnapshotSerializer snapshotSerializer
+            SnapshotSerializer snapshotSerializer,
+            IOpaqueBlobStore opaqueBlobStore = null
         )
         {
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
-            if (registry == null)
-                throw new ArgumentNullException(nameof(registry));
-            if (snapshotSerializer == null)
-                throw new ArgumentNullException(nameof(snapshotSerializer));
 
             _log = world.Log;
-            _worldOwner = world;
-            _snapshotSerializer = snapshotSerializer;
-            _queueBuffer = new SerializationBuffer(registry);
-        }
-
-        public void Initialize()
-        {
-            ThrowIfDisposed();
-            _world = _worldOwner.CreateAccessor(AccessorRole.Unrestricted, nameof(BundleReplayer));
+            // No OpaqueBlobPersistence: replay restores opaque *input* blobs
+            // through opaqueBlobStore (handled inside the engine's queue
+            // deserialize); the initial snapshot's opaque blobs are expected
+            // resident already.
+            _core = new RecordingEngine(
+                world,
+                registry,
+                snapshotSerializer,
+                accessorLabel: nameof(BundleReplayer),
+                opaqueBlobStore: opaqueBlobStore
+            );
         }
 
         public BundlePlaybackState State => _state;
@@ -107,7 +101,7 @@ namespace Trecs.Internal
         /// Failure semantics: bundle-shape checks (null payload, queue
         /// envelope corruption) fire <i>before</i> any world mutation, so a
         /// throw at that stage leaves the live world untouched and the
-        /// player Idle. Once <see cref="SnapshotSerializer.LoadSnapshot"/>
+        /// player Idle. Once <see cref="SnapshotSerializer.Deserialize"/>
         /// has run, the world has already been mutated and cannot be rolled
         /// back; on a later failure (checksum mismatch, queue deserialize
         /// error) the player still resets to Idle so a follow-up Start can
@@ -133,6 +127,38 @@ namespace Trecs.Internal
                     "Bundle has no initial snapshot — cannot replay."
                 );
 
+            // Schema gate, before any world mutation: the bundle's snapshot
+            // and input-queue wire formats depend on the world schema
+            // matching the recording exactly. (The embedded snapshot's own
+            // metadata fingerprint is re-checked by LoadSnapshot below; this
+            // earlier header-level check keeps the world untouched and words
+            // the error for recordings.)
+            var currentFingerprint = _core.World.SchemaFingerprint;
+            if (bundle.Header.SchemaFingerprint != currentFingerprint)
+            {
+                throw new SerializationException(
+                    WorldSchemaFingerprintCalculator.BuildMismatchMessage(
+                        "recording",
+                        bundle.Header.SchemaFingerprint,
+                        currentFingerprint
+                    )
+                );
+            }
+
+            // Replaying inputs against a different fixed tick rate desyncs
+            // even with an identical schema — flag it up-front rather than
+            // letting the user chase a checksum mismatch mid-playback.
+            var liveFixedDeltaTime = _core.World.SystemRunner.FixedDeltaTime;
+            if (bundle.Header.FixedDeltaTime != liveFixedDeltaTime)
+            {
+                _log.Warning(
+                    "Recording was captured with FixedDeltaTime {0} but the live world runs at "
+                        + "{1} — input replay against a different tick rate will desync.",
+                    bundle.Header.FixedDeltaTime,
+                    liveFixedDeltaTime
+                );
+            }
+
             // Pre-flight the queue payload's outer envelope (Trecs header
             // magic + format version) before mutating the world. A corrupt
             // envelope here means the queue deserialize is doomed to fail —
@@ -147,7 +173,7 @@ namespace Trecs.Internal
 
             // Restore initial state from the bundle's embedded snapshot.
             // Past this point, world has been mutated and we can't roll back.
-            _snapshotSerializer.LoadSnapshot(bundle.InitialSnapshot);
+            _core.LoadSnapshot(bundle.InitialSnapshot);
 
             try
             {
@@ -156,22 +182,15 @@ namespace Trecs.Internal
                 // Wipe the live queue and replace it with the bundle's serialized
                 // inputs. ClearAllInputs (vs ClearFutureInputsAfterOrAt) is
                 // correct here: we're switching timelines wholesale.
-                var inputQueue = _world.GetEntityInputQueue();
-                inputQueue.ClearAllInputs();
+                _core.Accessor.GetEntityInputQueue().ClearAllInputs();
                 if (!bundle.InputQueue.IsEmpty)
                 {
-                    // ClearMemoryStream resets the reused buffer's length so a
-                    // shorter input-queue payload than last time doesn't leave
-                    // stale trailing bytes behind.
-                    _queueBuffer.ClearMemoryStream();
-                    _queueBuffer.MemoryStream.Write(bundle.InputQueue.Span);
-                    _queueBuffer.MemoryStream.Position = 0;
-                    _queueBuffer.StartRead();
-                    inputQueue.Deserialize(_queueBuffer.Reader);
-                    _queueBuffer.StopRead(verifySentinel: false);
+                    // Wraps the bundle's input-queue bytes directly (zero copy)
+                    // and reads them back through the engine's reused buffers.
+                    _core.DeserializeEntityInputQueue(bundle.InputQueue);
                 }
 
-                inputQueue.AddHistoryLocker(this);
+                _core.AddHistoryLocker(this);
                 SetInputSystemsEnabled(false);
             }
             catch
@@ -184,11 +203,10 @@ namespace Trecs.Internal
                 // shape it would be after a clean Stop.
                 _state = BundlePlaybackState.Idle;
                 _bundle = null;
-                // Force the reused queue buffer back to Idle so a subsequent
-                // Start() can safely ClearMemoryStream / StartRead on it
-                // again. No-op if Deserialize succeeded; required if it threw
-                // mid-Read.
-                _queueBuffer.ResetForErrorRecovery();
+                // Force the reused queue reader back to idle so a subsequent
+                // Start() can safely re-read. No-op unless a step *outside*
+                // DeserializeEntityInputQueue's own try faulted mid-read.
+                _core.ResetQueueBufferForErrorRecovery();
                 throw;
             }
 
@@ -240,16 +258,13 @@ namespace Trecs.Internal
                 return default;
             }
 
-            var currentFrame = _world.FixedFrame;
+            var currentFrame = _core.Accessor.FixedFrame;
             if (!_bundle.Checksums.TryGetValue(currentFrame, out var expected))
             {
                 return default;
             }
 
-            var actual = _snapshotSerializer.ComputeChecksum(
-                _bundle.Header.Version,
-                includeTypeChecks: true
-            );
+            var actual = _core.ComputeChecksum(_bundle.Header.Version);
             if (expected != actual)
             {
                 _log.Warning(
@@ -276,13 +291,7 @@ namespace Trecs.Internal
             if (!IsPlaying)
                 throw new InvalidOperationException("Cannot Stop: playback is not active.");
 
-            var queue = _world.GetEntityInputQueue();
-            queue.RemoveHistoryLocker(this);
-            queue.ClearFutureInputsAfterOrAt(_world.FixedFrame);
-            SetInputSystemsEnabled(true);
-
-            _bundle = null;
-            _state = BundlePlaybackState.Idle;
+            TearDownPlayback();
             _log.Info("Playback stopped");
         }
 
@@ -295,15 +304,28 @@ namespace Trecs.Internal
             if (IsPlaying)
             {
                 _log.Warning("Disposing BundleReplayer while playback is active — stopping first");
-                var queue = _world.GetEntityInputQueue();
-                queue.RemoveHistoryLocker(this);
-                queue.ClearFutureInputsAfterOrAt(_world.FixedFrame);
-                SetInputSystemsEnabled(true);
-                _bundle = null;
-                _state = BundlePlaybackState.Idle;
+                TearDownPlayback();
             }
+        }
 
-            _queueBuffer?.Dispose();
+        // Shared teardown for Stop and dispose-while-playing: release the
+        // input history lock, drop the abandoned timeline's queued future
+        // inputs, re-enable input systems, and return to Idle. Skips the
+        // queue cleanup when the world is already disposed (the queue went
+        // down with it); the locker removal and SetInputSystemsEnabled
+        // guard themselves.
+        void TearDownPlayback()
+        {
+            _core.RemoveHistoryLocker(this);
+            if (!_core.World.IsDisposed)
+            {
+                _core
+                    .Accessor.GetEntityInputQueue()
+                    .ClearFutureInputsAfterOrAt(_core.Accessor.FixedFrame);
+            }
+            SetInputSystemsEnabled(true);
+            _bundle = null;
+            _state = BundlePlaybackState.Idle;
         }
 
         void VerifyPostDeserializationChecksum(RecordingBundle bundle)
@@ -319,10 +341,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            var actual = _snapshotSerializer.ComputeChecksum(
-                bundle.Header.Version,
-                includeTypeChecks: true
-            );
+            var actual = _core.ComputeChecksum(bundle.Header.Version);
             if (actual != expected)
             {
                 throw new SerializationException(
@@ -334,16 +353,16 @@ namespace Trecs.Internal
 
         void SetInputSystemsEnabled(bool enable)
         {
-            if (_world == null || _worldOwner.IsDisposed)
+            if (_core.World.IsDisposed)
                 return;
-            var systems = _worldOwner.GetSystems();
+            var systems = _core.World.GetSystems();
             for (int i = 0; i < systems.Count; i++)
             {
                 if (systems[i].Phase != SystemPhase.Input)
                     continue;
-                if (_world.IsSystemEnabled(i, EnableChannel.Playback) != enable)
+                if (_core.Accessor.IsSystemEnabled(i, EnableChannel.Playback) != enable)
                 {
-                    _world.SetSystemEnabled(i, EnableChannel.Playback, enable);
+                    _core.Accessor.SetSystemEnabled(i, EnableChannel.Playback, enable);
                 }
             }
         }

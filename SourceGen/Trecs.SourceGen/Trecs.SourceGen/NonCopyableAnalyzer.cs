@@ -37,10 +37,23 @@ namespace Trecs.SourceGen
     /// value from a method, constructing a new instance, or <c>default</c>
     /// initialization are allowed.</para>
     ///
+    /// <para>TRECS133 covers the <em>implicit</em> copy the compiler synthesizes when a
+    /// non-<c>readonly</c> instance member is invoked on a non-copyable value through a
+    /// read-only reference (an <c>in</c> parameter or a <c>ref readonly</c> local). Unlike
+    /// TRECS118/131, this copy is nowhere in the source — the receiver is silently duplicated
+    /// before the call, so the mutation lands on a throwaway copy and a pointer-backed wrapper
+    /// can be left aliasing freed storage. Static members (including <c>ref this</c> extension
+    /// methods, which the compiler already rejects on a readonly receiver via CS8329) and
+    /// members the author marked <c>readonly</c> never copy, so neither fires. The fix is to
+    /// pass the receiver by <c>ref</c>, or to mark a genuinely-non-mutating member
+    /// <c>readonly</c>. Scoped to <c>in</c>-parameter / <c>ref readonly</c>-local receivers —
+    /// the surface that matters for <c>ref struct</c> wrappers, which can never be fields.</para>
+    ///
     /// <list type="bullet">
     ///   <item><b>TRECS118</b> — by-value local copied from an existing variable</item>
-    ///   <item><b>TRECS119</b> — by-value method parameter of a non-copyable type</item>
+    ///   <item><b>TRECS131</b> — by-value method parameter of a non-copyable type</item>
     ///   <item><b>TRECS120</b> — a struct carries both <c>[NonCopyable]</c> and <c>[Copyable]</c></item>
+    ///   <item><b>TRECS133</b> — non-<c>readonly</c> member invoked on a non-copyable value through a read-only reference</item>
     /// </list>
     /// </summary>
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -55,7 +68,8 @@ namespace Trecs.SourceGen
             ImmutableArray.Create(
                 DiagnosticDescriptors.NonCopyableByValueLocal,
                 DiagnosticDescriptors.NonCopyableByValueParameter,
-                DiagnosticDescriptors.NonCopyableCopyableConflict
+                DiagnosticDescriptors.NonCopyableCopyableConflict,
+                DiagnosticDescriptors.NonCopyableReadonlyRefMemberAccess
             );
 
         public override void Initialize(AnalysisContext context)
@@ -78,6 +92,11 @@ namespace Trecs.SourceGen
                     SymbolKind.Method
                 );
                 start.RegisterSymbolAction(AnalyzeTypeForConflict, SymbolKind.NamedType);
+                start.RegisterOperationAction(
+                    ctx => AnalyzeReadonlyRefMemberAccess(ctx, cache),
+                    OperationKind.Invocation,
+                    OperationKind.PropertyReference
+                );
             });
         }
 
@@ -161,6 +180,117 @@ namespace Trecs.SourceGen
                         param.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
                     )
                 );
+            }
+        }
+
+        // TRECS133: a non-readonly instance member invoked on a non-copyable value through a
+        // read-only reference. The C# compiler synthesizes a defensive copy of the receiver so
+        // the readonly reference can't be mutated; the call then runs against the copy, silently
+        // discarding any field mutation (and, for pointer-rebinding wrappers, leaving the original
+        // aliasing freed storage). The copy is invisible in source — that's what makes it worth a
+        // dedicated diagnostic on top of the explicit-copy rules above.
+        static void AnalyzeReadonlyRefMemberAccess(
+            OperationAnalysisContext context,
+            ConcurrentDictionary<INamedTypeSymbol, bool> cache
+        )
+        {
+            IMethodSymbol? member;
+            IOperation? instance;
+
+            switch (context.Operation)
+            {
+                case IInvocationOperation invocation:
+                    member = invocation.TargetMethod;
+                    instance = invocation.Instance;
+                    break;
+                case IPropertyReferenceOperation propertyRef:
+                    member = SelectInvokedAccessor(propertyRef);
+                    instance = propertyRef.Instance;
+                    break;
+                default:
+                    return;
+            }
+
+            // Cheapest, most selective gate first. This action runs on every invocation and
+            // property reference in the compilation; the overwhelming majority have a `this` /
+            // local / field / rvalue receiver, so bail here before touching the member symbol
+            // or the (cache-populating) non-copyable walk that follows.
+            if (instance is null || !IsReadOnlyReferenceReceiver(instance))
+                return;
+
+            // No member resolved (e.g. a write-only property read), or one that can't copy the
+            // receiver: static members (including `ref this` extension methods, which the
+            // compiler already rejects on a readonly receiver via CS8329), and `readonly`
+            // members, which read through the reference in place.
+            if (member is null || member.IsStatic || member.IsReadOnly)
+                return;
+
+            // Constructors / finalizers aren't invoked through an existing readonly receiver.
+            if (
+                member.MethodKind == MethodKind.Constructor
+                || member.MethodKind == MethodKind.StaticConstructor
+            )
+                return;
+
+            if (member.ContainingType is not INamedTypeSymbol containing)
+                return;
+            if (!IsNonCopyable(containing, cache))
+                return;
+
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.NonCopyableReadonlyRefMemberAccess,
+                    context.Operation.Syntax.GetLocation(),
+                    member.Name,
+                    containing.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+                )
+            );
+        }
+
+        // The accessor actually invoked by a property/indexer reference. A write (or a
+        // read-modify-write via compound assignment / increment) runs the setter — that's the
+        // mutation the defensive copy swallows, so report it; a plain read runs the getter.
+        // Returns null when the relevant accessor doesn't exist (the downstream IsReadOnly /
+        // IsStatic checks handle the rest).
+        static IMethodSymbol? SelectInvokedAccessor(IPropertyReferenceOperation propertyRef)
+        {
+            var property = propertyRef.Property;
+            var parent = propertyRef.Parent;
+
+            bool isWriteTarget =
+                (
+                    parent is ISimpleAssignmentOperation simple
+                    && ReferenceEquals(simple.Target, propertyRef)
+                )
+                || (
+                    parent is ICompoundAssignmentOperation compound
+                    && ReferenceEquals(compound.Target, propertyRef)
+                )
+                || (
+                    parent is IIncrementOrDecrementOperation incr
+                    && ReferenceEquals(incr.Target, propertyRef)
+                );
+
+            if (isWriteTarget)
+                return property.SetMethod ?? property.GetMethod;
+            return property.GetMethod;
+        }
+
+        // True when the receiver denotes a read-only reference to value-type storage, so the
+        // compiler would synthesize a defensive copy before a mutating call. `in` parameters and
+        // `ref readonly` locals share RefKind.In; a `ref` local / by-value local aliases writable
+        // storage (mutation lands in place — no copy), and everything else is handled elsewhere.
+        // Receivers reached through a field of an `in` parameter are intentionally out of scope.
+        static bool IsReadOnlyReferenceReceiver(IOperation instance)
+        {
+            switch (instance)
+            {
+                case IParameterReferenceOperation parameterRef:
+                    return parameterRef.Parameter.RefKind == RefKind.In;
+                case ILocalReferenceOperation localRef:
+                    return localRef.Local.RefKind == RefKind.In;
+                default:
+                    return false;
             }
         }
 

@@ -83,27 +83,16 @@ namespace Trecs
 
         readonly List<World> _dropdownWorlds = new();
         string _searchText = string.Empty;
-        readonly ParsedSearch _searchFilter = new();
 
-        // Most-recent-first list of distinct search queries the user has
-        // typed during this and prior sessions. Up/Down arrow in the
-        // search field cycles through them. Persisted via EditorPrefs as
-        // a newline-joined string (JsonUtility doesn't serialize List<string>
-        // at the top level).
-        readonly List<string> _searchHistory = new();
+        // Query parse + row matching + highlight spans. Created in
+        // OnEnable (the access-tracker provider closes over _source, so a
+        // field initializer can't build it).
+        TrecsHierarchySearch _search;
 
-        // -1 means the user isn't navigating history. >= 0 indexes
-        // into _searchHistory (0 = most recent).
-        int _searchHistoryIndex = -1;
-
-        // What the user was typing before they hit Up the first time.
-        // Restored when they Down-arrow back past the newest history entry.
-        string _searchHistoryDraft = string.Empty;
-
-        // Suppresses history-record on programmatic value changes (history
-        // recall + Esc-clear).
-        bool _suppressSearchHistoryRecord;
-        const int SearchHistoryMax = 20;
+        // Up/Down-arrow query recall, persisted via EditorPrefs. Created
+        // in OnEnable (EditorPrefs isn't safe from a ScriptableObject
+        // field initializer during deserialization).
+        TrecsSearchFieldHistory _searchHistory;
         const string SearchHistoryPref = "Trecs.Hierarchy.SearchHistory";
 
         // Browser-style selection navigation. Each user-driven selection
@@ -155,11 +144,12 @@ namespace Trecs
         // via UQuery once, since BaseListView.scrollView is internal).
         ScrollView _treeScrollViewCache;
 
-        // Snapshot of expanded keys taken when the user starts typing in the
-        // search field. While search is active we override the natural
-        // expand state (collapse all templates, expand all accessor phases)
-        // and we want clearing the search to restore the user's previous
-        // shape rather than leave them with our search-time mutations.
+        // Snapshot of expanded keys taken when the parsed search filter
+        // first becomes effective (see OnSearchChanged — keyed on the
+        // filter, not raw text). While search is active the tree renders
+        // flat and the per-tick expansion sync sees those leaf rows as
+        // collapsed; restoring this snapshot when the search clears is what
+        // keeps the user's pre-search shape from being lost.
         HashSet<string> _preSearchExpandedKeys;
 
         // First-rebuild gate for the root sections. After the initial rebuild
@@ -278,11 +268,7 @@ namespace Trecs
                 menu.AddItem(
                     new GUIContent("Clear Search History"),
                     false,
-                    () =>
-                    {
-                        _searchHistory.Clear();
-                        SaveSearchHistory();
-                    }
+                    () => _searchHistory.Clear()
                 );
             }
             else
@@ -373,7 +359,8 @@ namespace Trecs
         {
             _showEmptyTemplates = EditorPrefs.GetBool(PrefShowEmptyTemplates, true);
             _showAbstractTemplates = EditorPrefs.GetBool(PrefShowAbstractTemplates, true);
-            LoadSearchHistory();
+            _search = new TrecsHierarchySearch(() => _source?.AccessTracker);
+            _searchHistory = new TrecsSearchFieldHistory(SearchHistoryPref);
 
             // Rehydrate persisted state from SessionState (survives the
             // domain reload that fires on play-mode entry).
@@ -550,13 +537,13 @@ namespace Trecs
         {
             if (evt.keyCode == KeyCode.UpArrow)
             {
-                RecallSearchHistory(+1);
+                _searchHistory.Recall(+1, _searchText, t => _searchField.value = t);
                 evt.StopPropagation();
                 return;
             }
             if (evt.keyCode == KeyCode.DownArrow)
             {
-                RecallSearchHistory(-1);
+                _searchHistory.Recall(-1, _searchText, t => _searchField.value = t);
                 evt.StopPropagation();
                 return;
             }
@@ -660,326 +647,28 @@ namespace Trecs
         void OnSearchChanged(ChangeEvent<string> evt)
         {
             var newSearch = (evt.newValue ?? string.Empty).Trim();
-            // Entering search mode: capture pre-search expand state so we
-            // can restore it when the user clears the field. While search
-            // is active we collapse all templates / expand all phases for
-            // a cleaner result view, but those mutations shouldn't outlast
-            // the search.
-            if (string.IsNullOrEmpty(_searchText) && !string.IsNullOrEmpty(newSearch))
+            // Manual edit (vs Up/Down recall) — exit history navigation
+            // and record the new query. Recall-driven value changes are
+            // recognized inside the history object and skipped.
+            _searchHistory.NotifyQueryChanged(newSearch);
+            _searchText = newSearch;
+            bool wasActive = _search.IsActive;
+            _search.Parse(newSearch);
+            // Entering search mode — keyed on the parsed filter becoming
+            // effective, not on raw text, so a query that tokenizes to
+            // nothing (e.g. the opening quote of a "quoted phrase") doesn't
+            // count as a search. Capture the pre-search expand state so we
+            // can restore it when the user clears the field: while search
+            // is active the tree renders flat, and the per-tick expansion
+            // sync sees those flat leaf rows as collapsed — without the
+            // snapshot, clearing the search would land on a fully-collapsed
+            // hierarchy.
+            if (!wasActive && _search.IsActive)
             {
                 _preSearchExpandedKeys = CaptureExpandedKeys();
             }
-            // Manual edit (vs Up/Down recall) — exit history navigation
-            // and record the new query in history. Programmatic recall
-            // sets _suppressSearchHistoryRecord to skip both.
-            if (!_suppressSearchHistoryRecord)
-            {
-                _searchHistoryIndex = -1;
-                RecordSearchHistory(newSearch);
-            }
-            _searchText = newSearch;
-            ParseSearch(newSearch);
             ForceFullRebuild();
         }
-
-        // Adds the query at the front of the history list. Dedupe rules:
-        //   - Empty queries skipped.
-        //   - Identical to the current head → no-op (avoids spamming on
-        //     refocus).
-        //   - Current head is a strict prefix of the new query → replace
-        //     the head (so typing "tag:e" → "tag:en" → "tag:enemy" leaves
-        //     a single "tag:enemy" entry, not three partial ones).
-        //   - Otherwise prepend.
-        // Capped at SearchHistoryMax entries.
-        void RecordSearchHistory(string query)
-        {
-            if (string.IsNullOrEmpty(query))
-                return;
-            if (_searchHistory.Count > 0)
-            {
-                var head = _searchHistory[0];
-                if (head == query)
-                    return;
-                if (query.StartsWith(head, StringComparison.Ordinal))
-                {
-                    _searchHistory[0] = query;
-                    SaveSearchHistory();
-                    return;
-                }
-                // Promote an existing identical entry to the front rather
-                // than duplicating it (lets the user revisit a query
-                // without churning recent history).
-                int existing = _searchHistory.IndexOf(query);
-                if (existing > 0)
-                {
-                    _searchHistory.RemoveAt(existing);
-                    _searchHistory.Insert(0, query);
-                    SaveSearchHistory();
-                    return;
-                }
-            }
-            _searchHistory.Insert(0, query);
-            if (_searchHistory.Count > SearchHistoryMax)
-            {
-                _searchHistory.RemoveRange(
-                    SearchHistoryMax,
-                    _searchHistory.Count - SearchHistoryMax
-                );
-            }
-            SaveSearchHistory();
-        }
-
-        void LoadSearchHistory()
-        {
-            _searchHistory.Clear();
-            var raw = EditorPrefs.GetString(SearchHistoryPref, string.Empty);
-            if (string.IsNullOrEmpty(raw))
-                return;
-            foreach (var line in raw.Split('\n'))
-            {
-                if (!string.IsNullOrEmpty(line))
-                    _searchHistory.Add(line);
-            }
-        }
-
-        void SaveSearchHistory()
-        {
-            EditorPrefs.SetString(SearchHistoryPref, string.Join("\n", _searchHistory));
-        }
-
-        void RecallSearchHistory(int delta)
-        {
-            if (_searchHistory.Count == 0)
-                return;
-            int newIndex;
-            if (_searchHistoryIndex < 0)
-            {
-                if (delta < 0)
-                    return; // Down with no nav in progress: no-op.
-                _searchHistoryDraft = _searchText ?? string.Empty;
-                newIndex = 0;
-            }
-            else
-            {
-                newIndex = _searchHistoryIndex + delta;
-            }
-            if (newIndex >= _searchHistory.Count)
-                return; // Past oldest — clamp.
-            _suppressSearchHistoryRecord = true;
-            try
-            {
-                if (newIndex < 0)
-                {
-                    // Stepped forward past the newest entry — restore the
-                    // user's draft and exit nav.
-                    _searchHistoryIndex = -1;
-                    _searchField.value = _searchHistoryDraft;
-                }
-                else
-                {
-                    _searchHistoryIndex = newIndex;
-                    _searchField.value = _searchHistory[newIndex];
-                }
-            }
-            finally
-            {
-                _suppressSearchHistoryRecord = false;
-            }
-        }
-
-        // Tokenizes the input on whitespace, respecting double-quoted
-        // phrases as single tokens, and bins each one of:
-        //   - "t:value" — kind selector
-        //   - "key:value" with a recognized predicate key — typed predicate
-        //   - bare word OR "key:value" with an unrecognized key — bare
-        //     substring (so accidental colons don't silently disappear)
-        //
-        // A leading '-' on a token negates it: -tag:player excludes rows
-        // tagged player; -foo excludes rows whose display name contains
-        // foo. The kind selector ("t:") doesn't negate — "-t:e" falls
-        // through to bare substring.
-        void ParseSearch(string raw)
-        {
-            _searchFilter.Reset();
-            raw ??= string.Empty;
-            foreach (var rawTok in TokenizeSearch(raw))
-            {
-                if (rawTok.Length == 0)
-                    continue;
-                bool negate = false;
-                var tok = rawTok;
-                if (tok.Length > 1 && tok[0] == '-')
-                {
-                    negate = true;
-                    tok = tok.Substring(1);
-                }
-                int colon = tok.IndexOf(':');
-                if (colon <= 0)
-                {
-                    _searchFilter.BareSubstrings.Add((tok, negate));
-                    continue;
-                }
-                var key = tok.Substring(0, colon).ToLowerInvariant();
-                var value = tok.Substring(colon + 1);
-                if (key == "t" && !negate)
-                {
-                    var kind = ScopeFromKindValue(value);
-                    if (kind != 0)
-                    {
-                        _searchFilter.ExplicitKind = kind;
-                        _searchFilter.HasExplicitKind = true;
-                    }
-                    else
-                    {
-                        _searchFilter.BareSubstrings.Add((tok, false));
-                    }
-                    continue;
-                }
-                if (IsKnownPredicate(key))
-                {
-                    _searchFilter.Predicates.Add((key, value, negate));
-                }
-                else
-                {
-                    _searchFilter.BareSubstrings.Add((tok, negate));
-                }
-            }
-        }
-
-        // Whitespace-tokenizer that treats "..." as a single token (the
-        // quotes are stripped). Used so the user can search for substrings
-        // containing spaces, e.g. "Player Spawner" or "id:42 ".
-        static List<string> TokenizeSearch(string raw)
-        {
-            var tokens = new List<string>();
-            var cur = new StringBuilder();
-            bool inQuote = false;
-            for (int i = 0; i < raw.Length; i++)
-            {
-                char c = raw[i];
-                if (c == '"')
-                {
-                    inQuote = !inQuote;
-                    continue;
-                }
-                if (!inQuote && (c == ' ' || c == '\t'))
-                {
-                    if (cur.Length > 0)
-                    {
-                        tokens.Add(cur.ToString());
-                        cur.Clear();
-                    }
-                    continue;
-                }
-                cur.Append(c);
-            }
-            if (cur.Length > 0)
-                tokens.Add(cur.ToString());
-            return tokens;
-        }
-
-        // Smart-case: a bare substring with no uppercase characters
-        // matches case-insensitively (the typical fast-typing case),
-        // while introducing any uppercase character flips the token to
-        // case-sensitive — same convention as ripgrep, vim, ag, etc.
-        // Picked per token, so `play COLL` requires a literal "COLL"
-        // even though `play` still matches loosely.
-        static StringComparison ComparisonForToken(string tok)
-        {
-            if (string.IsNullOrEmpty(tok))
-                return StringComparison.OrdinalIgnoreCase;
-            for (int i = 0; i < tok.Length; i++)
-            {
-                if (char.IsUpper(tok[i]))
-                    return StringComparison.Ordinal;
-            }
-            return StringComparison.OrdinalIgnoreCase;
-        }
-
-        static SearchScope ScopeFromKindValue(string v) =>
-            (v ?? "").ToLowerInvariant() switch
-            {
-                "e" or "entity" or "entities" => SearchScope.Entities,
-                "t" or "template" or "templates" => SearchScope.Templates,
-                "c" or "component" or "components" => SearchScope.Components,
-                "s" or "set" or "sets" => SearchScope.Sets,
-                "tag" or "tags" => SearchScope.Tags,
-                "a" or "accessor" or "accessors" => SearchScope.Accessors,
-                _ => 0,
-            };
-
-        static bool IsKnownPredicate(string key) =>
-            key switch
-            {
-                "tag"
-                or "c"
-                or "component"
-                or "base"
-                or "derived"
-                or "template"
-                or "reads"
-                or "writes"
-                or "accesses" => true,
-                _ => false,
-            };
-
-        // True iff the user has typed something — either text, a kind
-        // selector, or a predicate. Filter sites short-circuit when this
-        // is false to keep the no-filter rebuild path cheap.
-        bool SearchActive => !_searchFilter.IsEmpty;
-
-        // Predicate-aware row match. Returns true when the row satisfies
-        // every part of the active filter:
-        //   - Kind: row's scope must overlap the explicit t: selector
-        //     (or no selector → any kind ok).
-        //   - Bare substrings: each must appear in displayName.
-        //   - Predicates: each key must be defined for this kind, and at
-        //     least one of the kind's resolved values for that key must
-        //     contain the user's value as a substring.
-        // PredicateData is passed by ref so callers can stamp only the
-        // fields relevant to the current row's kind.
-        bool MatchesSearch(
-            SearchScope rowScope,
-            string displayName,
-            string altName,
-            in PredicateData ctx
-        )
-        {
-            var f = _searchFilter;
-            if (f.IsEmpty)
-                return true;
-            if (f.HasExplicitKind && (f.ExplicitKind & rowScope) == 0)
-                return false;
-            for (int i = 0; i < f.BareSubstrings.Count; i++)
-            {
-                var (sub, negate) = f.BareSubstrings[i];
-                var cmp = ComparisonForToken(sub);
-                bool inDisplay = displayName != null && displayName.IndexOf(sub, cmp) >= 0;
-                bool inAlt = altName != null && altName.IndexOf(sub, cmp) >= 0;
-                bool match = inDisplay || inAlt;
-                if (negate ? match : !match)
-                    return false;
-            }
-            for (int i = 0; i < f.Predicates.Count; i++)
-            {
-                var (key, value, negate) = f.Predicates[i];
-                bool match = MatchesPredicate(rowScope, key, value, in ctx);
-                if (negate ? match : !match)
-                    return false;
-            }
-            return true;
-        }
-
-        bool MatchesSearch(SearchScope rowScope, string displayName, in PredicateData ctx) =>
-            MatchesSearch(rowScope, displayName, null, in ctx);
-
-        // Substring-only sites (sections, partition rows, phase headings).
-        // A query that includes predicates filters these out — predicate
-        // dispatch returns false for kinds it doesn't handle, which is the
-        // desired behavior (predicates need to apply somewhere, and
-        // partitions etc. aren't a meaningful target).
-        bool MatchesSearch(SearchScope rowScope, string displayName) =>
-            MatchesSearch(rowScope, displayName, null, in PredicateData.Empty);
 
         void OnWorldDropdownChanged(ChangeEvent<string> evt)
         {
@@ -1716,11 +1405,15 @@ namespace Trecs
             }
 
             // While search is active the tree morphs into a flat list of
-            // matching content rows (see HarvestFlatLeaves). Otherwise we
+            // matching content rows (see TrecsHierarchySearch.HarvestFlatLeaves).
+            // Otherwise we
             // emit the standard 5-section hierarchy. The per-section build
             // calls run unconditionally so reverse-lookup tables and stable
             // ids stay populated either way.
-            bool searchActive = !string.IsNullOrEmpty(_searchText);
+            // Keyed on the parsed filter (not raw text) so degenerate
+            // queries that tokenize to nothing — a lone quote, "" — render
+            // the normal hierarchy instead of flat-dumping every leaf.
+            bool searchActive = _search.IsActive;
 
             EmitSection(
                 SectionTemplatesId,
@@ -1843,73 +1536,6 @@ namespace Trecs
             // off-screen — scroll it into view so they regain context.
             UpdateRowSelectionFromUnity(scrollToItem: leavingSearch);
         }
-
-        // While search is active we render a flat list of matching leaves
-        // instead of the section hierarchy — see header comment on
-        // _preSearchExpandedKeys. Walks the per-section subtree and pulls
-        // out every content row, dropping headers (Section, AccessorPhase,
-        // Group, MorePlaceholder). Each harvested leaf is reconstructed
-        // without children so it sits at the root of the flat tree.
-        //
-        // The explicit-kind filter (e.g. `t:e`) gets re-applied here:
-        // TryBuildTemplateNode keeps a template node when any of
-        // its entity children match, since hierarchy-mode rendering needs
-        // the template as the structural parent of those children. In
-        // flat mode there's no structural reason to keep it, so a `t:e`
-        // search would otherwise show both the template row and its
-        // matching entities. Re-checking the kind mask drops the
-        // template.
-        void HarvestFlatLeaves(
-            List<TreeViewItemData<RowData>> source,
-            List<TreeViewItemData<RowData>> sink
-        )
-        {
-            var kindMask = _searchFilter.HasExplicitKind
-                ? _searchFilter.ExplicitKind
-                : SearchScope.All;
-            HarvestFlatLeavesInner(source, sink, kindMask);
-        }
-
-        static void HarvestFlatLeavesInner(
-            List<TreeViewItemData<RowData>> source,
-            List<TreeViewItemData<RowData>> sink,
-            SearchScope kindMask
-        )
-        {
-            foreach (var item in source)
-            {
-                var kind = item.data.Kind;
-                var rowScope = ScopeForRowKind(kind);
-                bool isLeafContent = rowScope != 0;
-                if (isLeafContent && (rowScope & kindMask) != 0)
-                {
-                    sink.Add(new TreeViewItemData<RowData>(item.id, item.data));
-                }
-                if (item.hasChildren)
-                {
-                    HarvestFlatLeavesInner(
-                        (List<TreeViewItemData<RowData>>)item.children,
-                        sink,
-                        kindMask
-                    );
-                }
-            }
-        }
-
-        // Maps a row's RowKind to the SearchScope it represents. Header
-        // kinds (Section / AccessorPhase / Group / MorePlaceholder) return
-        // 0 since they aren't user-searchable content.
-        static SearchScope ScopeForRowKind(RowKind kind) =>
-            kind switch
-            {
-                RowKind.Template or RowKind.AbstractTemplate => SearchScope.Templates,
-                RowKind.Entity => SearchScope.Entities,
-                RowKind.Accessor => SearchScope.Accessors,
-                RowKind.ComponentType => SearchScope.Components,
-                RowKind.SetItem => SearchScope.Sets,
-                RowKind.TagItem => SearchScope.Tags,
-                _ => 0,
-            };
 
         // Walks live tree rows, looks up each id's stable string key, and
         // emits the keys for rows that are currently expanded. Rows
@@ -2148,14 +1774,14 @@ namespace Trecs
             // (tags, components, base/derived templates) so the matchers
             // read uniformly across live and cache modes.
             var ctx = new PredicateData { Template = tref };
-            bool selfMatches = MatchesSearch(
+            bool selfMatches = _search.Matches(
                 SearchScope.Templates,
                 displayName,
                 tref.DebugName ?? string.Empty,
                 in ctx
             );
             bool anyChildMatches = tplChildren != null && tplChildren.Count > 0;
-            if (SearchActive && !selfMatches && !anyChildMatches)
+            if (_search.IsActive && !selfMatches && !anyChildMatches)
             {
                 return false;
             }
@@ -2221,9 +1847,9 @@ namespace Trecs
                 entityChildren
             );
 
-            bool selfMatches = MatchesSearch(SearchScope.Partitions, displayName);
+            bool selfMatches = _search.Matches(SearchScope.Partitions, displayName);
             bool anyChildMatches = entityChildren.Count > 0;
-            if (SearchActive && !selfMatches && !anyChildMatches)
+            if (_search.IsActive && !selfMatches && !anyChildMatches)
             {
                 return false;
             }
@@ -2276,11 +1902,11 @@ namespace Trecs
                     ? $"#{handle.Id}"
                     : $"{templateDisplay} #{handle.Id}";
 
-                if (SearchActive)
+                if (_search.IsActive)
                 {
                     var hay = $"{displayName} id:{handle.Id}";
                     var ctx = new PredicateData { Template = parentTref };
-                    if (!MatchesSearch(SearchScope.Entities, hay, in ctx))
+                    if (!_search.Matches(SearchScope.Entities, hay, in ctx))
                     {
                         continue;
                     }
@@ -2305,7 +1931,7 @@ namespace Trecs
             // unconditionally — Cave Bounds, the largest, always survived
             // every search). The placeholder also wouldn't reflect search
             // hits among entities beyond `shown` anyway.
-            if (count > shown && string.IsNullOrEmpty(_searchText))
+            if (count > shown && !_search.IsActive)
             {
                 int phid = AllocateAnonId();
                 var data = new RowData
@@ -2345,7 +1971,7 @@ namespace Trecs
             foreach (var aref in phase.Accessors)
             {
                 var ctx = new PredicateData { AccessorDebugName = aref.DebugName };
-                if (!MatchesSearch(SearchScope.Accessors, aref.DebugName, in ctx))
+                if (!_search.Matches(SearchScope.Accessors, aref.DebugName, in ctx))
                 {
                     continue;
                 }
@@ -2380,8 +2006,8 @@ namespace Trecs
                 phaseChildren.Add(new TreeViewItemData<RowData>(aid, data));
             }
 
-            bool phaseTitleMatches = MatchesSearch(SearchScope.Accessors, phase.PhaseName);
-            if (SearchActive && !phaseTitleMatches && phaseChildren.Count == 0)
+            bool phaseTitleMatches = _search.Matches(SearchScope.Accessors, phase.PhaseName);
+            if (_search.IsActive && !phaseTitleMatches && phaseChildren.Count == 0)
             {
                 return;
             }
@@ -2429,7 +2055,7 @@ namespace Trecs
             {
                 var display = cref.DisplayName ?? "(unnamed)";
                 var ctx = new PredicateData { ComponentType = cref };
-                if (!MatchesSearch(SearchScope.Components, display, cref.LiveType?.Name, in ctx))
+                if (!_search.Matches(SearchScope.Components, display, cref.LiveType?.Name, in ctx))
                 {
                     continue;
                 }
@@ -2469,7 +2095,7 @@ namespace Trecs
             {
                 var display = sref.DebugName ?? "(unnamed)";
                 var ctx = new PredicateData { Set = sref };
-                if (!MatchesSearch(SearchScope.Sets, display, in ctx))
+                if (!_search.Matches(SearchScope.Sets, display, in ctx))
                 {
                     continue;
                 }
@@ -2570,7 +2196,7 @@ namespace Trecs
             {
                 var display = tref.Name ?? "(unnamed)";
                 var ctx = new PredicateData { Tag = tref };
-                if (!MatchesSearch(SearchScope.Tags, display, in ctx))
+                if (!_search.Matches(SearchScope.Tags, display, in ctx))
                 {
                     continue;
                 }
@@ -2614,7 +2240,7 @@ namespace Trecs
             _dataById[sectionId] = sectionData;
             if (searchActive)
             {
-                HarvestFlatLeaves(children, rootItems);
+                _search.HarvestFlatLeaves(children, rootItems);
             }
             else
             {
@@ -3385,108 +3011,34 @@ namespace Trecs
             return id;
         }
 
+        // Stamps the row text, wrapping search matches in highlight spans
+        // when the engine produces them (see
+        // TrecsHierarchySearch.TryBuildHighlightedRichText). Rich text is
+        // explicitly disabled on the plain path: labels are recycled
+        // across binds (and default to enableRichText = true when fresh),
+        // so leaving the flag floating let generic-type display names
+        // ("Interpolated<CFoo>") get mangled by the rich-text parser
+        // depending on the label's recycling history.
+        void ApplyLabelTextWithSearchHighlight(Label label, string displayName)
+        {
+            if (_search.TryBuildHighlightedRichText(displayName, out var richText))
+            {
+                label.enableRichText = true;
+                label.text = richText;
+            }
+            else
+            {
+                label.enableRichText = false;
+                label.text = displayName;
+            }
+        }
+
         // Scroll the row vertically centered in the viewport rather than
         // just barely-visible (which is what TreeView's built-in
         // ScrollToItemById does — it aligns to the nearest edge). With a
         // fixed item height we can compute the offset directly from the
         // row's flat-tree index; clamps to the valid scroll range so rows
         // near the top/bottom degrade gracefully.
-        // Renders the row text with every non-negated bare search
-        // substring wrapped in a bold yellow rich-text span. Bypasses
-        // rich text for generic-type display names (which contain
-        // literal "<>") so the parser doesn't mangle them; those rows
-        // still show, just without a highlight band.
-        void ApplyLabelTextWithSearchHighlight(Label label, string displayName)
-        {
-            // Fast path: no positive bare tokens → just stamp the text.
-            // BindTreeItem calls this for every visible row on every
-            // refresh, so skipping the IndexOf and rich-text toggle when
-            // there's nothing to highlight is worth a branch.
-            var bare = _searchFilter.BareSubstrings;
-            bool anyPositive = false;
-            for (int i = 0; i < bare.Count; i++)
-            {
-                if (!bare[i].Negate && !string.IsNullOrEmpty(bare[i].Substring))
-                {
-                    anyPositive = true;
-                    break;
-                }
-            }
-            if (!anyPositive)
-            {
-                label.text = displayName;
-                return;
-            }
-            // Generic-type display names contain literal "<>" — bypass
-            // rich text so Unity's parser doesn't mangle them. Those
-            // rows still render, just without a highlight band.
-            if (displayName.IndexOf('<') >= 0)
-            {
-                label.enableRichText = false;
-                label.text = displayName;
-                return;
-            }
-
-            // Collect every match span across all positive substrings,
-            // then merge overlapping/adjacent spans so the rich-text
-            // wrapping doesn't nest <color> tags or split the same
-            // character across multiple spans.
-            var spans = new List<(int start, int end)>();
-            for (int i = 0; i < bare.Count; i++)
-            {
-                var (sub, neg) = bare[i];
-                if (neg || string.IsNullOrEmpty(sub))
-                    continue;
-                var cmp = ComparisonForToken(sub);
-                int from = 0;
-                while (from <= displayName.Length - sub.Length)
-                {
-                    int idx = displayName.IndexOf(sub, from, cmp);
-                    if (idx < 0)
-                        break;
-                    spans.Add((idx, idx + sub.Length));
-                    from = idx + sub.Length;
-                }
-            }
-            if (spans.Count == 0)
-            {
-                label.enableRichText = false;
-                label.text = displayName;
-                return;
-            }
-            spans.Sort((a, b) => a.start.CompareTo(b.start));
-            var merged = new List<(int start, int end)> { spans[0] };
-            for (int i = 1; i < spans.Count; i++)
-            {
-                var top = merged[merged.Count - 1];
-                var s = spans[i];
-                if (s.start <= top.end)
-                {
-                    merged[merged.Count - 1] = (top.start, Math.Max(top.end, s.end));
-                }
-                else
-                {
-                    merged.Add(s);
-                }
-            }
-
-            label.enableRichText = true;
-            var sb = new StringBuilder(displayName.Length + merged.Count * 24);
-            int cursor = 0;
-            foreach (var (start, end) in merged)
-            {
-                if (start > cursor)
-                    sb.Append(displayName, cursor, start - cursor);
-                sb.Append("<color=#FFD24A><b>");
-                sb.Append(displayName, start, end - start);
-                sb.Append("</b></color>");
-                cursor = end;
-            }
-            if (cursor < displayName.Length)
-                sb.Append(displayName, cursor, displayName.Length - cursor);
-            label.text = sb.ToString();
-        }
-
         void ScrollToItemCentered(int id)
         {
             // BaseListView.scrollView is internal in this Unity version, so
@@ -3921,139 +3473,6 @@ namespace Trecs
             }
             sb.Append('>');
             return sb.ToString();
-        }
-
-        // Dispatch table: returns true if at least one of the row's
-        // resolved values for `key` contains `value` as a substring. False
-        // if the predicate isn't defined for this kind (so the row gets
-        // filtered) or no value matches.
-        bool MatchesPredicate(SearchScope rowScope, string key, string value, in PredicateData ctx)
-        {
-            switch (rowScope)
-            {
-                case SearchScope.Templates:
-                    return MatchesTemplatePredicate(key, value, in ctx);
-                case SearchScope.Entities:
-                    return MatchesEntityPredicate(key, value, in ctx);
-                case SearchScope.Components:
-                    return MatchesComponentPredicate(key, value, in ctx);
-                case SearchScope.Sets:
-                    return MatchesSetPredicate(key, value, in ctx);
-                case SearchScope.Tags:
-                    return MatchesTagPredicate(key, value, in ctx);
-                case SearchScope.Accessors:
-                    return MatchesAccessorPredicate(key, value, in ctx);
-                default:
-                    return false;
-            }
-        }
-
-        bool MatchesTemplatePredicate(string key, string value, in PredicateData ctx)
-        {
-            var t = ctx.Template;
-            if (t == null)
-                return false;
-            return key switch
-            {
-                "tag" => AnyContains(t.AllTagNames, value),
-                "c" or "component" => AnyContains(t.ComponentTypeNames, value),
-                "base" => AnyContains(t.BaseTemplateNames, value),
-                "derived" => AnyContains(t.DerivedTemplateNames, value),
-                _ => false,
-            };
-        }
-
-        bool MatchesEntityPredicate(string key, string value, in PredicateData ctx)
-        {
-            // Entity rows reuse their parent template's data for tag/component
-            // queries — entities don't carry per-instance tags or components,
-            // they inherit from the resolved template they were spawned from.
-            switch (key)
-            {
-                case "tag":
-                case "c":
-                case "component":
-                    return MatchesTemplatePredicate(key, value, in ctx);
-                case "template":
-                    var n = ctx.Template?.DebugName;
-                    return n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
-                default:
-                    return false;
-            }
-        }
-
-        bool MatchesComponentPredicate(string key, string value, in PredicateData ctx)
-        {
-            // Components only answer "c:X" — matches when the row's own
-            // display name contains X. Other predicates filter the row out
-            // (a component isn't itself tagged, doesn't have a base, etc.).
-            if (key != "c" && key != "component")
-                return false;
-            var name = ctx.ComponentType?.DisplayName;
-            return name != null && name.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        bool MatchesSetPredicate(string key, string value, in PredicateData ctx)
-        {
-            if (key != "tag" || ctx.Set == null)
-                return false;
-            return AnyContains(ctx.Set.TagNames, value);
-        }
-
-        bool MatchesTagPredicate(string key, string value, in PredicateData ctx)
-        {
-            // A tag "has" itself — so tag:player matches the tag named
-            // player. Other predicates filter out (tags don't have
-            // components/templates/etc.).
-            if (key != "tag")
-                return false;
-            var name = ctx.Tag?.Name;
-            return name != null && name.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        bool MatchesAccessorPredicate(string key, string value, in PredicateData ctx)
-        {
-            if (string.IsNullOrEmpty(ctx.AccessorDebugName) || _source == null)
-            {
-                return false;
-            }
-            var tracker = _source.AccessTracker;
-            if (tracker == null)
-            {
-                return false;
-            }
-            switch (key)
-            {
-                case "reads":
-                    return AnyContains(tracker.GetComponentsReadBy(ctx.AccessorDebugName), value);
-                case "writes":
-                    return AnyContains(
-                        tracker.GetComponentsWrittenBy(ctx.AccessorDebugName),
-                        value
-                    );
-                case "accesses":
-                    return AnyContains(tracker.GetComponentsReadBy(ctx.AccessorDebugName), value)
-                        || AnyContains(
-                            tracker.GetComponentsWrittenBy(ctx.AccessorDebugName),
-                            value
-                        );
-                default:
-                    return false;
-            }
-        }
-
-        static bool AnyContains(IReadOnlyCollection<string> names, string value)
-        {
-            if (names == null || names.Count == 0)
-                return false;
-            foreach (var n in names)
-            {
-                if (n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-            }
-            return false;
         }
     }
 }

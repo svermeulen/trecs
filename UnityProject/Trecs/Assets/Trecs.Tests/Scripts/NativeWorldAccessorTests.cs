@@ -19,7 +19,7 @@ namespace Trecs.Tests
             using var refs = a.ReserveEntityHandles(1, Allocator.Temp);
             var init = nativeEcs.AddEntity(TestTags.Alpha, sortKey: 1, refs[0]);
             init.Set(new TestInt { Value = 42 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
             var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
@@ -40,7 +40,7 @@ namespace Trecs.Tests
                     .AddEntity(TestTags.Alpha, sortKey: (uint)i, refs[i])
                     .Set(new TestInt { Value = i * 10 });
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -58,7 +58,7 @@ namespace Trecs.Tests
 
             // No ReserveEntityHandles needed for the fire-and-forget variant.
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 1).Set(new TestInt { Value = 42 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
             var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
@@ -74,7 +74,7 @@ namespace Trecs.Tests
 
             nativeEcs.AddEntity<TestAlpha>(sortKey: 1).Set(new TestInt { Value = 1 });
             nativeEcs.AddEntity<TestAlpha>(sortKey: 2).Set(new TestInt { Value = 2 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -96,7 +96,7 @@ namespace Trecs.Tests
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 30).Set(new TestInt { Value = 300 });
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 10).Set(new TestInt { Value = 100 });
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 20).Set(new TestInt { Value = 200 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -121,7 +121,7 @@ namespace Trecs.Tests
                 .AddEntity(TestTags.Alpha, sortKey: 1, refs[0])
                 .Set(new TestInt { Value = 11 });
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 2).Set(new TestInt { Value = 22 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
             // Pre-reserved handle must resolve to its entity.
@@ -140,11 +140,11 @@ namespace Trecs.Tests
             var nativeEcs = a.ToNative();
 
             nativeEcs.AddEntity(TestTags.Alpha, sortKey: 1).Set(new TestInt { Value = 99 });
-            a.Submit();
+            a.World.Submit();
 
             var handle = a.Query().WithTags(TestTags.Alpha).SingleHandle();
             handle.Remove(a);
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -168,10 +168,10 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             nativeEcs.RemoveEntity(handles[1]);
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.IsFalse(handles[1].Exists(a));
@@ -188,10 +188,10 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 1 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             nativeEcs.RemoveEntity(handle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -215,10 +215,10 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             nativeEcs.SetTag<TestPartitionB>(handle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
@@ -239,10 +239,10 @@ namespace Trecs.Tests
                 .Set(new TestVec { X = 1.5f, Y = 2.5f })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             nativeEcs.SetTag<TestPartitionB>(handle.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             var comp = a.Query().WithTags(partitionB).SingleHandle().Component<TestInt>(a);
             NAssert.AreEqual(88, comp.Read.Value);
@@ -274,7 +274,7 @@ namespace Trecs.Tests
             nativeEcs
                 .AddEntity(TestTags.Alpha, sortKey: 20, refs[2])
                 .Set(new TestInt { Value = 200 });
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -305,7 +305,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Add 2 via native, remove 1 via native
             using var newRefs = a.ReserveEntityHandles(2, Allocator.Temp);
@@ -316,7 +316,7 @@ namespace Trecs.Tests
                 .AddEntity(TestTags.Alpha, sortKey: 2, newRefs[1])
                 .Set(new TestInt { Value = 20 });
             nativeEcs.RemoveEntity(handles[0]);
-            a.Submit();
+            a.World.Submit();
 
             // 3 - 1 + 2 = 4
             NAssert.AreEqual(4, a.CountEntitiesWithTags(TestTags.Alpha));
@@ -341,11 +341,11 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             a.Set<NWATestSet>().DeferredAdd(new EntityIndex(0, group));
-            a.Submit();
+            a.World.Submit();
 
             var set = a.Set<NWATestSet>();
             NAssert.AreEqual(1, set.Read.Count);
@@ -365,18 +365,52 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<NWATestSet>();
             set.Write.Add(new EntityIndex(0, group));
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(1, set.Read.Count);
 
             a.Set<NWATestSet>().DeferredRemove(new EntityIndex(0, group));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(0, set.Read.Count);
+        }
+
+        #endregion
+
+        #region World info (frame counts / pause / global entity)
+
+        [Test]
+        public void NativeAccessor_FixedFrame_MatchesWorldAccessor()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            // Fresh world starts at fixed frame 0.
+            NAssert.AreEqual(a.FixedFrame, a.ToNative().FixedFrame);
+
+            env.StepFixedFrames(3);
+
+            // The snapshot is taken at ToNative() time, so re-fetch after stepping.
+            NAssert.AreEqual(a.FixedFrame, a.ToNative().FixedFrame);
+        }
+
+        [Test]
+        public void NativeAccessor_Frame_FallsBackToFixedFrameOutsideSystemPhase()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            env.StepFixedFrames(2);
+
+            // The test accessor is Unrestricted (no phase context), so the phase-aware
+            // Frame mirrors the deterministic FixedFrame rather than the variable counter.
+            var nativeEcs = a.ToNative();
+            NAssert.AreEqual(a.FixedFrame, nativeEcs.Frame);
+            NAssert.AreEqual(nativeEcs.FixedFrame, nativeEcs.Frame);
         }
 
         #endregion

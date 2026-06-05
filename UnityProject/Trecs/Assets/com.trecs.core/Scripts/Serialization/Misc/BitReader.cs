@@ -19,12 +19,12 @@ namespace Trecs.Internal
             _currentCapacity = 0;
         }
 
-        public bool HasMoreBits
+        public int ConsumedBitCount
         {
             get
             {
                 TrecsDebugAssert.That(_hasStarted);
-                return (_byteIndex * 8 + _bitPosition) < _totalBits;
+                return _byteIndex * 8 + _bitPosition;
             }
         }
 
@@ -50,25 +50,20 @@ namespace Trecs.Internal
             }
         }
 
-        public void Reset(ReadOnlySpan<byte> data, ref int offset)
+        /// <summary>
+        /// Reset from a standalone packed bit-field section plus its bit count — the form held by
+        /// <see cref="IReadOnlySerializationData"/>. The section is already sliced out (the
+        /// <c>[bitCount][bitFieldBytes][dataBytes]</c> prefix is parsed by the caller), so there
+        /// is nothing to parse here.
+        /// </summary>
+        public void Reset(ReadOnlySpan<byte> packedBytes, int totalBits)
         {
             TrecsDebugAssert.That(!_hasStarted);
             _hasStarted = true;
 
-            _totalBits = 0;
-            MemoryBlitter.Read(ref _totalBits, data, ref offset);
-            int byteCount = 0;
-            MemoryBlitter.Read(ref byteCount, data, ref offset);
-            EnsureCapacity(byteCount);
-
-            if (offset + byteCount > data.Length)
-            {
-                throw new SerializationException(
-                    $"Truncated data: expected {byteCount} bit-field bytes at offset {offset} but data length is only {data.Length}"
-                );
-            }
-            data.Slice(offset, byteCount).CopyTo(_bytes);
-            offset += byteCount;
+            _totalBits = totalBits;
+            EnsureCapacity(packedBytes.Length);
+            packedBytes.CopyTo(_bytes);
 
             _byteIndex = 0;
             _bitPosition = 0;

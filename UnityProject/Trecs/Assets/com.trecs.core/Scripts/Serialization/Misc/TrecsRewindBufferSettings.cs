@@ -10,13 +10,13 @@ namespace Trecs.Internal
     {
         /// <summary>
         /// Wall-clock seconds (in simulation time, derived from FixedDeltaTime
-        /// and frame counts) between persisted-anchor captures. Anchors are
+        /// and frame counts) between persisted-keyframe captures. Keyframes are
         /// the snapshots that survive Save/Load and serve as desync-recovery
         /// points during runtime playback. Sparse — larger values reduce file
         /// size; smaller values reduce the maximum amount of resimulation
         /// needed during playback recovery.
         /// </summary>
-        public float AnchorIntervalSeconds = 30f;
+        public float KeyframeIntervalSeconds = 30f;
 
         /// <summary>
         /// Wall-clock seconds (simulation time) between transient scrub-cache
@@ -35,11 +35,11 @@ namespace Trecs.Internal
         public int Version = 1;
 
         /// <summary>
-        /// Maximum number of persisted anchors kept in memory. Oldest is
+        /// Maximum number of persisted keyframes kept in memory. Oldest is
         /// dropped when the cap is hit. 0 means unbounded — fine for short
         /// debug sessions, not recommended for hours-long recordings.
         /// </summary>
-        public int MaxAnchorCount = 0;
+        public int MaxKeyframeCount = 0;
 
         /// <summary>
         /// Maximum total bytes of transient scrub-cache snapshots kept in

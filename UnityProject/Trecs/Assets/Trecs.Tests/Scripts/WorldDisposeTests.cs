@@ -25,20 +25,20 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove some
             a.RemoveEntity(refs[0]);
             a.RemoveEntity(refs[2]);
-            a.Submit();
+            a.World.Submit();
 
             // Move some
             a.SetTag<TestPartitionB>(refs[1].ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             // Add more
             a.AddEntity(partitionA).Set(new TestInt { Value = 99 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             // Dispose should not throw
             NAssert.DoesNotThrow(() => env.Dispose());

@@ -5,7 +5,7 @@ using Trecs.Collections;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class WorldAccessorRegistry
+    internal sealed class WorldAccessorRegistry
     {
         readonly TrecsLog _log;
 

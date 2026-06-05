@@ -16,9 +16,9 @@ namespace Trecs
     /// from this field's own location rather than from any absolute pointer
     /// or root-relative offset.</para>
     ///
-    /// <para>The DOTS equivalent is <c>BlobPtr&lt;T&gt;</c>, but that name is
+    /// <para>The DOTS equivalent is <c>SharedAnchor&lt;T&gt;</c>, but that name is
     /// already taken in Trecs by the heap-pin type in
-    /// <see cref="BlobPtr{T}"/>, so we ship this as <c>Trecs.BlobRef&lt;T&gt;</c>.</para>
+    /// <see cref="SharedAnchor{T}"/>, so we ship this as <c>Trecs.BlobRef&lt;T&gt;</c>.</para>
     ///
     /// <para>Constructed via <see cref="BlobBuilder.Allocate{T}(in BlobRef{T})"/>.
     /// Same storage-on-component caveat as <see cref="BlobArray{T}"/>: storing
@@ -31,7 +31,7 @@ namespace Trecs
     /// as <see cref="BlobArray{T}"/>: a by-value copy onto the stack would
     /// keep the original <c>m_OffsetPtr</c> but compute the target from the
     /// stack address, producing garbage reads. The
-    /// <c>NonCopyableAnalyzer</c> (TRECS118 / TRECS119) catches by-value
+    /// <c>NonCopyableAnalyzer</c> (TRECS118 / TRECS131) catches by-value
     /// local copies and non-<c>in</c> parameter passes at compile time.</para>
     /// </summary>
     [NonCopyable]

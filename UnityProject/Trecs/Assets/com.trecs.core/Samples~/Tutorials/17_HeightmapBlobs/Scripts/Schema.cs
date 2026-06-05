@@ -25,10 +25,10 @@ namespace Trecs.Samples.HeightmapBlobs
     }
 
     /// <summary>
-    /// Inputs that define a heightmap's content. Hashed with
-    /// <see cref="UniqueHashGenerator"/> to derive the heightmap's
-    /// <see cref="BlobId"/>, so two callers asking for "16×16, seed 42,
-    /// 4m tall, 20m wide" always get the same blob — the content recipe is
+    /// Inputs that define a heightmap's content. Hashed by the descriptor
+    /// interner to derive the heightmap's <see cref="BlobId"/>, so two callers
+    /// asking for "16×16, seed
+    /// 42, 4m tall, 20m wide" always get the same blob — the content recipe is
     /// the identity. Changing any field produces a different BlobId, so the
     /// cache lookup naturally invalidates when the recipe changes.
     /// </summary>
@@ -160,8 +160,8 @@ namespace Trecs.Samples.HeightmapBlobs
     /// <summary>
     /// Unmanaged heightmap blob: the descriptor plus a 16×16 (256-element)
     /// inline grid of heights. Sized so the entire blob fits inside the
-    /// struct — no secondary allocation needed, just <c>NativeSharedPtr.Alloc</c>
-    /// of the value. For larger heightmaps, see
+    /// struct — no secondary allocation needed, just the interner's inline-value
+    /// builder copies it onto the heap. For larger heightmaps, see
     /// <see cref="NativeHeightmapDataLarge"/>, which uses a
     /// <c>BlobArray&lt;float&gt;</c> field built via <c>BlobBuilder</c> —
     /// single allocation, relocatable, no inline cap, and no intermediate
@@ -217,19 +217,19 @@ namespace Trecs.Samples.HeightmapBlobs
     // ─── Native flavor (large / taking-ownership) ─────────────────────
     // NativeHeightmapDataLarge is the "blob bigger than inline storage"
     // shape. Heights live in the same native allocation as the root struct,
-    // reached via a relative-offset BlobArray<float>. Seeded by
-    // BlobBuilder + NativeSharedPtr.AllocTakingOwnership; the heap takes
+    // reached via a relative-offset BlobArray<float>. The interner's
+    // taking-ownership builder produces it with BlobBuilder; the heap takes
     // ownership of the (ptr, size, alignment) triple and frees it through
     // AllocatorManager when the refcount hits zero.
 
     /// <summary>
     /// Native heightmap blob with heights in a relative-offset
     /// <see cref="BlobArray{T}"/>. Built via
-    /// <see cref="BlobBuilder.Build{T}(WorldAccessor, BlobId)"/> — the
-    /// builder produces a single contiguous allocation containing this
-    /// header struct plus the heights, and patches <see cref="Heights"/>'s
-    /// offset to point at them. No intermediate stack-to-field copy on
-    /// the seed path and no inline-storage cap, unlike
+    /// <see cref="BlobBuilder.BuildNativeBlobAllocation"/> inside a
+    /// taking-ownership interner factory — the builder produces a single
+    /// contiguous allocation containing this header struct plus the heights, and
+    /// patches <see cref="Heights"/>'s offset to point at them. No intermediate
+    /// stack-to-field copy on the seed path and no inline-storage cap, unlike
     /// <see cref="NativeHeightmapData"/>.
     ///
     /// <para>Declared as a plain <c>struct</c> (not <c>readonly struct</c>)

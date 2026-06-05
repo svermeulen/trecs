@@ -1,8 +1,9 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
 using UnityEngine;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -10,19 +11,17 @@ namespace Trecs.Tests
     public class ErrorHandlingTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
+        private SerializationReadBuffer _readBuffer;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _cacheHelper?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
+            _readBuffer = new SerializationReadBuffer();
         }
 
         [Test]
@@ -35,8 +34,8 @@ namespace Trecs.Tests
             // Act & Assert
             TrecsDebugAssert.Throws<TrecsException>(() =>
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     unregisteredObject,
                     TestConstants.Version,
                     includeTypeChecks: true,
@@ -53,15 +52,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Framework now handles null strings correctly
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 nullString,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllObject() as string;
+            var result = _helper.ReadAllObject(_data) as string;
 
             // Assert - Verify null string is preserved
             TrecsDebugAssert.That(result == null);
@@ -75,15 +73,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Framework now handles null elements in collections correctly
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 listWithNulls,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<List<string>>();
+            var result = _helper.ReadAll<List<string>>(_data);
 
             // Assert - Verify null elements are preserved
             TrecsDebugAssert.That(result != null);
@@ -101,15 +98,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalList,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<List<int>>();
+            var result = _helper.ReadAll<List<int>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(result);
@@ -126,14 +122,18 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - First write valid data
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(validData, TestConstants.Version, includeTypeChecks: true, flags);
+            _helper.WriteAll(
+                _data,
+                validData,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
 
             // Try to read as wrong type - this should handle the type mismatch
-            _cacheHelper.ResetMemoryPosition();
 
             // This should work fine since int is compatible
-            var result = _cacheHelper.ReadAll<int>();
+            var result = _helper.ReadAll<int>(_data);
             TrecsDebugAssert.That(result == validData);
         }
 
@@ -149,10 +149,14 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(largeList, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<List<int>>();
+            _helper.WriteAll(
+                _data,
+                largeList,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var result = _helper.ReadAll<List<int>>(_data);
 
             // Assert
             TrecsDebugAssert.IsNotNull(result);
@@ -170,18 +174,15 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act - Write first piece of data
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(data1, TestConstants.Version, includeTypeChecks: true, flags);
-            var position1 = _cacheHelper.MemoryStream.Position;
+            _helper.WriteAll(_data, data1, TestConstants.Version, includeTypeChecks: true, flags);
+            var position1 = _data.ContiguousSize;
 
             // Clear and write second piece of data
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(data2, TestConstants.Version, includeTypeChecks: true, flags);
-            var position2 = _cacheHelper.MemoryStream.Position;
+            _helper.WriteAll(_data, data2, TestConstants.Version, includeTypeChecks: true, flags);
+            var position2 = _data.ContiguousSize;
 
             // Reset and read data
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<int>();
+            var result = _helper.ReadAll<int>(_data);
 
             // Assert
             TrecsDebugAssert.That(position1 > 0);
@@ -206,15 +207,14 @@ namespace Trecs.Tests
             foreach (var original in specialVectors)
             {
                 // Act
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     original,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags
                 );
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<Vector3>();
+                var result = _helper.ReadAll<Vector3>(_data);
 
                 // Assert
                 if (float.IsNaN(original.x))
@@ -251,15 +251,14 @@ namespace Trecs.Tests
             foreach (var original in boolValues)
             {
                 // Act
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     original,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags
                 );
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<bool>();
+                var result = _helper.ReadAll<bool>(_data);
 
                 // Assert
                 TrecsDebugAssert.That(result == original);
@@ -274,8 +273,8 @@ namespace Trecs.Tests
 
             TrecsDebugAssert.Throws<TrecsException>(() =>
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     unregistered,
                     TestConstants.Version,
                     includeTypeChecks: true,
@@ -284,10 +283,8 @@ namespace Trecs.Tests
             });
 
             // After the failed write, the buffer should be usable again.
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(123, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<int>();
+            _helper.WriteAll(_data, 123, TestConstants.Version, includeTypeChecks: true, flags);
+            var result = _helper.ReadAll<int>(_data);
 
             TrecsDebugAssert.That(result == 123);
         }
@@ -297,20 +294,17 @@ namespace Trecs.Tests
         {
             var flags = 0L;
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(123, TestConstants.Version, includeTypeChecks: true, flags);
+            _helper.WriteAll(_data, 123, TestConstants.Version, includeTypeChecks: true, flags);
 
-            // Truncate the stream so the next read blows up mid-header.
-            _cacheHelper.MemoryStream.SetLength(2);
-            _cacheHelper.ResetMemoryPosition();
+            // Truncate the serialized bytes so the next read blows up mid-header.
+            var truncated = _data.ToContiguousBytes();
+            NAssert.Catch(() =>
+                _helper.ReadAll<int>(_readBuffer.Wrap(new ReadOnlyMemory<byte>(truncated, 0, 2)))
+            );
 
-            Assert.Catch(() => _cacheHelper.ReadAll<int>());
-
-            // Buffer should be recovered: full write/read round-trip must succeed.
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(456, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<int>();
+            // Helper should be recovered: full write/read round-trip must succeed.
+            _helper.WriteAll(_data, 456, TestConstants.Version, includeTypeChecks: true, flags);
+            var result = _helper.ReadAll<int>(_data);
 
             TrecsDebugAssert.That(result == 456);
         }

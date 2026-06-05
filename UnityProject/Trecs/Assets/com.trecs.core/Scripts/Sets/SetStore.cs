@@ -8,9 +8,9 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class SetStore : IDisposable
+    internal sealed class SetStore : IDisposable
     {
-        internal NativeHashMap<SetId, EntitySetStorage> EntitySets;
+        NativeHashMap<SetId, EntitySetStorage> _entitySets;
         internal NativeHashMap<SetId, NativeSetDeferredQueues> DeferredQueues;
         internal NativeList<SetId> SetIds;
 
@@ -20,21 +20,21 @@ namespace Trecs.Internal
         // update them. Inner is UnsafeList<SetId> so the outer NativeList holds
         // non-NativeContainer values — same pattern as EntityHandleMap's reverse map.
         [NativeDisableContainerSafetyRestriction]
-        internal NativeList<UnsafeList<SetId>> SetIdsByGroup;
+        NativeList<UnsafeList<SetId>> _setIdsByGroup;
 
         public SetStore(int groupCount)
         {
-            EntitySets = new NativeHashMap<SetId, EntitySetStorage>(0, Allocator.Persistent);
+            _entitySets = new NativeHashMap<SetId, EntitySetStorage>(0, Allocator.Persistent);
             DeferredQueues = new NativeHashMap<SetId, NativeSetDeferredQueues>(
                 0,
                 Allocator.Persistent
             );
             SetIds = new NativeList<SetId>(0, Allocator.Persistent);
-            SetIdsByGroup = new NativeList<UnsafeList<SetId>>(groupCount, Allocator.Persistent);
-            SetIdsByGroup.Resize(groupCount, NativeArrayOptions.UninitializedMemory);
+            _setIdsByGroup = new NativeList<UnsafeList<SetId>>(groupCount, Allocator.Persistent);
+            _setIdsByGroup.Resize(groupCount, NativeArrayOptions.UninitializedMemory);
             for (int i = 0; i < groupCount; i++)
             {
-                SetIdsByGroup[i] = new UnsafeList<SetId>(0, Allocator.Persistent);
+                _setIdsByGroup[i] = new UnsafeList<SetId>(0, Allocator.Persistent);
             }
         }
 
@@ -45,7 +45,7 @@ namespace Trecs.Internal
         public void RegisterSet(EntitySet entitySet, WorldInfo worldInfo)
         {
             TrecsDebugAssert.That(
-                !EntitySets.ContainsKey(entitySet.Id),
+                !_entitySets.ContainsKey(entitySet.Id),
                 "Set '{0}' is already registered",
                 entitySet.DebugName
             );
@@ -65,7 +65,7 @@ namespace Trecs.Internal
                 validGroups.Add(group);
             }
 
-            EntitySets.Add(
+            _entitySets.Add(
                 entitySet.Id,
                 new EntitySetStorage(entitySet.Id, worldInfo.AllGroups.Count, validGroups)
             );
@@ -81,14 +81,14 @@ namespace Trecs.Internal
 
             foreach (var group in groups)
             {
-                ref var list = ref SetIdsByGroup.ElementAt(group.Index);
+                ref var list = ref _setIdsByGroup.ElementAt(group.Index);
                 list.Add(entitySet.Id);
             }
         }
 
         internal EntitySetStorage GetSet(SetId setId)
         {
-            var found = EntitySets.TryGetValue(setId, out var result);
+            var found = _entitySets.TryGetValue(setId, out var result);
             TrecsDebugAssert.That(
                 found,
                 "Set with ID '{0}' not registered. Add it to the WorldBuilder via AddSet<T>().",
@@ -99,7 +99,7 @@ namespace Trecs.Internal
 
         internal EntitySetStorage GetSet(EntitySet entitySet)
         {
-            return EntitySets[entitySet.Id];
+            return _entitySets[entitySet.Id];
         }
 
         internal NativeSetDeferredQueues GetDeferredQueues(SetId setId)
@@ -115,7 +115,7 @@ namespace Trecs.Internal
         {
             for (int i = 0; i < SetIds.Length; i++)
             {
-                EntitySets[SetIds[i]].FlushJobWrites();
+                _entitySets[SetIds[i]].FlushJobWrites();
             }
         }
 
@@ -129,7 +129,7 @@ namespace Trecs.Internal
             for (int i = 0; i < SetIds.Length; i++)
             {
                 var setId = SetIds[i];
-                var set = EntitySets[setId];
+                var set = _entitySets[setId];
                 var queues = DeferredQueues[setId];
                 FlushDeferredOpsForSet(ref set, ref queues);
             }
@@ -185,23 +185,23 @@ namespace Trecs.Internal
             for (int i = 0; i < SetIds.Length; i++)
             {
                 var setId = SetIds[i];
-                EntitySets[setId].Dispose();
+                _entitySets[setId].Dispose();
                 DeferredQueues[setId].Dispose();
             }
 
-            for (int i = 0; i < SetIdsByGroup.Length; i++)
+            for (int i = 0; i < _setIdsByGroup.Length; i++)
             {
-                ref var list = ref SetIdsByGroup.ElementAt(i);
+                ref var list = ref _setIdsByGroup.ElementAt(i);
                 if (list.IsCreated)
                 {
                     list.Dispose();
                 }
             }
 
-            EntitySets.Dispose();
+            _entitySets.Dispose();
             DeferredQueues.Dispose();
             SetIds.Dispose();
-            SetIdsByGroup.Dispose();
+            _setIdsByGroup.Dispose();
         }
 
         /// <summary>
@@ -214,7 +214,7 @@ namespace Trecs.Internal
             IterableDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
         )
         {
-            var setIds = SetIdsByGroup[fromGroup.Index];
+            var setIds = _setIdsByGroup[fromGroup.Index];
             var numberOfSets = setIds.Length;
             if (numberOfSets == 0)
             {
@@ -223,7 +223,7 @@ namespace Trecs.Internal
 
             for (int i = 0; i < numberOfSets; ++i)
             {
-                var setCollection = EntitySets[setIds[i]];
+                var setCollection = _entitySets[setIds[i]];
 
                 if (!setCollection.TryGetGroupEntry(fromGroup, out var fromGroupEntry))
                 {
@@ -249,14 +249,18 @@ namespace Trecs.Internal
             }
         }
 
-        public void SwapEntityBetweenSets(
-            NativeList<MoveInfoEntry> fromEntityToEntityIDs,
-            GroupIndex fromGroup,
-            GroupIndex toGroup,
-            IterableDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
+        /// <summary>
+        /// Removes the given departed entity indices from every set the group
+        /// participates in, without touching survivor positions. Used to defer set
+        /// removal until after OnRemoved callbacks for whole-group removals (where
+        /// there are no survivors and therefore no swap-back re-keying to do).
+        /// </summary>
+        public void RemoveDepartedEntitiesFromSets(
+            List<int> entityIndicesRemoved,
+            GroupIndex fromGroup
         )
         {
-            var setIds = SetIdsByGroup[fromGroup.Index];
+            var setIds = _setIdsByGroup[fromGroup.Index];
             var numberOfSets = setIds.Length;
             if (numberOfSets == 0)
             {
@@ -265,7 +269,64 @@ namespace Trecs.Internal
 
             for (int i = 0; i < numberOfSets; ++i)
             {
-                var setCollection = EntitySets[setIds[i]];
+                var setCollection = _entitySets[setIds[i]];
+
+                if (!setCollection.TryGetGroupEntry(fromGroup, out var fromGroupEntry))
+                {
+                    continue;
+                }
+
+                var entitiesCount = entityIndicesRemoved.Count;
+                for (int entityIndex = 0; entityIndex < entitiesCount; ++entityIndex)
+                {
+                    fromGroupEntry.Remove(entityIndicesRemoved[entityIndex]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clears the given group's entries from every set the group participates
+        /// in. Used by the whole-group removal fast path, where the entire group is
+        /// removed in one batch (no survivors) so the group's set entry can be
+        /// cleared wholesale instead of removing each departed index individually.
+        /// </summary>
+        public void ClearGroupFromSets(GroupIndex group)
+        {
+            var setIds = _setIdsByGroup[group.Index];
+            var numberOfSets = setIds.Length;
+            if (numberOfSets == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < numberOfSets; ++i)
+            {
+                var setCollection = _entitySets[setIds[i]];
+
+                if (setCollection.TryGetGroupEntry(group, out var groupEntry))
+                {
+                    groupEntry.Clear();
+                }
+            }
+        }
+
+        public void SwapEntityBetweenSets(
+            NativeList<MoveInfoEntry> fromEntityToEntityIDs,
+            GroupIndex fromGroup,
+            GroupIndex toGroup,
+            IterableDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
+        )
+        {
+            var setIds = _setIdsByGroup[fromGroup.Index];
+            var numberOfSets = setIds.Length;
+            if (numberOfSets == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < numberOfSets; ++i)
+            {
+                var setCollection = _entitySets[setIds[i]];
 
                 if (!setCollection.TryGetGroupEntry(fromGroup, out var fromGroupEntry))
                 {
@@ -313,11 +374,137 @@ namespace Trecs.Internal
             }
         }
 
-        public bool HasAnySets => SetIds.Length > 0;
-
-        public EntityQuerier.TrecsSets GetTrecsSets()
+        /// <summary>
+        /// Writes all set-membership state (per-set group entries plus the
+        /// group→set routing index) to the snapshot stream. The wire format
+        /// lives here, next to the storage it mirrors;
+        /// <see cref="WorldStateSerializer"/> only owns section ordering.
+        /// </summary>
+        public void Serialize(ISerializationWriter writer, WorldInfo worldInfo)
         {
-            return new EntityQuerier.TrecsSets(EntitySets);
+            WriteSets(writer, worldInfo);
+            WriteRoutingIndex(writer, worldInfo);
         }
+
+        public void Deserialize(ISerializationReader reader, WorldInfo worldInfo)
+        {
+            ReadSets(reader, worldInfo);
+            ReadRoutingIndex(reader, worldInfo);
+        }
+
+        void WriteSets(ISerializationWriter writer, WorldInfo worldInfo)
+        {
+            var numSets = SetIds.Length;
+            writer.Write("NumSets", numSets);
+
+            for (int i = 0; i < numSets; i++)
+            {
+                writer.PushScope("Set{0}", i);
+                writer.Write("SetId", SetIds[i]);
+
+                var set = _entitySets[SetIds[i]];
+                var registeredGroups = set._registeredGroups;
+                var entriesPerGroup = set._entriesPerGroup;
+
+                var numGroups = registeredGroups.Length;
+                writer.Write("NumGroups", numGroups);
+
+                for (int k = 0; k < numGroups; k++)
+                {
+                    writer.PushScope("Group{0}", k);
+                    var group = registeredGroups[k];
+                    writer.Write("Group", worldInfo.ToTagSet(group));
+
+                    var groupEntities = entriesPerGroup[group.Index];
+
+                    writer.Write("EntityIdToDenseIndex", groupEntities._entityIdToDenseIndex);
+                    writer.PopScope();
+                }
+                writer.PopScope();
+            }
+        }
+
+        void ReadSets(ISerializationReader reader, WorldInfo worldInfo)
+        {
+            var numSets = reader.Read<int>("NumSets");
+            TrecsDebugAssert.That(numSets >= 0);
+
+            TrecsDebugAssert.IsEqual(SetIds.Length, numSets);
+
+            for (int i = 0; i < numSets; i++)
+            {
+                var setId = reader.Read<SetId>("SetId");
+
+                var currentSetId = SetIds[i];
+                TrecsDebugAssert.IsEqual(setId, currentSetId);
+
+                var groupMap = _entitySets[setId];
+
+                var numGroups = reader.Read<int>("NumGroups");
+                TrecsDebugAssert.IsEqual(groupMap._registeredGroups.Length, numGroups);
+                groupMap.Clear();
+
+                for (int k = 0; k < numGroups; k++)
+                {
+                    var tagSet = reader.Read<TagSet>("Group");
+                    var group = worldInfo.ToGroupIndex(tagSet);
+
+                    var groupEntry = groupMap.GetSetGroupEntry(group);
+
+                    reader.Read("EntityIdToDenseIndex", ref groupEntry._entityIdToDenseIndex);
+                }
+            }
+        }
+
+        void WriteRoutingIndex(ISerializationWriter writer, WorldInfo worldInfo)
+        {
+            writer.PushScope("RoutingIndex");
+            // Emit only non-empty slots, keeping the wire format sparse.
+            int nonEmptyCount = 0;
+            for (int i = 0; i < _setIdsByGroup.Length; i++)
+            {
+                if (_setIdsByGroup[i].Length > 0)
+                    nonEmptyCount++;
+            }
+            writer.Write("NumRoutingEntries", nonEmptyCount);
+
+            int entryIndex = 0;
+            for (int i = 0; i < _setIdsByGroup.Length; i++)
+            {
+                var list = _setIdsByGroup[i];
+                if (list.Length == 0)
+                    continue;
+                writer.PushScope("Entry{0}", entryIndex);
+                writer.Write("Group", worldInfo.ToTagSet(GroupIndex.FromIndex(i)));
+                writer.Write("SetIds", in list);
+                writer.PopScope();
+                entryIndex++;
+            }
+            writer.PopScope();
+        }
+
+        void ReadRoutingIndex(ISerializationReader reader, WorldInfo worldInfo)
+        {
+            var numEntries = reader.Read<int>("NumRoutingEntries");
+
+            // Clear existing contents of every slot (reset to empty). Slots
+            // present in the snapshot are overwritten by the Resize inside
+            // UnsafeListSerializer; this pass handles the sparse slots that
+            // the snapshot omits entirely.
+            for (int i = 0; i < _setIdsByGroup.Length; i++)
+            {
+                _setIdsByGroup.ElementAt(i).Clear();
+            }
+
+            for (int i = 0; i < numEntries; i++)
+            {
+                var tagSet = reader.Read<TagSet>("Group");
+                var group = worldInfo.ToGroupIndex(tagSet);
+                ref var list = ref _setIdsByGroup.ElementAt(group.Index);
+                reader.Read("SetIds", ref list);
+            }
+        }
+
+        public bool HasAnySets => SetIds.Length > 0;
     }
 }

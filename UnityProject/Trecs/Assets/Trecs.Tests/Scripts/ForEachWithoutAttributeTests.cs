@@ -51,7 +51,7 @@ namespace Trecs.Tests
                 .AssertComplete();
             // QCatB only — fails the Tags=QCatA filter regardless of Without.
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 3 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             _singleResults.Clear();
             ProcessSingleWithout(a);
@@ -88,7 +88,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 20 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             _arrayResults.Clear();
             ProcessWithoutsArray(a);
@@ -128,7 +128,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 200 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             _namedResults.Clear();
             ProcessNamedTagsWithout(a);
@@ -158,7 +158,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 42 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             _emptyResults.Clear();
             ProcessEmptyExpected(a);

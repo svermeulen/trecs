@@ -282,6 +282,27 @@ public class Diagnostics_TRECS025_to_029_ComponentTests
         );
     }
 
+    [Test]
+    public void TRECS132_NonPartialComponentReportsMustBePartial()
+    {
+        // A struct implementing IEntityComponent must be partial so the generator
+        // can attach Equals/GetHashCode/operators to a partial half. A non-partial
+        // declaration used to silently emit a mismatched phantom partial; now it
+        // reports a clean "must be partial" diagnostic and skips generation.
+        const string source = """
+            namespace Sample
+            {
+                public struct CPos : Trecs.IEntityComponent { public float X; }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS132",
+            new IIncrementalGenerator[] { new EntityComponentGenerator() }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,

@@ -11,7 +11,7 @@ namespace Trecs.Internal
     /// API; user code should use the <see cref="EntityHandle"/> overloads on
     /// the set views directly.
     /// </summary>
-    public static class SetInternalExtensions
+    internal static class SetInternalExtensions
     {
         // ── SetWrite<T> ───────────────────────────────────────────────────
 

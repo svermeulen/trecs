@@ -47,14 +47,12 @@ namespace Trecs.Internal
             int id = member.Value;
             if (id == 0)
             {
-                id = 1;
+                throw EmptyCollisionException();
             }
 
             if (_entries.TryGetValue(id, out var existing))
             {
-#if DEBUG
                 AssertMembersMatch(id, existing.Members, stackalloc int[] { member.Value });
-#endif
                 return new TypeIdSet(id);
             }
 
@@ -77,22 +75,25 @@ namespace Trecs.Internal
                 }
             }
 
+            // No id is ever remapped, so a stored id always equals the exact XOR of its
+            // members; existing.Id ^ member.Value is therefore the true new-set id. A 0
+            // result would be a non-empty set colliding with the empty/null set (id 0) —
+            // an astronomically rare XOR coincidence, surfaced as a loud throw rather than
+            // silently remapped (which used to break every XOR-against-id consumer).
             int newId = existing.Id ^ member.Value;
             if (newId == 0)
             {
-                newId = 1;
+                throw EmptyCollisionException();
             }
 
             if (_entries.TryGetValue(newId, out var existingNewEntry))
             {
-#if DEBUG
                 AssertCombinedMembersMatch(
                     newId,
                     existingNewEntry.Members,
                     existingMembers,
                     member
                 );
-#endif
                 return new TypeIdSet(newId);
             }
 
@@ -145,15 +146,19 @@ namespace Trecs.Internal
 
             if (hash == 0)
             {
-                hash = 1;
+                throw EmptyCollisionException();
             }
 
             if (_entries.TryGetValue(hash, out var existing))
             {
-#if DEBUG
-                var merged = MergeSorted(membersA, membersB);
-                AssertMembersMatch(hash, existing.Members, MemberValuesSpan(merged));
-#endif
+                // Allocation-free collision check: merge into the shared buffer (no array
+                // alloc, unlike MergeSorted) and compare against the interned members.
+                int count = MergeIntoSortBuffer(membersA, membersB);
+                AssertMembersMatch(
+                    hash,
+                    existing.Members,
+                    new ReadOnlySpan<int>(_sortBuffer, 0, count)
+                );
                 return new TypeIdSet(hash);
             }
 
@@ -204,7 +209,10 @@ namespace Trecs.Internal
             }
         }
 
-        static TypeId[] MergeSorted(TypeId[] a, TypeId[] b)
+        // Merges the two sorted, deduped member arrays into the shared _sortBuffer and
+        // returns the merged length. Allocation-free; the caller must consume _sortBuffer
+        // before any other registry call reuses it.
+        static int MergeIntoSortBuffer(TypeId[] a, TypeId[] b)
         {
             int max = a.Length + b.Length;
             if (_sortBuffer.Length < max)
@@ -241,6 +249,12 @@ namespace Trecs.Internal
             while (ib < b.Length)
                 _sortBuffer[count++] = b[ib++].Value;
 
+            return count;
+        }
+
+        static TypeId[] MergeSorted(TypeId[] a, TypeId[] b)
+        {
+            int count = MergeIntoSortBuffer(a, b);
             var result = new TypeId[count];
             for (int i = 0; i < count; i++)
             {
@@ -249,22 +263,29 @@ namespace Trecs.Internal
             return result;
         }
 
-        static ReadOnlySpan<int> MemberValuesSpan(TypeId[] members)
-        {
-            if (_sortBuffer.Length < members.Length)
-            {
-                _sortBuffer = new int[members.Length];
-            }
-            for (int i = 0; i < members.Length; i++)
-            {
-                _sortBuffer[i] = members[i].Value;
-            }
-            return new ReadOnlySpan<int>(_sortBuffer, 0, members.Length);
-        }
+        // A non-empty set whose members XOR to 0 collides with the empty/null set, which
+        // owns id 0. We reserve id 0 for the empty set (so default(TypeIdSet) stays a safe
+        // null sentinel and id == XOR(members) holds exactly for every other set), and
+        // treat the collision as the same kind of (astronomically rare) XOR-hash collision
+        // that AssertMembersMatch guards — a loud, always-on throw rather than a silent
+        // remap. Keeping id == XOR(members) exact is what lets callers XOR against a stored
+        // id directly (including in Burst, where the member list is unreachable).
+        static TrecsException EmptyCollisionException() =>
+            new TrecsException(
+                "TypeIdSet XOR-hash collision: a non-empty set's members XOR to 0, which is "
+                    + "reserved for the empty/null set (TypeIdSet.Null). This is an "
+                    + "astronomically rare coincidence of member TypeId values. Resolve it by "
+                    + "renaming one of the member types (in default mode a type's id is the "
+                    + "hash of its name), or by changing a [TypeId] under "
+                    + "TRECS_REQUIRE_EXPLICIT_TYPE_IDS."
+            );
 
-        // Assert that the supplied sorted-int sequence matches the existing
-        // interned set, surfacing XOR-hash collisions instead of letting them
-        // silently alias two distinct sets.
+        // Always-on collision guard: the supplied sorted-int sequence must match the
+        // already-interned set at this id. XOR-hash ids are non-injective, so two distinct
+        // member sets can land on the same id; without this check the second one would
+        // silently alias the first (wrong query/group results). The comparison is O(members)
+        // and allocation-free, and the registry is a cold path (set construction / warmup,
+        // not per-entity), so it runs in every build rather than DEBUG-only.
         static void AssertMembersMatch(int id, TypeId[] existing, ReadOnlySpan<int> sortedValues)
         {
             if (existing.Length == sortedValues.Length)
@@ -285,8 +306,11 @@ namespace Trecs.Internal
             }
 
             throw new TrecsException(
-                $"TypeIdSet hash collision! ID {id} is already interned as a "
-                    + $"different member set."
+                $"TypeIdSet XOR-hash collision: id {id} is already interned for a different "
+                    + "member set. This is an astronomically rare coincidence of member "
+                    + "TypeId values. Resolve it by renaming one of the member types (in "
+                    + "default mode a type's id is the hash of its name), or by changing a "
+                    + "[TypeId] under TRECS_REQUIRE_EXPLICIT_TYPE_IDS."
             );
         }
 

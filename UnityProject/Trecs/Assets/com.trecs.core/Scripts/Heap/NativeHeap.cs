@@ -807,11 +807,7 @@ namespace Trecs.Internal
                 NextFreshSideTableSlot = _nextFreshSideTableSlot,
                 NumPages = _pages.Length,
             };
-            writer.BlitWriteRawBytes(
-                "Header",
-                &heapHeader,
-                UnsafeUtility.SizeOf<SerializedHeapHeader>()
-            );
+            writer.BlitWrite("Header", heapHeader);
 
             using (TrecsProfiling.Start("ZeroFreeSlots"))
             {
@@ -826,11 +822,7 @@ namespace Trecs.Internal
                     if (page.Address == IntPtr.Zero)
                     {
                         var nullHeader = new SerializedPageHeader { Kind = (byte)PageKind.Null };
-                        writer.BlitWriteRawBytes(
-                            "PageHeader",
-                            &nullHeader,
-                            UnsafeUtility.SizeOf<SerializedPageHeader>()
-                        );
+                        writer.BlitWrite("PageHeader", nullHeader);
                         continue;
                     }
 
@@ -844,14 +836,14 @@ namespace Trecs.Internal
                         Alignment = page.Alignment,
                         BucketIdx = page.BucketIdx,
                     };
-                    writer.BlitWriteRawBytes(
-                        "PageHeader",
-                        &pageHeader,
-                        UnsafeUtility.SizeOf<SerializedPageHeader>()
-                    );
+                    writer.BlitWrite("PageHeader", pageHeader);
 
                     var pageBytes =
                         page.BucketIdx >= 0 ? page.SlotSize * page.SlotCount : page.SlotSize;
+                    // Page payloads are genuinely type-erased (a page interleaves
+                    // whatever slot types were allocated into it), so the raw-bytes
+                    // blit is the right tool here — unlike the typed headers/counts
+                    // above, which use BlitWrite<T>.
                     writer.BlitWriteRawBytes("Data", page.Address.ToPointer(), pageBytes);
                 }
             }
@@ -943,12 +935,8 @@ namespace Trecs.Internal
             // memclear cost drops to zero — the largest single win in this
             // path. See ResetForDeserialize's ZeroChunks loop for the
             // rationale on the partial wipe.
-            SerializedHeapHeader heapHeader;
-            reader.BlitReadRawBytes(
-                "Header",
-                &heapHeader,
-                UnsafeUtility.SizeOf<SerializedHeapHeader>()
-            );
+            SerializedHeapHeader heapHeader = default;
+            reader.BlitRead("Header", ref heapHeader);
             TrecsAssert.That(
                 heapHeader.Version == SerializationVersion,
                 "Deserialize: chunk-store snapshot version {0} does not match expected {1}",
@@ -983,12 +971,8 @@ namespace Trecs.Internal
             {
                 for (int pageId = 0; pageId < numPages; pageId++)
                 {
-                    SerializedPageHeader pageHeader;
-                    reader.BlitReadRawBytes(
-                        "PageHeader",
-                        &pageHeader,
-                        UnsafeUtility.SizeOf<SerializedPageHeader>()
-                    );
+                    SerializedPageHeader pageHeader = default;
+                    reader.BlitRead("PageHeader", ref pageHeader);
                     var kind = (PageKind)pageHeader.Kind;
                     if (kind == PageKind.Null)
                     {
@@ -1038,8 +1022,8 @@ namespace Trecs.Internal
             }
 
             // Sparse side-table entries.
-            int numLiveEntries;
-            reader.BlitReadRawBytes("NumLiveEntries", &numLiveEntries, sizeof(int));
+            int numLiveEntries = 0;
+            reader.BlitRead("NumLiveEntries", ref numLiveEntries);
             TrecsDebugAssert.That(
                 numLiveEntries == liveCount,
                 "Deserialize: numLiveEntries {0} does not match liveCount {1}",
@@ -1052,16 +1036,12 @@ namespace Trecs.Internal
                 _denseSlotIndices.ResizeUninitialized(numLiveEntries);
                 _densePayloads.ResizeUninitialized(numLiveEntries);
 
-                reader.BlitReadRawBytes(
+                reader.BlitReadArrayPtr(
                     "SlotIndices",
                     _denseSlotIndices.GetUnsafePtr(),
-                    numLiveEntries * UnsafeUtility.SizeOf<int>()
+                    numLiveEntries
                 );
-                reader.BlitReadRawBytes(
-                    "Entries",
-                    _densePayloads.GetUnsafePtr(),
-                    numLiveEntries * UnsafeUtility.SizeOf<NativeHeapEntryPayload>()
-                );
+                reader.BlitReadArrayPtr("Entries", _densePayloads.GetUnsafePtr(), numLiveEntries);
 
                 // Grow _sparseToDense to cover the full side-table range, filled with -1.
                 if (_sparseToDense.Length < sideTableLength)
@@ -1126,19 +1106,19 @@ namespace Trecs.Internal
                 for (int b = 0; b < _buckets.Length; b++)
                 {
                     var bucket = _buckets[b];
-                    int count;
-                    reader.BlitReadRawBytes("BucketFreeSlotsCount", &count, sizeof(int));
+                    int count = 0;
+                    reader.BlitRead("BucketFreeSlotsCount", ref count);
                     var pageIds = new NativeArray<int>(count, Allocator.Temp);
                     var slotIdxs = new NativeArray<int>(count, Allocator.Temp);
-                    reader.BlitReadRawBytes(
+                    reader.BlitReadArrayPtr(
                         "PageIds",
-                        NativeArrayUnsafeUtility.GetUnsafePtr(pageIds),
-                        count * UnsafeUtility.SizeOf<int>()
+                        (int*)NativeArrayUnsafeUtility.GetUnsafePtr(pageIds),
+                        count
                     );
-                    reader.BlitReadRawBytes(
+                    reader.BlitReadArrayPtr(
                         "SlotIndices",
-                        NativeArrayUnsafeUtility.GetUnsafePtr(slotIdxs),
-                        count * UnsafeUtility.SizeOf<int>()
+                        (int*)NativeArrayUnsafeUtility.GetUnsafePtr(slotIdxs),
+                        count
                     );
                     // Data is top-to-bottom; push in reverse so top ends up on top.
                     for (int j = count - 1; j >= 0; j--)
@@ -1302,29 +1282,25 @@ namespace Trecs.Internal
         static unsafe void WriteStack(ISerializationWriter writer, string name, Stack<int> stack)
         {
             var count = stack.Count;
-            writer.BlitWriteRawBytes(name + "Count", &count, sizeof(int));
+            writer.BlitWrite(name + "Count", count);
             var arr = new NativeArray<int>(count, Allocator.Temp);
             int idx = 0;
             foreach (var item in stack)
                 arr[idx++] = item;
-            writer.BlitWriteRawBytes(
+            writer.BlitWriteArrayPtr(
                 name,
-                NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(arr),
-                count * UnsafeUtility.SizeOf<int>()
+                (int*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(arr),
+                count
             );
             arr.Dispose();
         }
 
         static unsafe void ReadStack(ISerializationReader reader, string name, Stack<int> stack)
         {
-            int count;
-            reader.BlitReadRawBytes(name + "Count", &count, sizeof(int));
+            int count = 0;
+            reader.BlitRead(name + "Count", ref count);
             var arr = new NativeArray<int>(count, Allocator.Temp);
-            reader.BlitReadRawBytes(
-                name,
-                NativeArrayUnsafeUtility.GetUnsafePtr(arr),
-                count * UnsafeUtility.SizeOf<int>()
-            );
+            reader.BlitReadArrayPtr(name, (int*)NativeArrayUnsafeUtility.GetUnsafePtr(arr), count);
             // Data is top-to-bottom; push in reverse so top ends up on top.
             for (int i = count - 1; i >= 0; i--)
                 stack.Push(arr[i]);
@@ -1333,8 +1309,7 @@ namespace Trecs.Internal
 
         unsafe void WriteSideTableAndFreeSlots(ISerializationWriter writer)
         {
-            var liveCountLocal = _liveCount;
-            writer.BlitWriteRawBytes("NumLiveEntries", &liveCountLocal, sizeof(int));
+            writer.BlitWrite("NumLiveEntries", _liveCount);
 
             TrecsDebugAssert.That(
                 _densePayloads.Length == _liveCount,
@@ -1342,17 +1317,19 @@ namespace Trecs.Internal
                 _densePayloads.Length,
                 _liveCount
             );
+            TrecsDebugAssert.That(
+                _denseSlotIndices.Length == _liveCount,
+                "Serialize: dense-slot-index length {0} vs _liveCount {1}",
+                _denseSlotIndices.Length,
+                _liveCount
+            );
 
-            writer.BlitWriteRawBytes(
+            writer.BlitWriteArrayPtr(
                 "SlotIndices",
                 _denseSlotIndices.GetUnsafeReadOnlyPtr(),
-                _liveCount * sizeof(int)
+                _liveCount
             );
-            writer.BlitWriteRawBytes(
-                "Entries",
-                _densePayloads.GetUnsafeReadOnlyPtr(),
-                _liveCount * UnsafeUtility.SizeOf<NativeHeapEntryPayload>()
-            );
+            writer.BlitWriteArrayPtr("Entries", _densePayloads.GetUnsafeReadOnlyPtr(), _liveCount);
 
             WriteSideTableFreeSlots(writer);
             WriteStack(writer, "freePageIds", _freePageIds);
@@ -1374,22 +1351,18 @@ namespace Trecs.Internal
             {
                 var bucket = _buckets[b];
                 var count = bucket.FreeSlots.Count;
-                writer.BlitWriteRawBytes("BucketFreeSlotsCount", &count, sizeof(int));
+                writer.BlitWrite("BucketFreeSlotsCount", count);
                 foreach (var (pageId, slotIdx) in bucket.FreeSlots)
                 {
                     allBucketPageIdsPtr[offset] = pageId;
                     allBucketSlotIdxsPtr[offset] = slotIdx;
                     offset++;
                 }
-                writer.BlitWriteRawBytes(
-                    "PageIds",
-                    allBucketPageIdsPtr + (offset - count),
-                    count * sizeof(int)
-                );
-                writer.BlitWriteRawBytes(
+                writer.BlitWriteArrayPtr("PageIds", allBucketPageIdsPtr + (offset - count), count);
+                writer.BlitWriteArrayPtr(
                     "SlotIndices",
                     allBucketSlotIdxsPtr + (offset - count),
-                    count * sizeof(int)
+                    count
                 );
             }
             allBucketPageIds.Dispose();
@@ -1399,7 +1372,7 @@ namespace Trecs.Internal
         unsafe void WriteSideTableFreeSlots(ISerializationWriter writer)
         {
             var count = _freeSideTableSlots.Count;
-            writer.BlitWriteRawBytes("FreeSideTableSlotsCount", &count, sizeof(int));
+            writer.BlitWrite("FreeSideTableSlotsCount", count);
             var slotIdxArr = new NativeArray<int>(count, Allocator.Temp);
             var genArr = new NativeArray<byte>(count, Allocator.Temp);
             int idx = 0;
@@ -1409,15 +1382,15 @@ namespace Trecs.Internal
                 genArr[idx] = GetEntry(item).Generation;
                 idx++;
             }
-            writer.BlitWriteRawBytes(
+            writer.BlitWriteArrayPtr(
                 "SlotIndices",
-                NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(slotIdxArr),
-                count * UnsafeUtility.SizeOf<int>()
+                (int*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(slotIdxArr),
+                count
             );
-            writer.BlitWriteRawBytes(
+            writer.BlitWriteArrayPtr(
                 "Generations",
-                NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(genArr),
-                count * UnsafeUtility.SizeOf<byte>()
+                (byte*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(genArr),
+                count
             );
             slotIdxArr.Dispose();
             genArr.Dispose();
@@ -1425,19 +1398,19 @@ namespace Trecs.Internal
 
         unsafe void ReadSideTableFreeSlots(ISerializationReader reader)
         {
-            int count;
-            reader.BlitReadRawBytes("FreeSideTableSlotsCount", &count, sizeof(int));
+            int count = 0;
+            reader.BlitRead("FreeSideTableSlotsCount", ref count);
             var slotIdxArr = new NativeArray<int>(count, Allocator.Temp);
             var genArr = new NativeArray<byte>(count, Allocator.Temp);
-            reader.BlitReadRawBytes(
+            reader.BlitReadArrayPtr(
                 "SlotIndices",
-                NativeArrayUnsafeUtility.GetUnsafePtr(slotIdxArr),
-                count * UnsafeUtility.SizeOf<int>()
+                (int*)NativeArrayUnsafeUtility.GetUnsafePtr(slotIdxArr),
+                count
             );
-            reader.BlitReadRawBytes(
+            reader.BlitReadArrayPtr(
                 "Generations",
-                NativeArrayUnsafeUtility.GetUnsafePtr(genArr),
-                count * UnsafeUtility.SizeOf<byte>()
+                (byte*)NativeArrayUnsafeUtility.GetUnsafePtr(genArr),
+                count
             );
             // Data is top-to-bottom; push in reverse so top ends up on top.
             for (int i = count - 1; i >= 0; i--)

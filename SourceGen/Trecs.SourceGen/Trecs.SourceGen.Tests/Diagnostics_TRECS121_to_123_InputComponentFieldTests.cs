@@ -245,6 +245,94 @@ public class Diagnostics_TRECS121_to_123_InputComponentFieldTests
         AssertNoDiagnostic(source, "TRECS123");
     }
 
+    [Test]
+    public void TRECS121_PersistentPtr_NestedInPlainSubStruct_Fires()
+    {
+        // The forbidden persistent pointer is buried inside a plain sub-struct; the
+        // recursive walk catches it and names the full path.
+        const string source = """
+            namespace Sample
+            {
+                public class MyBlob { }
+
+                public struct Inner
+                {
+                    public Trecs.SharedPtr<MyBlob> Blob;
+                }
+
+                public partial struct CCmd : Trecs.IEntityComponent
+                {
+                    public Inner Nested;
+                }
+
+                public partial class PlayerTemplate : Trecs.ITemplate
+                {
+                    [Trecs.Input(Trecs.MissingInputBehavior.Reset)]
+                    CCmd Command;
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS121");
+        AssertDiagnosticMessageContains(source, "TRECS121", "Nested.Blob");
+    }
+
+    [Test]
+    public void TRECS122_TrecsList_NestedInPlainSubStruct_Fires()
+    {
+        const string source = """
+            namespace Sample
+            {
+                public struct Inner
+                {
+                    public Trecs.TrecsList<int> Items;
+                }
+
+                public partial struct CCmd : Trecs.IEntityComponent
+                {
+                    public Inner Nested;
+                }
+
+                public partial class PlayerTemplate : Trecs.ITemplate
+                {
+                    [Trecs.Input(Trecs.MissingInputBehavior.Reset)]
+                    CCmd Command;
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS122");
+        AssertDiagnosticMessageContains(source, "TRECS122", "Nested.Items");
+    }
+
+    [Test]
+    public void TRECS123_RetainPlusInputPtr_NestedInPlainSubStruct_Fires()
+    {
+        const string source = """
+            namespace Sample
+            {
+                public struct Inner
+                {
+                    public Trecs.InputNativeUniquePtr<int> Payload;
+                }
+
+                public partial struct CCmd : Trecs.IEntityComponent
+                {
+                    public Inner Nested;
+                }
+
+                public partial class PlayerTemplate : Trecs.ITemplate
+                {
+                    [Trecs.Input(Trecs.MissingInputBehavior.Retain)]
+                    CCmd Command;
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS123");
+        AssertDiagnosticMessageContains(source, "TRECS123", "Nested.Payload");
+    }
+
     static void AssertDiagnostic(string source, string expectedId)
     {
         var run = GeneratorTestHarness.Run(
@@ -258,6 +346,26 @@ public class Diagnostics_TRECS121_to_123_InputComponentFieldTests
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
         Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
+    }
+
+    static void AssertDiagnosticMessageContains(string source, string id, string expectedSubstring)
+    {
+        var run = GeneratorTestHarness.Run(
+            new IIncrementalGenerator[]
+            {
+                new TemplateDefinitionGenerator(),
+                new EntityComponentGenerator(),
+                new VariableUpdateOnlyValidator(),
+            },
+            source
+        );
+        var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == id);
+        Assert.That(diag, Is.Not.Null, $"Expected {id}, got:\n{run.Format()}");
+        Assert.That(
+            diag!.GetMessage(),
+            Does.Contain(expectedSubstring),
+            $"Expected {id} message to name the full field path '{expectedSubstring}', got:\n{diag.GetMessage()}"
+        );
     }
 
     static void AssertNoDiagnostic(string source, string forbiddenId)

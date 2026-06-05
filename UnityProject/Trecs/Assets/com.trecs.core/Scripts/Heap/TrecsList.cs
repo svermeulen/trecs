@@ -46,7 +46,7 @@ namespace Trecs.Internal
     /// Never instantiated — only its type identity matters.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public readonly struct TrecsListDataMarker<T>
+    internal readonly struct TrecsListDataMarker<T>
         where T : unmanaged { }
 }
 

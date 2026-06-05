@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
 using Trecs.Internal;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -15,7 +15,8 @@ namespace Trecs.Tests
     public class AbstractTypeDivertTests
     {
         SerializerRegistry _serializerRegistry;
-        SerializationBuffer _buffer;
+        SerializationHelper _helper;
+        SerializationData _data;
 
         [SetUp]
         public void SetUp()
@@ -27,13 +28,8 @@ namespace Trecs.Tests
             _serializerRegistry.RegisterSerializerDelta<DerivedASerializer>();
             _serializerRegistry.RegisterSerializerDelta<DerivedBSerializer>();
 
-            _buffer = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            _buffer?.Dispose();
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
         }
 
         [Test]
@@ -41,20 +37,19 @@ namespace Trecs.Tests
         {
             AbstractBase original = new DerivedA { Common = 42, AOnly = "alpha" };
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<AbstractBase>(
+            _helper.WriteAll<AbstractBase>(
+                _data,
                 original,
                 TestConstants.Version,
                 includeTypeChecks: true
             );
-            _buffer.ResetMemoryPosition();
-            var result = _buffer.ReadAll<AbstractBase>();
+            var result = _helper.ReadAll<AbstractBase>(_data);
 
-            Assert.IsNotNull(result);
-            Assert.IsInstanceOf<DerivedA>(result);
+            NAssert.IsNotNull(result);
+            NAssert.IsInstanceOf<DerivedA>(result);
             var derived = (DerivedA)result;
-            Assert.That(derived.Common == 42);
-            Assert.That(derived.AOnly == "alpha");
+            NAssert.That(derived.Common == 42);
+            NAssert.That(derived.AOnly == "alpha");
         }
 
         [Test]
@@ -62,22 +57,28 @@ namespace Trecs.Tests
         {
             AbstractBase a = new DerivedA { Common = 1, AOnly = "x" };
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<AbstractBase>(a, TestConstants.Version, includeTypeChecks: true);
-            _buffer.ResetMemoryPosition();
-            var resultA = _buffer.ReadAll<AbstractBase>();
+            _helper.WriteAll<AbstractBase>(
+                _data,
+                a,
+                TestConstants.Version,
+                includeTypeChecks: true
+            );
+            var resultA = _helper.ReadAll<AbstractBase>(_data);
 
             AbstractBase b = new DerivedB { Common = 2, BOnly = 7 };
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<AbstractBase>(b, TestConstants.Version, includeTypeChecks: true);
-            _buffer.ResetMemoryPosition();
-            var resultB = _buffer.ReadAll<AbstractBase>();
+            _helper.WriteAll<AbstractBase>(
+                _data,
+                b,
+                TestConstants.Version,
+                includeTypeChecks: true
+            );
+            var resultB = _helper.ReadAll<AbstractBase>(_data);
 
-            Assert.IsInstanceOf<DerivedA>(resultA);
-            Assert.IsInstanceOf<DerivedB>(resultB);
-            Assert.That(((DerivedA)resultA).AOnly == "x");
-            Assert.That(((DerivedB)resultB).BOnly == 7);
+            NAssert.IsInstanceOf<DerivedA>(resultA);
+            NAssert.IsInstanceOf<DerivedB>(resultB);
+            NAssert.That(((DerivedA)resultA).AOnly == "x");
+            NAssert.That(((DerivedB)resultB).BOnly == 7);
         }
 
         [Test]
@@ -88,19 +89,18 @@ namespace Trecs.Tests
             // toggle is off.
             AbstractBase original = new DerivedB { Common = 9, BOnly = 99 };
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<AbstractBase>(
+            _helper.WriteAll<AbstractBase>(
+                _data,
                 original,
                 TestConstants.Version,
                 includeTypeChecks: false
             );
-            _buffer.ResetMemoryPosition();
-            var result = _buffer.ReadAll<AbstractBase>();
+            var result = _helper.ReadAll<AbstractBase>(_data);
 
-            Assert.IsInstanceOf<DerivedB>(result);
+            NAssert.IsInstanceOf<DerivedB>(result);
             var derived = (DerivedB)result;
-            Assert.That(derived.Common == 9);
-            Assert.That(derived.BOnly == 99);
+            NAssert.That(derived.Common == 9);
+            NAssert.That(derived.BOnly == 99);
         }
 
         [Test]
@@ -109,20 +109,19 @@ namespace Trecs.Tests
             AbstractBase baseValue = new DerivedA { Common = 1, AOnly = "old" };
             AbstractBase changed = new DerivedA { Common = 2, AOnly = "new" };
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAllDelta<AbstractBase>(
+            _helper.WriteAllDelta<AbstractBase>(
+                _data,
                 changed,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true
             );
-            _buffer.ResetMemoryPosition();
-            var result = _buffer.ReadAllDelta<AbstractBase>(baseValue);
+            var result = _helper.ReadAllDelta<AbstractBase>(_data, baseValue);
 
-            Assert.IsInstanceOf<DerivedA>(result);
+            NAssert.IsInstanceOf<DerivedA>(result);
             var derived = (DerivedA)result;
-            Assert.That(derived.Common == 2);
-            Assert.That(derived.AOnly == "new");
+            NAssert.That(derived.Common == 2);
+            NAssert.That(derived.AOnly == "new");
         }
 
         [Test]
@@ -131,20 +130,19 @@ namespace Trecs.Tests
             AbstractBase baseValue = new DerivedB { Common = 5, BOnly = 50 };
             AbstractBase same = new DerivedB { Common = 5, BOnly = 50 };
 
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAllDelta<AbstractBase>(
+            _helper.WriteAllDelta<AbstractBase>(
+                _data,
                 same,
                 baseValue,
                 TestConstants.Version,
                 includeTypeChecks: true
             );
-            _buffer.ResetMemoryPosition();
-            var result = _buffer.ReadAllDelta<AbstractBase>(baseValue);
+            var result = _helper.ReadAllDelta<AbstractBase>(_data, baseValue);
 
-            Assert.IsInstanceOf<DerivedB>(result);
+            NAssert.IsInstanceOf<DerivedB>(result);
             var derived = (DerivedB)result;
-            Assert.That(derived.Common == 5);
-            Assert.That(derived.BOnly == 50);
+            NAssert.That(derived.Common == 5);
+            NAssert.That(derived.BOnly == 50);
         }
 
         public abstract class AbstractBase

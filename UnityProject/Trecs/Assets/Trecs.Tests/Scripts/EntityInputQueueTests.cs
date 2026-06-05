@@ -20,7 +20,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 42 });
 
@@ -40,7 +40,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 5, handle, new TestInt { Value = 99 });
 
@@ -60,7 +60,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             bool found = inputQueue.TryGetInput<TestInt>(0, handle, out _);
             NAssert.IsFalse(found);
@@ -81,7 +81,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 10 });
             inputQueue.SetInput(frame: 0, handle, new TestInt { Value = 20 });
@@ -101,7 +101,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.SetInput(frame: 0, handle, new TestInt { Value = 55 });
 
@@ -124,7 +124,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 100 });
             inputQueue.AddInput(frame: 1, handle, new TestInt { Value = 200 });
@@ -158,7 +158,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 0, h1, new TestInt { Value = 10 });
             inputQueue.AddInput(frame: 0, h2, new TestInt { Value = 20 });
@@ -185,7 +185,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 5, handle, new TestInt { Value = 50 });
             inputQueue.AddInput(frame: 10, handle, new TestInt { Value = 100 });
@@ -219,7 +219,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 5, handle, new TestInt { Value = 50 });
             inputQueue.AddInput(frame: 10, handle, new TestInt { Value = 100 });
@@ -253,7 +253,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 10 });
             inputQueue.AddInput(frame: 1, handle, new TestInt { Value = 20 });
@@ -279,7 +279,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 10 });
 
@@ -287,6 +287,46 @@ namespace Trecs.Tests
             {
                 inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 20 });
             });
+        }
+
+        #endregion
+
+        #region ApplyInputs — Removed Entity
+
+        // Applying an input whose target entity no longer exists should be
+        // impossible under normal operation (inputs are applied just-in-time
+        // before the fixed tick, with no Submit() between the input systems and
+        // ApplyInputs). It therefore trips a debug assert. In a release build the
+        // assert is stripped and the input is silently dropped to avoid crashing.
+        [Test]
+        public void InputQueue_ApplyInputs_RemovedEntity_AssertsInDebug()
+        {
+            if (!TrecsDebugAssert.IsEnabled)
+            {
+                // Release-style build: assert is stripped, input is dropped
+                // silently. Nothing observable to assert here.
+                NAssert.Pass("Debug asserts disabled — release behavior is silent drop.");
+            }
+
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+            var inputQueue = env.World.GetEntityInputQueue();
+
+            var handle = a.AddEntity(TestTags.Alpha)
+                .Set(new TestInt { Value = 0 })
+                .AssertComplete()
+                .Handle;
+            a.World.Submit();
+
+            inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 42 });
+
+            // Remove the entity and flush the removal so the handle no longer
+            // resolves by the time inputs are applied.
+            a.RemoveEntity(handle);
+            a.World.Submit();
+            NAssert.IsFalse(handle.Exists(a));
+
+            NAssert.Throws<TrecsException>(() => inputQueue.ApplyInputs(currentFixedFrame: 0));
         }
 
         #endregion

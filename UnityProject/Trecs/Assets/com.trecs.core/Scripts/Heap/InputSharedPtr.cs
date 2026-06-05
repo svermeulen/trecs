@@ -11,11 +11,21 @@ namespace Trecs
     /// </summary>
     public static class InputSharedPtr
     {
-        public static InputSharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId, T value)
+        /// <summary>
+        /// Content-addressed eager input alloc: derives the <see cref="BlobId"/> by serializing and
+        /// hashing <paramref name="value"/> (so identical content dedups and the id is stable across
+        /// machines/runs), makes it resident, and returns a frame-scoped <see cref="InputSharedPtr{T}"/>.
+        /// The input-pipeline mirror of <see cref="SharedPtr.Alloc{T}(WorldAccessor, T)"/> — you never
+        /// name the blob. Describe it with a descriptor builder instead (and
+        /// <see cref="Acquire{TDesc,T}(WorldAccessor, in TDesc)"/>) if it is cheaply derivable; the
+        /// blob has no source, so it serializes into a recording as an opaque (eager) blob whose bytes
+        /// are persisted.
+        /// </summary>
+        public static InputSharedPtr<T> Alloc<T>(WorldAccessor world, T value)
             where T : class
         {
             world.AssertCanAddInputsHeap();
-            return world.InputSharedHeap.Alloc<T>(world.FixedFrame, blobId, value);
+            return world.InputSharedHeap.Alloc<T>(world.FixedFrame, value);
         }
 
         public static InputSharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
@@ -23,6 +33,30 @@ namespace Trecs
         {
             world.AssertCanAddInputsHeap();
             return world.InputSharedHeap.Acquire<T>(world.FixedFrame, blobId);
+        }
+
+        /// <summary>
+        /// Interns <paramref name="descriptor"/> — hashing it to a content-derived
+        /// <see cref="BlobId"/>, deduplicating against the cache, and running the registered builder
+        /// on a miss — and acquires a frame-scoped input handle in one step. Register the builder
+        /// once at setup with <see cref="SharedAnchor.Register{TDesc,T}(WorldAccessor, System.Func{TDesc,T})"/>
+        /// (the factory registry is shared across the sim and input pointer types).
+        /// <para>
+        /// Unlike the simulation-side <see cref="SharedPtr.Acquire{TDesc,T}(WorldAccessor, in TDesc)"/>,
+        /// the registered source is ambient (input is not simulation state, so the sim cannot
+        /// resolve the id until it justifies it — see the input→sim conversion
+        /// <see cref="SharedPtr.Acquire{T}(WorldAccessor, InputSharedPtr{T})"/>); the descriptor is
+        /// recorded into the input stream so a fresh-process replay can re-derive the blob.
+        /// </para>
+        /// </summary>
+        public static InputSharedPtr<T> Acquire<TDesc, T>(WorldAccessor world, in TDesc descriptor)
+            where T : class
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputSharedHeap.AcquireFromDescriptor<TDesc, T>(
+                world.FixedFrame,
+                in descriptor
+            );
         }
 
         public static bool TryAcquire<T>(
@@ -74,7 +108,7 @@ namespace Trecs
         public readonly T Get(WorldAccessor world)
         {
             TrecsDebugAssert.That(!IsNull, "Cannot Get on a null InputSharedPtr");
-            return world.BlobCache.GetManagedBlob<T>(BlobId, updateAccessTime: true);
+            return world.BlobCache.GetManagedBlob<T>(BlobId);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

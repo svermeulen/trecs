@@ -8,7 +8,7 @@ In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-rol
 
 Submission drains the queued operations. The system runner calls it automatically at the end of every fixed update and at the end of `World.LateTick()` — see the [per-frame phase diagram](../core/systems.md#phase-diagram).
 
-Call it manually via `World.Submit()` (though note this shouldn't be necessary normally)
+Manual submission lives on the `World` class itself — `world.Submit()` — not on the accessor, since submitting is forbidden during system execution. It is only needed for host-side setup (entities that must exist before the first tick) or test harnesses.
 
 ## Deferred operations
 
@@ -34,6 +34,26 @@ enemyAspect.Remove(World);
 // Bulk by tag
 World.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
+
+### Removing entities in bulk
+
+Three bulk-removal entry points on `WorldAccessor`, all **deferred** like every other structural change (they take effect at the next submission):
+
+```csharp
+// Every entity whose tag set includes the given tags.
+World.RemoveEntitiesWithTags<GameTags.Bullet>();
+
+// Every entity in one specific group.
+World.RemoveAllEntitiesInGroup(group);
+
+// Every non-global entity in the world. Requires an Unrestricted-role accessor
+// (it spans every template, including [VariableUpdateOnly] ones).
+World.RemoveAllEntities();
+```
+
+All three fire `OnRemoved` for each removed entity under the same [callback contract](entity-events.md#the-onremoved-contract) as a single `RemoveEntity`. They use a whole-group fast path internally (no per-entity sort or data movement), so clearing out large groups at shutdown or on a level reset is cheap. `RemoveAllEntities` never removes the [global singleton entity](../core/world-setup.md) — its lifetime is the world's.
+
+An equivalent remove-all pass also runs automatically during [`World.Dispose()`](../core/world-setup.md#disposal), which is what fires the final `OnRemoved` cleanup pass for every entity.
 
 ### Partition transition (`SetTag` / `UnsetTag`)
 
@@ -87,6 +107,19 @@ When the same entity has multiple operations queued in a single submission:
 - **Cascading submission.** If an observer queues more changes during submission (e.g. an `OnAdded` handler spawning a child), Trecs runs additional submission iterations until the queues drain — bounded by `WorldSettings.MaxSubmissionIterations` (default 10).
 
 To react to submission boundaries, see [Entity Events — Frame Events](entity-events.md#frame-events).
+
+## Submission phase order
+
+Within a single submission iteration, queued operations are applied in a fixed order:
+
+> **moves → per-entity removes → adds → whole-group removals**
+
+Two consequences worth knowing:
+
+- **A move *out* of a group escapes a same-submit whole-group removal.** Moves run first, so an entity that leaves the group via `SetTag`/`UnsetTag` is already gone before the whole-group removal reads the group's contents — it survives in its destination group.
+- **An add *into* a group that's whole-group-removed in the same submit fires both `OnAdded` and `OnRemoved`.** Adds run before whole-group removals, so the entity is materialized (firing `OnAdded`) and then removed (firing `OnRemoved`). This is the ["both events fire" lifecycle guarantee](entity-events.md#lifecycle-guarantee): once an add is submitted it never silently disappears.
+
+A group marked for whole-group removal still runs any per-entity removes queued against it first; the whole-group pass then clears whatever entities remain.
 
 ## Deterministic submission
 

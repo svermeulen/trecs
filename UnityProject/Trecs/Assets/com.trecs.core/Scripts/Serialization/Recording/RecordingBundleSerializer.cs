@@ -8,70 +8,70 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// Reads and writes <see cref="RecordingBundle"/> instances to streams or
-    /// files. Reuses an internal <see cref="SerializationBuffer"/> across calls
-    /// to avoid allocations when the same serializer handles many save/load
-    /// cycles (e.g. the recorder UI's save library).
+    /// files. Reuses an internal write buffer (<see cref="SerializationData"/>) and read buffer
+    /// (<see cref="SerializationReadBuffer"/>) across calls to avoid allocations when the same
+    /// serializer handles many save/load cycles (e.g. the recorder UI's save library).
     ///
     /// Main-thread only.
     /// </summary>
-    public sealed class RecordingBundleSerializer : IDisposable
+    public sealed class RecordingBundleSerializer
     {
         static readonly TrecsLog _log = TrecsLog.Default;
 
-        readonly SerializationBuffer _buffer;
-        bool _disposed;
+        readonly SerializationHelper _helper;
+        readonly SerializationData _writeData = new(); // multi-field write scratch; emitted via WriteContiguousTo
+        readonly SerializationReadBuffer _readBuffer = new(); // drains + views a stream for multi-field read
 
         public RecordingBundleSerializer(SerializerRegistry registry)
         {
             if (registry == null)
                 throw new ArgumentNullException(nameof(registry));
-            _buffer = new SerializationBuffer(registry);
+            _helper = new SerializationHelper(registry);
         }
 
         /// <summary>
         /// Write <paramref name="bundle"/> to <paramref name="stream"/>.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="bundle"/> or <paramref name="stream"/> is null, or any required bundle field is null.</exception>
-        /// <exception cref="ObjectDisposedException">The serializer has been disposed.</exception>
         public void Save(RecordingBundle bundle, Stream stream)
         {
-            ThrowIfDisposed();
             if (bundle == null)
                 throw new ArgumentNullException(nameof(bundle));
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
             ValidateBundleForSave(bundle);
 
-            long totalBytes;
+            int totalBytes;
             try
             {
-                _buffer.ClearMemoryStream();
-                _buffer.StartWrite(version: bundle.Header.Version, includeTypeChecks: true);
+                var writer = _helper.Writer;
+                writer.Start(_writeData, version: bundle.Header.Version, includeTypeChecks: true);
 
-                _buffer.Write("Header", bundle.Header);
+                writer.Write("Header", bundle.Header);
                 WriteMemoryBytes("initialSnapshot", bundle.InitialSnapshot);
                 WriteMemoryBytes("inputQueue", bundle.InputQueue);
-                _buffer.Write("Checksums", bundle.Checksums);
+                writer.Write("Checksums", bundle.Checksums);
 
-                WriteSnapshotList("Anchor", bundle.Anchors, writeLabel: false);
+                WriteSnapshotList("Keyframe", bundle.Keyframes, writeLabel: false);
                 WriteSnapshotList("Bookmark", bundle.Bookmarks, writeLabel: true);
 
-                _buffer.Write<int>("BundleSentinel", TrecsConstants.RecordingSentinelValue);
-                totalBytes = _buffer.EndWrite();
+                writer.Write<int>("BundleSentinel", TrecsConstants.RecordingSentinelValue);
+                writer.Complete();
+                totalBytes = _writeData.ContiguousSize;
             }
             catch
             {
-                _buffer.ResetForErrorRecovery();
+                _helper.ResetForErrorRecovery();
                 throw;
             }
 
-            _buffer.MemoryStream.Position = 0;
-            _buffer.MemoryStream.CopyTo(stream);
+            // Emit the contiguous form straight to the destination — no intermediate MemoryStream.
+            _writeData.WriteContiguousTo(stream);
 
             _log.Debug(
-                "Bundle serialized ({0:0.00} kb): {1} anchors, {2} bookmarks",
+                "Bundle serialized ({0:0.00} kb): {1} keyframes, {2} bookmarks",
                 totalBytes / 1024f,
-                bundle.Anchors.Count,
+                bundle.Keyframes.Count,
                 bundle.Bookmarks.Count
             );
         }
@@ -83,7 +83,6 @@ namespace Trecs.Internal
         /// <exception cref="ArgumentException"><paramref name="filePath"/> is null or empty.</exception>
         public void Save(RecordingBundle bundle, string filePath)
         {
-            ThrowIfDisposed();
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentException("filePath must be non-empty", nameof(filePath));
 
@@ -103,40 +102,42 @@ namespace Trecs.Internal
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
         /// <exception cref="SerializationException">The stream is empty/truncated or the binary payload is invalid.</exception>
-        /// <exception cref="ObjectDisposedException">The serializer has been disposed.</exception>
         public RecordingBundle Load(Stream stream)
         {
-            ThrowIfDisposed();
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
             try
             {
-                LoadStreamIntoBuffer(stream);
-                _buffer.StartRead();
+                var reader = _helper.Reader;
+                reader.Start(_readBuffer.Load(stream));
 
-                var header = _buffer.Read<BundleHeader>("Header");
+                var header = reader.Read<BundleHeader>("Header");
                 var initialSnapshot = ReadByteArray("initialSnapshot");
                 var inputQueue = ReadByteArray("inputQueue");
-                var checksums = _buffer.Read<IterableDictionary<int, ulong>>("checksums");
+                // Field names are diagnostic labels only (not validated wire data), but keep
+                // them matching the Save side to avoid implying otherwise.
+                var checksums = reader.Read<IterableDictionary<int, ulong>>("Checksums");
 
-                var anchors = ReadSnapshotList("Anchor", SnapshotKind.Anchor, readLabel: false);
+                var keyframes = ReadSnapshotList(
+                    "Keyframe",
+                    SnapshotKind.Keyframe,
+                    readLabel: false
+                );
                 var bookmarks = ReadSnapshotList(
                     "Bookmark",
                     SnapshotKind.Bookmark,
                     readLabel: true
                 );
 
-                var sentinel = _buffer.Read<int>("BundleSentinel");
+                var sentinel = reader.Read<int>("BundleSentinel");
                 if (sentinel != TrecsConstants.RecordingSentinelValue)
                 {
-                    // Bundle-level sentinel (an int) is distinct from the
-                    // Layer-1 EndOfPayloadMarker (a byte) verified by the
-                    // StopRead call below: this one catches bundle-format
-                    // drift where the trailing payload marker is intact
-                    // but the bundle's own structure has been corrupted
-                    // (e.g. truncated anchors/snapshots list mid-write).
-                    // Release-strict — must fire in release builds too.
+                    // Bundle-level sentinel (an int field inside the payload) is distinct from the
+                    // Layer-1 full-consumption check StopRead performs below: this one catches
+                    // bundle-format drift where the payload framing is intact but the bundle's own
+                    // structure has been corrupted (e.g. truncated keyframes/snapshots list
+                    // mid-write). Release-strict — must fire in release builds too.
                     throw new SerializationException(
                         $"Bundle sentinel mismatch: expected "
                             + $"{TrecsConstants.RecordingSentinelValue}, got {sentinel}. "
@@ -144,7 +145,7 @@ namespace Trecs.Internal
                     );
                 }
 
-                _buffer.StopRead(verifySentinel: true);
+                reader.Complete();
 
                 return new RecordingBundle
                 {
@@ -152,13 +153,13 @@ namespace Trecs.Internal
                     InitialSnapshot = initialSnapshot,
                     InputQueue = inputQueue,
                     Checksums = checksums,
-                    Anchors = anchors,
+                    Keyframes = keyframes,
                     Bookmarks = bookmarks,
                 };
             }
             catch
             {
-                _buffer.ResetForErrorRecovery();
+                _helper.ResetForErrorRecovery();
                 throw;
             }
         }
@@ -170,7 +171,6 @@ namespace Trecs.Internal
         /// <exception cref="FileNotFoundException">No file at <paramref name="filePath"/>.</exception>
         public RecordingBundle Load(string filePath)
         {
-            ThrowIfDisposed();
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentException("filePath must be non-empty", nameof(filePath));
             if (!File.Exists(filePath))
@@ -189,25 +189,22 @@ namespace Trecs.Internal
         /// <exception cref="SerializationException">The stream is empty/truncated or the binary payload is invalid.</exception>
         public BundleHeader PeekHeader(Stream stream)
         {
-            ThrowIfDisposed();
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
             try
             {
-                LoadStreamIntoBuffer(stream);
-                _buffer.StartRead();
-                var header = _buffer.Read<BundleHeader>("Header");
-                // Header sits at the start of the payload, so the rest of the
-                // payload (sentinel included) is unread on purpose. Skip
-                // sentinel verification for the same reason
-                // SnapshotSerializer.PeekMetadata does.
-                _buffer.StopRead(verifySentinel: false);
+                var reader = _helper.Reader;
+                reader.Start(_readBuffer.Load(stream));
+                var header = reader.Read<BundleHeader>("Header");
+                // Header sits at the start of the payload, so the rest is unread on purpose. Skip
+                // the full-consumption check, same as SnapshotSerializer.PeekMetadata.
+                reader.CompletePartial();
                 return header;
             }
             catch
             {
-                _buffer.ResetForErrorRecovery();
+                _helper.ResetForErrorRecovery();
                 throw;
             }
         }
@@ -217,7 +214,6 @@ namespace Trecs.Internal
         /// </summary>
         public BundleHeader PeekHeader(string filePath)
         {
-            ThrowIfDisposed();
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentException("filePath must be non-empty", nameof(filePath));
             if (!File.Exists(filePath))
@@ -225,16 +221,6 @@ namespace Trecs.Internal
 
             using var fs = File.OpenRead(filePath);
             return PeekHeader(fs);
-        }
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-            _disposed = true;
-            _buffer.Dispose();
         }
 
         static void ValidateBundleForSave(RecordingBundle bundle)
@@ -248,8 +234,8 @@ namespace Trecs.Internal
                 );
             if (bundle.Checksums == null)
                 throw new ArgumentNullException(nameof(bundle) + ".Checksums");
-            if (bundle.Anchors == null)
-                throw new ArgumentNullException(nameof(bundle) + ".Anchors");
+            if (bundle.Keyframes == null)
+                throw new ArgumentNullException(nameof(bundle) + ".Keyframes");
             if (bundle.Bookmarks == null)
                 throw new ArgumentNullException(nameof(bundle) + ".Bookmarks");
         }
@@ -261,7 +247,7 @@ namespace Trecs.Internal
         ReadOnlyMemory<byte> ReadByteArray(string name)
         {
             byte[] buffer = null;
-            var length = _buffer.ReadBytes(name, ref buffer);
+            var length = _helper.Reader.ReadBytes(name, ref buffer);
             if (buffer == null || length == 0)
             {
                 return ReadOnlyMemory<byte>.Empty;
@@ -277,7 +263,7 @@ namespace Trecs.Internal
         {
             if (payload.IsEmpty)
             {
-                _buffer.WriteBytes(name, Array.Empty<byte>(), 0, 0);
+                _helper.Writer.WriteBytes(name, Array.Empty<byte>(), 0, 0);
                 return;
             }
             if (!MemoryMarshal.TryGetArray(payload, out var seg))
@@ -286,7 +272,7 @@ namespace Trecs.Internal
                     $"Cannot serialize '{name}': payload is backed by non-array memory."
                 );
             }
-            _buffer.WriteBytes(name, seg.Array, seg.Offset, seg.Count);
+            _helper.Writer.WriteBytes(name, seg.Array, seg.Offset, seg.Count);
         }
 
         void WriteSnapshotList(
@@ -295,28 +281,32 @@ namespace Trecs.Internal
             bool writeLabel
         )
         {
-            _buffer.Write($"{namePrefix}Count", list.Count);
+            var writer = _helper.Writer;
+            var payloadName = $"{namePrefix.ToLowerInvariant()}Payload";
+            writer.Write($"{namePrefix}Count", list.Count);
             for (int i = 0; i < list.Count; i++)
             {
                 var entry = list[i];
-                _buffer.Write($"{namePrefix}Frame", entry.FixedFrame);
+                writer.Write($"{namePrefix}Frame", entry.FixedFrame);
                 if (writeLabel)
                 {
-                    _buffer.WriteString($"{namePrefix}Label", entry.Label);
+                    writer.WriteString($"{namePrefix}Label", entry.Label);
                 }
-                WriteMemoryBytes($"{namePrefix.ToLowerInvariant()}Payload", entry.Payload);
+                WriteMemoryBytes(payloadName, entry.Payload);
             }
         }
 
         List<WorldSnapshot> ReadSnapshotList(string namePrefix, SnapshotKind kind, bool readLabel)
         {
-            var count = _buffer.Read<int>($"{namePrefix}Count");
+            var reader = _helper.Reader;
+            var payloadName = $"{namePrefix.ToLowerInvariant()}Payload";
+            var count = reader.Read<int>($"{namePrefix}Count");
             var result = new List<WorldSnapshot>(count);
             for (int i = 0; i < count; i++)
             {
-                var frame = _buffer.Read<int>($"{namePrefix}Frame");
-                var label = readLabel ? _buffer.ReadString($"{namePrefix}Label") : "";
-                var payload = ReadByteArray($"{namePrefix.ToLowerInvariant()}Payload");
+                var frame = reader.Read<int>($"{namePrefix}Frame");
+                var label = readLabel ? reader.ReadString($"{namePrefix}Label") : "";
+                var payload = ReadByteArray(payloadName);
                 result.Add(
                     new WorldSnapshot
                     {
@@ -328,27 +318,6 @@ namespace Trecs.Internal
                 );
             }
             return result;
-        }
-
-        void LoadStreamIntoBuffer(Stream stream)
-        {
-            _buffer.ClearMemoryStream();
-            stream.CopyTo(_buffer.MemoryStream);
-            if (_buffer.MemoryStream.Length == 0)
-            {
-                throw new SerializationException(
-                    "Bundle stream is empty — cannot load an empty bundle."
-                );
-            }
-            _buffer.MemoryStream.Position = 0;
-        }
-
-        void ThrowIfDisposed()
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(RecordingBundleSerializer));
-            }
         }
     }
 }

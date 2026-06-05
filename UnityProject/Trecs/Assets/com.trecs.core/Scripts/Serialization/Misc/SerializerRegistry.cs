@@ -32,7 +32,7 @@ namespace Trecs
     ///   serializer Type may be registered from multiple call sites; extra registrations
     ///   are silently ignored. Different serializer Types targeting the same object
     ///   type still throw. Use for common reusable serializers (e.g.
-    ///   <c>ListSerializer&lt;int&gt;</c>) so unrelated systems can register what they
+    ///   <c>ListSerializerUnmanaged&lt;int&gt;</c>) so unrelated systems can register what they
     ///   need without coordinating.</description></item>
     ///   </list>
     ///
@@ -225,9 +225,16 @@ namespace Trecs
             return null;
         }
 
+        // Release-safe (TrecsAssert): registration runs at setup frequency, and
+        // without this the instance-vs-lazy cross-shape conflict is silent in
+        // release — the two shapes live in different dictionaries, so the
+        // backing Dictionary.Add never collides, and the materialized-first
+        // lookup order would quietly shadow the lazy registration. A type's
+        // serializer (and thus its wire format) must never change once
+        // registered.
         void AssertSerializerSlotEmpty(Type objectType)
         {
-            TrecsDebugAssert.That(
+            TrecsAssert.That(
                 !_objectTypeToSerializer.ContainsKey(objectType)
                     && !_pendingLazySerializers.ContainsKey(objectType),
                 "Serializer for type {0} is already registered",
@@ -237,7 +244,7 @@ namespace Trecs
 
         void AssertSerializerDeltaSlotEmpty(Type objectType)
         {
-            TrecsDebugAssert.That(
+            TrecsAssert.That(
                 !_objectTypeToSerializerDelta.ContainsKey(objectType)
                     && !_pendingLazySerializerDeltas.ContainsKey(objectType),
                 "Serializer delta for type {0} is already registered",

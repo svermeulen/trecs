@@ -8,12 +8,14 @@ namespace Trecs.SourceGen.Tests;
 
 /// <summary>
 /// Tests for the <c>[NonCopyable]</c> / <c>[Copyable]</c> diagnostics group
-/// (TRECS118-120). All three are emitted by <see cref="NonCopyableAnalyzer"/>,
-/// a <see cref="DiagnosticAnalyzer"/> rather than an
-/// <see cref="IIncrementalGenerator"/>, so the tests drive it through
+/// (TRECS118, TRECS131, TRECS120). All three are emitted by
+/// <see cref="NonCopyableAnalyzer"/>, a <see cref="DiagnosticAnalyzer"/> rather
+/// than an <see cref="IIncrementalGenerator"/>, so the tests drive it through
 /// <see cref="GeneratorTestHarness.RunAnalyzers"/>.
 ///
-/// Codes covered: 118, 119, 120.
+/// Codes covered: 118, 120, 131. (TRECS131 — by-value parameter — was renumbered
+/// from a previously-duplicated TRECS119, which is already shipped for the
+/// unrelated [FromGlobalEntity]-could-not-resolve diagnostic.)
 /// </summary>
 [TestFixture]
 public class Diagnostics_TRECS118_to_120_NonCopyableTests
@@ -180,7 +182,7 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
     }
 
     [Test]
-    public void TRECS119_ByValueParameter_Fires()
+    public void TRECS131_ByValueParameter_Fires()
     {
         const string source = """
             namespace Sample
@@ -195,11 +197,11 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
             }
             """;
 
-        AssertFires(source, "TRECS119");
+        AssertFires(source, "TRECS131");
     }
 
     [Test]
-    public void TRECS119_RefParameter_DoesNotFire()
+    public void TRECS131_RefParameter_DoesNotFire()
     {
         const string source = """
             namespace Sample
@@ -216,11 +218,11 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
             }
             """;
 
-        AssertDoesNotFire(source, "TRECS119");
+        AssertDoesNotFire(source, "TRECS131");
     }
 
     [Test]
-    public void TRECS119_MemberOfNonCopyableType_DoesNotFire()
+    public void TRECS131_MemberOfNonCopyableType_DoesNotFire()
     {
         // The non-copyable type itself controls its own internals — Equals(in T)
         // and operators take by-value self in some patterns; don't fight them.
@@ -236,7 +238,7 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
             }
             """;
 
-        AssertDoesNotFire(source, "TRECS119");
+        AssertDoesNotFire(source, "TRECS131");
     }
 
     [Test]
@@ -265,7 +267,7 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
     }
 
     [Test]
-    public void TRECS119_EntityComponent_ByValueParameter_Fires()
+    public void TRECS131_EntityComponent_ByValueParameter_Fires()
     {
         const string source = """
             namespace Sample
@@ -279,7 +281,7 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
             }
             """;
 
-        AssertFires(source, "TRECS119");
+        AssertFires(source, "TRECS131");
     }
 
     [Test]
@@ -308,7 +310,7 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
     }
 
     [Test]
-    public void TRECS119_EntityComponent_WithCopyable_ByValueParameter_DoesNotFire()
+    public void TRECS131_EntityComponent_WithCopyable_ByValueParameter_DoesNotFire()
     {
         const string source = """
             namespace Sample
@@ -323,7 +325,7 @@ public class Diagnostics_TRECS118_to_120_NonCopyableTests
             }
             """;
 
-        AssertDoesNotFire(source, "TRECS119");
+        AssertDoesNotFire(source, "TRECS131");
     }
 
     [Test]

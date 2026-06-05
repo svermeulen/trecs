@@ -125,11 +125,10 @@ namespace Trecs.SourceGen.Template
                         );
                         isValid = false;
                     }
-                    // Check for managed fields in component types. This is
-                    // intentionally one level deep — we only care whether the
-                    // component itself contains reference fields. Nested
-                    // value-type chains can't introduce cycles here because
-                    // this loop doesn't recurse into them.
+                    // Apply the component field-type rules (managed-field, TRECS121-123,
+                    // TRECS136-137). The walk recurses into nested plain value-type
+                    // structs so a forbidden type buried inside a sub-struct can't escape
+                    // the rules — diagnostics name the full field path (e.g. "Nested.Ptr").
                     else if (field.Type is INamedTypeSymbol componentType)
                     {
                         bool isInputField =
@@ -138,48 +137,25 @@ namespace Trecs.SourceGen.Template
                         bool isRetainField =
                             isInputField && inputFieldBehaviours![field.Name].EndsWith(".Retain");
 
-                        foreach (var componentMember in componentType.GetMembers())
-                        {
-                            if (
-                                componentMember is not IFieldSymbol componentField
-                                || componentField.IsStatic
-                                || componentField.IsConst
-                            )
-                                continue;
-
-                            if (componentField.Type.IsReferenceType)
-                            {
-                                reportDiagnostic(
-                                    DiagnosticInfo.Create(
-                                        DiagnosticDescriptors.ComponentHasManagedFields,
-                                        fieldLocation,
-                                        PerformanceCache.GetDisplayString(componentType),
-                                        field.Name,
-                                        symbol.Name,
-                                        componentField.Name,
-                                        PerformanceCache.GetDisplayString(componentField.Type)
-                                    )
-                                );
-                                isValid = false;
-                            }
-
-                            if (isInputField)
-                            {
-                                if (
-                                    !ValidateInputComponentFieldType(
-                                        componentField,
-                                        componentType,
-                                        field,
-                                        symbol.Name,
-                                        isRetainField,
-                                        declLocation,
-                                        reportDiagnostic
-                                    )
+                        if (
+                            !WalkComponentFields(
+                                componentType,
+                                componentType,
+                                field,
+                                symbol.Name,
+                                isInputField,
+                                isRetainField,
+                                fieldPath: null,
+                                fieldLocation,
+                                declLocation,
+                                reportDiagnostic,
+                                visited: new HashSet<INamedTypeSymbol>(
+                                    SymbolEqualityComparer.Default
                                 )
-                                {
-                                    isValid = false;
-                                }
-                            }
+                            )
+                        )
+                        {
+                            isValid = false;
                         }
                     }
                 }
@@ -263,6 +239,181 @@ namespace Trecs.SourceGen.Template
                     dimShape
                 )
             );
+        }
+
+        // Recursively applies the component field-type rules (managed-field, TRECS121-123,
+        // TRECS136-137) to every field of <paramref name="currentType"/>, descending into
+        // nested plain value-type structs so a forbidden type buried below the top level
+        // cannot escape. <paramref name="fieldPath"/> is the dotted path from the component
+        // root down to (but not including) the current type's fields — null at the top
+        // level — and is prefixed onto each field name in the diagnostics so the offending
+        // field is findable (e.g. "Nested.Ptr").
+        //
+        // Recursion only follows value-type fields: reference-type fields are caught by the
+        // managed-field check at level one (the component itself can't be a reference type),
+        // and any reference-type sub-field is reported as managed and not descended into, so
+        // the walk can't cycle through classes. Value-type cycles are impossible in C#
+        // (the compiler rejects a struct that contains itself), but a visited-set guards
+        // against re-walking shared sub-structs anyway.
+        private static bool WalkComponentFields(
+            INamedTypeSymbol currentType,
+            INamedTypeSymbol componentType,
+            IFieldSymbol templateField,
+            string templateName,
+            bool isInputField,
+            bool isRetainField,
+            string? fieldPath,
+            LocationInfo componentLocation,
+            LocationInfo declLocation,
+            Action<DiagnosticInfo> reportDiagnostic,
+            HashSet<INamedTypeSymbol> visited
+        )
+        {
+            if (!visited.Add(currentType))
+                return true;
+
+            bool isValid = true;
+
+            foreach (var member in currentType.GetMembers())
+            {
+                if (
+                    member is not IFieldSymbol componentField
+                    || componentField.IsStatic
+                    || componentField.IsConst
+                )
+                    continue;
+
+                string path =
+                    fieldPath == null ? componentField.Name : $"{fieldPath}.{componentField.Name}";
+
+                if (componentField.Type.IsReferenceType)
+                {
+                    reportDiagnostic(
+                        DiagnosticInfo.Create(
+                            DiagnosticDescriptors.ComponentHasManagedFields,
+                            componentLocation,
+                            PerformanceCache.GetDisplayString(componentType),
+                            templateField.Name,
+                            templateName,
+                            path,
+                            PerformanceCache.GetDisplayString(componentField.Type)
+                        )
+                    );
+                    isValid = false;
+                    // Don't descend into reference types — they're already rejected and
+                    // recursing through a class could cycle.
+                    continue;
+                }
+
+                // TRECS137: anchors never belong in a component, input or persistent.
+                if (
+                    !ValidateNoAnchorField(
+                        componentField,
+                        componentType,
+                        templateField,
+                        path,
+                        declLocation,
+                        reportDiagnostic
+                    )
+                )
+                {
+                    isValid = false;
+                }
+
+                if (isInputField)
+                {
+                    if (
+                        !ValidateInputComponentFieldType(
+                            componentField,
+                            componentType,
+                            templateField,
+                            templateName,
+                            isRetainField,
+                            path,
+                            declLocation,
+                            reportDiagnostic
+                        )
+                    )
+                    {
+                        isValid = false;
+                    }
+                }
+                else
+                {
+                    // TRECS136: the converse of TRECS121 — input pointers must not
+                    // escape into persistent components.
+                    if (
+                        !ValidatePersistentComponentFieldType(
+                            componentField,
+                            componentType,
+                            templateField,
+                            path,
+                            declLocation,
+                            reportDiagnostic
+                        )
+                    )
+                    {
+                        isValid = false;
+                    }
+                }
+
+                // Descend into nested plain value-type structs. The special Trecs
+                // handle/list/anchor types are checked by the rules above and are not
+                // worth walking into (their internals are framework-owned); only
+                // recurse into user/plain structs that aren't in the Trecs namespace
+                // and aren't a known special type.
+                if (
+                    componentField.Type is INamedTypeSymbol nestedType
+                    && ShouldRecurseInto(nestedType)
+                )
+                {
+                    if (
+                        !WalkComponentFields(
+                            nestedType,
+                            componentType,
+                            templateField,
+                            templateName,
+                            isInputField,
+                            isRetainField,
+                            path,
+                            componentLocation,
+                            declLocation,
+                            reportDiagnostic,
+                            visited
+                        )
+                    )
+                    {
+                        isValid = false;
+                    }
+                }
+            }
+
+            return isValid;
+        }
+
+        // Whether the recursive field walk should descend into <paramref name="type"/>.
+        // We only recurse into plain user-defined structs — never into primitives/enums
+        // (no Trecs-forbidden fields possible), never into the Trecs framework's own
+        // pointer/list/anchor/handle types (the rules already classify those at this
+        // level, and their internals are framework-owned), and never into types outside
+        // the user's own assemblies (e.g. BCL/Unity structs, whose layout we don't police).
+        private static bool ShouldRecurseInto(INamedTypeSymbol type)
+        {
+            if (type.TypeKind != TypeKind.Struct)
+                return false;
+            // Primitives / enums have no nested component-relevant fields.
+            if (type.SpecialType != SpecialType.None || type.TypeKind == TypeKind.Enum)
+                return false;
+            // Trecs framework types (pointers, lists, anchors, handles) — classified by
+            // the rules above; don't walk their internals.
+            if (SymbolAnalyzer.IsInNamespace(type.ContainingNamespace, TrecsNamespaces.Trecs))
+                return false;
+            // Only descend into types defined in source we're compiling. Skip metadata
+            // types (BCL, Unity) — their internal layout isn't ours to police, and
+            // walking them is both noisy and potentially expensive.
+            if (type.Locations.All(loc => !loc.IsInSource))
+                return false;
+            return true;
         }
 
         private static bool ValidateComponentAttributes(
@@ -355,7 +506,9 @@ namespace Trecs.SourceGen.Template
         // Input-pointer types that themselves carry a handle into the per-frame arena
         // / refcount slot. Safe in Reset-mode input components; never safe in
         // Retain-mode because the previous frame's slot has already been released by
-        // the time Retain would re-apply the component.
+        // the time Retain would re-apply the component — and never safe in a
+        // *persistent* component (TRECS136), where the retained handle outlives the
+        // frame-scoped lifetime guarantee entirely.
         private static readonly string[] InputPtrTypeNames =
         {
             "InputNativeUniquePtr",
@@ -364,12 +517,21 @@ namespace Trecs.SourceGen.Template
             "InputSharedPtr",
         };
 
+        // Ambient cache-pin handle types: never valid inside any component (TRECS137) —
+        // their PtrHandle is a live BlobCache handle that does not survive serialization.
+        private static readonly string[] AnchorTypeNames =
+        {
+            "NativeSharedAnchor",
+            "SharedAnchor",
+        };
+
         private static bool ValidateInputComponentFieldType(
             IFieldSymbol componentField,
             INamedTypeSymbol componentType,
             IFieldSymbol templateField,
             string templateName,
             bool isRetain,
+            string fieldPath,
             LocationInfo fallbackLocation,
             Action<DiagnosticInfo> reportDiagnostic
         )
@@ -392,7 +554,7 @@ namespace Trecs.SourceGen.Template
                         DiagnosticInfo.Create(
                             DiagnosticDescriptors.InputComponentHasPersistentPtrField,
                             location,
-                            componentField.Name,
+                            fieldPath,
                             PerformanceCache.GetDisplayString(componentType),
                             templateField.Name,
                             PerformanceCache.GetDisplayString(named),
@@ -410,7 +572,7 @@ namespace Trecs.SourceGen.Template
                     DiagnosticInfo.Create(
                         DiagnosticDescriptors.InputComponentHasTrecsListField,
                         location,
-                        componentField.Name,
+                        fieldPath,
                         PerformanceCache.GetDisplayString(componentType),
                         templateField.Name,
                         PerformanceCache.GetDisplayString(named.TypeArguments[0])
@@ -432,7 +594,7 @@ namespace Trecs.SourceGen.Template
                         location,
                         PerformanceCache.GetDisplayString(componentType),
                         templateField.Name,
-                        componentField.Name,
+                        fieldPath,
                         PerformanceCache.GetDisplayString(named)
                     )
                 );
@@ -440,6 +602,80 @@ namespace Trecs.SourceGen.Template
             }
 
             return isValid;
+        }
+
+        // TRECS136: input pointers must not escape into persistent (non-[Input]) components —
+        // they are frame-scoped handles whose retention beyond the delivering frame is
+        // history-locker-dependent (non-deterministic), and snapshotting one stores a bare id
+        // replay cannot honor. The converse of TRECS121.
+        private static bool ValidatePersistentComponentFieldType(
+            IFieldSymbol componentField,
+            INamedTypeSymbol componentType,
+            IFieldSymbol templateField,
+            string fieldPath,
+            LocationInfo fallbackLocation,
+            Action<DiagnosticInfo> reportDiagnostic
+        )
+        {
+            if (componentField.Type is not INamedTypeSymbol named)
+                return true;
+            if (!SymbolAnalyzer.IsInNamespace(named.ContainingNamespace, TrecsNamespaces.Trecs))
+                return true;
+            if (!InputPtrTypeNames.Contains(named.Name) || named.TypeArguments.Length != 1)
+                return true;
+
+            var fieldLoc = componentField.Locations.FirstOrDefault();
+            var location = fieldLoc != null ? LocationInfo.From(fieldLoc) : fallbackLocation;
+            reportDiagnostic(
+                DiagnosticInfo.Create(
+                    DiagnosticDescriptors.PersistentComponentHasInputPtrField,
+                    location,
+                    fieldPath,
+                    PerformanceCache.GetDisplayString(componentType),
+                    templateField.Name,
+                    PerformanceCache.GetDisplayString(named)
+                )
+            );
+            return false;
+        }
+
+        // TRECS137: anchors (ambient BlobCache pins) are never valid component state — their
+        // PtrHandle is a live cache handle that does not survive serialization, in any component
+        // flavor (snapshotted persistent state or the recording's input stream).
+        private static bool ValidateNoAnchorField(
+            IFieldSymbol componentField,
+            INamedTypeSymbol componentType,
+            IFieldSymbol templateField,
+            string fieldPath,
+            LocationInfo fallbackLocation,
+            Action<DiagnosticInfo> reportDiagnostic
+        )
+        {
+            if (componentField.Type is not INamedTypeSymbol named)
+                return true;
+            if (!SymbolAnalyzer.IsInNamespace(named.ContainingNamespace, TrecsNamespaces.Trecs))
+                return true;
+
+            foreach (var anchorName in AnchorTypeNames)
+            {
+                if (named.Name == anchorName && named.TypeArguments.Length == 1)
+                {
+                    var fieldLoc = componentField.Locations.FirstOrDefault();
+                    var location = fieldLoc != null ? LocationInfo.From(fieldLoc) : fallbackLocation;
+                    reportDiagnostic(
+                        DiagnosticInfo.Create(
+                            DiagnosticDescriptors.ComponentHasAnchorField,
+                            location,
+                            fieldPath,
+                            PerformanceCache.GetDisplayString(componentType),
+                            templateField.Name,
+                            PerformanceCache.GetDisplayString(named)
+                        )
+                    );
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static bool ImplementsIEntityComponent(ITypeSymbol type)

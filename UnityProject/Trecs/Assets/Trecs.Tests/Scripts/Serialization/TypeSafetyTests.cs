@@ -5,7 +5,7 @@ using NUnit.Framework;
 using Trecs.Collections;
 using Trecs.Internal;
 using UnityEngine;
-using Assert = NUnit.Framework.Assert;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
@@ -13,26 +13,17 @@ namespace Trecs.Tests
     public class TypeSafetyTests
     {
         private SerializerRegistry _serializerRegistry;
-        private SerializationBuffer _cacheHelper;
+        private SerializationHelper _helper;
+        private SerializationData _data;
+        private SerializationReadBuffer _readBuffer;
 
         [SetUp]
         public void SetUp()
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
-            _cacheHelper = new SerializationBuffer(_serializerRegistry);
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            try
-            {
-                _cacheHelper?.Dispose();
-            }
-            catch
-            {
-                // Ignore dispose errors
-            }
+            _helper = new SerializationHelper(_serializerRegistry);
+            _data = new SerializationData();
+            _readBuffer = new SerializationReadBuffer();
         }
 
         [Test]
@@ -42,14 +33,18 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Serialize an int
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(42, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
+            _helper.WriteAllObject(
+                _data,
+                42,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
 
             // Try to deserialize as string - should throw
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.ReadAll<string>();
+                _helper.ReadAll<string>(_data);
             });
         }
 
@@ -71,14 +66,9 @@ namespace Trecs.Tests
             memoryStream.Position = 0;
 
             // This should throw when trying to allocate negative-length array
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
-                _cacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(memoryStream.ToArray()),
-                    (int)memoryStream.Length
-                );
-                _cacheHelper.ResetMemoryPosition();
-                _cacheHelper.ReadAllObject();
+                _helper.ReadAllObject(_readBuffer.Wrap(memoryStream.ToArray()));
             });
         }
 
@@ -86,7 +76,7 @@ namespace Trecs.Tests
         public void SerializerRegistry_NullType_ThrowsException()
         {
             // Test passing null type to registry
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
                 _serializerRegistry.GetSerializer(null);
             });
@@ -96,7 +86,7 @@ namespace Trecs.Tests
         public void SerializerRegistry_AbstractType_ThrowsException()
         {
             // Test trying to get serializer for abstract type
-            Assert.Catch<Exception>(() =>
+            NAssert.Catch<Exception>(() =>
             {
                 _serializerRegistry.GetSerializer(typeof(Stream)); // Abstract class
             });
@@ -113,16 +103,15 @@ namespace Trecs.Tests
 
             try
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     largeString,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags
                 );
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<string>();
-                Assert.That(result.Length == largeString.Length);
+                var result = _helper.ReadAll<string>(_data);
+                NAssert.That(result.Length == largeString.Length);
             }
             catch (OutOfMemoryException)
             {
@@ -138,22 +127,21 @@ namespace Trecs.Tests
             var flags = 0L;
             var originalData = new List<int> { 1, 2, 3 };
 
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
+            _helper.WriteAll(
+                _data,
                 originalData,
                 TestConstants.Version,
                 includeTypeChecks: true,
                 flags
             );
-            _cacheHelper.ResetMemoryPosition();
 
             // This tests if the framework properly clears existing list data
-            var result = _cacheHelper.ReadAll<List<int>>();
+            var result = _helper.ReadAll<List<int>>(_data);
 
-            Assert.That(result.Count == 3);
-            Assert.That(result[0] == 1);
-            Assert.That(result[1] == 2);
-            Assert.That(result[2] == 3);
+            NAssert.That(result.Count == 3);
+            NAssert.That(result[0] == 1);
+            NAssert.That(result[1] == 2);
+            NAssert.That(result[2] == 3);
         }
 
         [Test]
@@ -163,8 +151,8 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // This should no longer throw an exception with null support
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAllObject(
+            _helper.WriteAllObject(
+                _data,
                 null,
                 TestConstants.Version,
                 includeTypeChecks: true,
@@ -172,9 +160,8 @@ namespace Trecs.Tests
             );
 
             // Verify we can read back the null
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAllObject();
-            Assert.That(result == null);
+            var result = _helper.ReadAllObject(_data);
+            NAssert.That(result == null);
         }
 
         [Test]
@@ -197,18 +184,22 @@ namespace Trecs.Tests
 
             foreach (var value in specialFloats)
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(value, TestConstants.Version, includeTypeChecks: true, flags);
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<float>();
+                _helper.WriteAll(
+                    _data,
+                    value,
+                    TestConstants.Version,
+                    includeTypeChecks: true,
+                    flags
+                );
+                var result = _helper.ReadAll<float>(_data);
 
                 if (float.IsNaN(value))
                 {
-                    Assert.That(float.IsNaN(result), $"NaN not preserved");
+                    NAssert.That(float.IsNaN(result), $"NaN not preserved");
                 }
                 else
                 {
-                    Assert.That(result == value, $"Special float {value} not preserved correctly");
+                    NAssert.That(result == value, $"Special float {value} not preserved correctly");
                 }
             }
         }
@@ -234,11 +225,15 @@ namespace Trecs.Tests
 
             foreach (var value in boundaryInts)
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(value, TestConstants.Version, includeTypeChecks: true, flags);
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<int>();
-                Assert.That(result == value, $"Boundary int {value} not preserved correctly");
+                _helper.WriteAll(
+                    _data,
+                    value,
+                    TestConstants.Version,
+                    includeTypeChecks: true,
+                    flags
+                );
+                var result = _helper.ReadAll<int>(_data);
+                NAssert.That(result == value, $"Boundary int {value} not preserved correctly");
             }
         }
 
@@ -261,37 +256,36 @@ namespace Trecs.Tests
 
             foreach (var vector in extremeVectors)
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(
+                _helper.WriteAll(
+                    _data,
                     vector,
                     TestConstants.Version,
                     includeTypeChecks: true,
                     flags
                 );
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<Vector3>();
+                var result = _helper.ReadAll<Vector3>(_data);
 
                 if (float.IsNaN(vector.x))
                 {
-                    Assert.That(float.IsNaN(result.x), "NaN component not preserved in Vector3");
+                    NAssert.That(float.IsNaN(result.x), "NaN component not preserved in Vector3");
                 }
                 else if (float.IsInfinity(vector.y))
                 {
-                    Assert.That(
+                    NAssert.That(
                         float.IsInfinity(result.y),
                         "Infinity component not preserved in Vector3"
                     );
                 }
                 else if (float.IsNegativeInfinity(vector.z))
                 {
-                    Assert.That(
+                    NAssert.That(
                         float.IsNegativeInfinity(result.z),
                         "Negative infinity component not preserved in Vector3"
                     );
                 }
                 else
                 {
-                    Assert.That(
+                    NAssert.That(
                         Vector3.Distance(result, vector) < 0.001f,
                         $"Extreme Vector3 {vector} not preserved correctly, got {result}"
                     );
@@ -320,11 +314,9 @@ namespace Trecs.Tests
 
             foreach (var str in problematicStrings)
             {
-                _cacheHelper.ClearMemoryStream();
-                _cacheHelper.WriteAll(str, TestConstants.Version, includeTypeChecks: true, flags);
-                _cacheHelper.ResetMemoryPosition();
-                var result = _cacheHelper.ReadAll<string>();
-                Assert.That(
+                _helper.WriteAll(_data, str, TestConstants.Version, includeTypeChecks: true, flags);
+                var result = _helper.ReadAll<string>(_data);
+                NAssert.That(
                     result == str,
                     $"Problematic string not preserved: '{str}' vs '{result}'"
                 );
@@ -339,19 +331,27 @@ namespace Trecs.Tests
 
             // Empty List
             var emptyList = new List<int>();
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(emptyList, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var resultList = _cacheHelper.ReadAll<List<int>>();
-            Assert.That(resultList.Count == 0);
+            _helper.WriteAll(
+                _data,
+                emptyList,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var resultList = _helper.ReadAll<List<int>>(_data);
+            NAssert.That(resultList.Count == 0);
 
             // Empty IterableDictionary
             var emptyDict = new IterableDictionary<int, string>();
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(emptyDict, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var resultDict = _cacheHelper.ReadAll<IterableDictionary<int, string>>();
-            Assert.That(resultDict.Count == 0);
+            _helper.WriteAll(
+                _data,
+                emptyDict,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            var resultDict = _helper.ReadAll<IterableDictionary<int, string>>(_data);
+            NAssert.That(resultDict.Count == 0);
         }
     }
 }

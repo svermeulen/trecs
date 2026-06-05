@@ -98,7 +98,9 @@ namespace Trecs.Serialization
                     writer.Write<ulong>("Value", Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value)));
                     return;
             }
-            throw new NotImplementedException();
+            throw new InvalidOperationException(
+                $"Unhandled underlying kind '{_underlyingKind}' for enum {typeof(T)}"
+            );
         }
 
         public void Deserialize(ref T value, ISerializationReader reader)
@@ -130,7 +132,9 @@ namespace Trecs.Serialization
                     Unsafe.As<T, ulong>(ref value) = reader.Read<ulong>("Value");
                     return;
             }
-            throw new NotImplementedException();
+            throw new InvalidOperationException(
+                $"Unhandled underlying kind '{_underlyingKind}' for enum {typeof(T)}"
+            );
         }
 
         public void SerializeDelta(in T value, in T baseValue, ISerializationWriter writer)
@@ -219,7 +223,9 @@ namespace Trecs.Serialization
                     );
                     return;
             }
-            throw new NotImplementedException();
+            throw new InvalidOperationException(
+                $"Unhandled underlying kind '{_underlyingKind}' for enum {typeof(T)}"
+            );
         }
 
         public void DeserializeDelta(ref T value, in T baseValue, ISerializationReader reader)
@@ -301,7 +307,9 @@ namespace Trecs.Serialization
                     );
                     return;
             }
-            throw new NotImplementedException();
+            throw new InvalidOperationException(
+                $"Unhandled underlying kind '{_underlyingKind}' for enum {typeof(T)}"
+            );
         }
 
         static UnderlyingKind ResolveUnderlyingKind(Type underlying)

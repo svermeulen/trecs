@@ -34,20 +34,16 @@ namespace Trecs.Tests
 
         World CreateWorld()
         {
-            var globals = new Template(
-                debugName: "TestGlobals",
-                localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
-                localTags: Array.Empty<Tag>()
-            );
+            var globals = TestTemplate
+                .Named("TestGlobals")
+                .Extending(TrecsTemplates.Globals.Template)
+                .Build();
 
             return new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(globals)
                 .AddSystem(new SerEnableSystemA())
                 .AddSystem(new SerEnableSystemB())
-                .AddBlobStore(new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null))
                 .BuildAndInitialize();
         }
 
@@ -55,11 +51,13 @@ namespace Trecs.Tests
         {
             var serializer = new WorldStateSerializer(world);
             var writer = new BinarySerializationWriter(_serializerRegistry);
-            writer.Start(version: 1, includeTypeChecks: false);
+            var serData = new SerializationData();
+            writer.Start(serData, version: 1, includeTypeChecks: false);
             serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
-            writer.Complete(outputStream);
+            writer.Complete();
+            serData.WriteContiguousTo(outputStream);
             return outputStream.ToArray();
         }
 
@@ -67,7 +65,7 @@ namespace Trecs.Tests
         {
             var serializer = new WorldStateSerializer(world);
             var reader = new BinarySerializationReader(_serializerRegistry);
-            reader.Start(data);
+            reader.Start(new ContiguousSerializationData(data));
             serializer.DeserializeState(reader);
         }
 
@@ -133,6 +131,84 @@ namespace Trecs.Tests
             NAssert.IsTrue(
                 a.IsSystemEnabled(idxA, EnableChannel.User),
                 "Channel state is ephemeral and is not overwritten by deserialize"
+            );
+        }
+
+        [Test]
+        public void Snapshot_PausedState_FollowsSystemIdentity_AcrossRegistrationReorder()
+        {
+            // Paused state serializes by system identity (name + ordinal),
+            // not by index — a pause must land on the same system even when
+            // the live world registered its systems in a different order
+            // (e.g. a patch reordered registration code).
+            var globals = TestTemplate
+                .Named("TestGlobals")
+                .Extending(TrecsTemplates.Globals.Template)
+                .Build();
+
+            using var worldAb = new WorldBuilder()
+                .SetSettings(new WorldSettings())
+                .AddTemplate(globals)
+                .AddSystem(new SerEnableSystemA())
+                .AddSystem(new SerEnableSystemB())
+                .BuildAndInitialize();
+            using var worldBa = new WorldBuilder()
+                .SetSettings(new WorldSettings())
+                .AddTemplate(globals)
+                .AddSystem(new SerEnableSystemB())
+                .AddSystem(new SerEnableSystemA())
+                .BuildAndInitialize();
+
+            var accessorAb = worldAb.CreateAccessor(AccessorRole.Unrestricted);
+            accessorAb.SetSystemPaused(FindSystemIndex(worldAb, typeof(SerEnableSystemB)), true);
+
+            var data = SerializeWorld(worldAb);
+            DeserializeWorld(worldBa, data);
+
+            var accessorBa = worldBa.CreateAccessor(AccessorRole.Unrestricted);
+            NAssert.IsTrue(
+                accessorBa.IsSystemPaused(FindSystemIndex(worldBa, typeof(SerEnableSystemB))),
+                "Pause should follow system B's identity, not its saved index"
+            );
+            NAssert.IsFalse(
+                accessorBa.IsSystemPaused(FindSystemIndex(worldBa, typeof(SerEnableSystemA))),
+                "System A occupies B's old index but must not inherit B's pause"
+            );
+        }
+
+        [Test]
+        public void Snapshot_PausedStateForRemovedSystem_IsDroppedWithoutFailing()
+        {
+            // A snapshot pausing a system the live world no longer has must
+            // still load (the pause is dropped with a warning) — system
+            // removal should not invalidate saved state.
+            var globals = TestTemplate
+                .Named("TestGlobals")
+                .Extending(TrecsTemplates.Globals.Template)
+                .Build();
+
+            using var worldAb = new WorldBuilder()
+                .SetSettings(new WorldSettings())
+                .AddTemplate(globals)
+                .AddSystem(new SerEnableSystemA())
+                .AddSystem(new SerEnableSystemB())
+                .BuildAndInitialize();
+            using var worldA = new WorldBuilder()
+                .SetSettings(new WorldSettings())
+                .AddTemplate(globals)
+                .AddSystem(new SerEnableSystemA())
+                .BuildAndInitialize();
+
+            var accessorAb = worldAb.CreateAccessor(AccessorRole.Unrestricted);
+            accessorAb.SetSystemPaused(FindSystemIndex(worldAb, typeof(SerEnableSystemB)), true);
+
+            var data = SerializeWorld(worldAb);
+            DeserializeWorld(worldA, data);
+
+            var accessorA = worldA.CreateAccessor(AccessorRole.Unrestricted);
+            NAssert.IsFalse(
+                accessorA.IsSystemPaused(FindSystemIndex(worldA, typeof(SerEnableSystemA))),
+                "A inherits nothing from the dropped pause of the removed system B"
             );
         }
 

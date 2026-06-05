@@ -12,13 +12,13 @@ namespace Trecs.Samples.HeightmapBlobs
         // Unmanaged heightmap data behind a NativeSharedPtr<NativeHeightmapData>.
         // The struct holds a FixedArray256<float> inline, and the sampling
         // system is a [WrapAsJob] Burst job that resolves the pointer via
-        // NativeWorldAccessor.SharedPtrResolver. Simple seed path
-        // (NativeSharedPtr.Alloc copies the value into the heap), but capped
-        // at 256 cells by the inline storage.
+        // NativeWorldAccessor.SharedPtrResolver. Simple build path (the
+        // interner's inline-value factory copies the value into the heap), but
+        // capped at 256 cells by the inline storage.
         NativeSharedPtrInline,
 
         // Unmanaged heightmap behind a NativeSharedPtr<NativeHeightmapDataLarge>,
-        // seeded via NativeSharedPtr.AllocTakingOwnership of a single
+        // built via the interner's taking-ownership factory from a single
         // header+trailing-data allocation. The struct holds only a header
         // (descriptor + length); heights live in the same allocation right
         // after the header and are reached via pointer arithmetic. Lifts
@@ -48,9 +48,9 @@ namespace Trecs.Samples.HeightmapBlobs
         // Uniform scale applied to each character's sphere visual.
         public float CharacterSize = 0.5f;
 
-        // Inputs that define the heightmap's content. Hashed via
-        // UniqueHashGenerator → BlobId, so two callers with the same values
-        // resolve to the same blob.
+        // Inputs that define the heightmap's content. Hashed by the descriptor
+        // interner (descriptor hash → BlobId), so two callers with the same
+        // values resolve to the same blob.
         //
         // Resolution × Resolution must be ≤ 256 for the NativeSharedPtrInline
         // flavor (the inline FixedArray256 sets the cap). 16×16 = 256 — at

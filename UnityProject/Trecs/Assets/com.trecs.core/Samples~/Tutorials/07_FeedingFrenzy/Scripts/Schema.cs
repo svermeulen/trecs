@@ -30,11 +30,14 @@ namespace Trecs.Samples.FeedingFrenzy101
     }
 
     /// <summary>
-    /// Stable handle to the meal entity this fish is approaching.
+    /// Stable handle to the meal entity this fish is approaching. When the
+    /// fish is removed, [CascadeRemove] tears down the referenced meal too
+    /// (skipped automatically when the handle is Null/stale).
     /// </summary>
     [Unwrap]
     public partial struct TargetMeal : IEntityComponent
     {
+        [CascadeRemove]
         public EntityHandle Value;
     }
 
@@ -68,9 +71,15 @@ namespace Trecs.Samples.FeedingFrenzy101
         public float3 Value;
     }
 
+    /// <summary>
+    /// Stable handle to the fish approaching this meal. When the meal is
+    /// removed, [CascadeRemove] tears down the referenced fish too (skipped
+    /// automatically when the handle is Null/stale).
+    /// </summary>
     [Unwrap]
     public partial struct ApproachingFish : IEntityComponent
     {
+        [CascadeRemove]
         public EntityHandle Value;
     }
 

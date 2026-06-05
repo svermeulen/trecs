@@ -61,6 +61,10 @@ namespace Trecs.Internal
             // Collapse Length to the LIVE count so the user can compare it
             // against requiredCount and decide how to reconcile (preserve in
             // place, resize-and-clear, dispose-and-rebuild, etc.).
+            // No try/finally here, unlike Serialize: if the user serializer
+            // throws mid-load the world is already half-restored and must be
+            // discarded (see IWorldStateSerializer.DeserializeState), so
+            // restoring the capacity-as-length invariant would be pointless.
             list.Resize(typed.Count, NativeArrayOptions.UninitializedMemory);
             _user.Deserialize(list, requiredCount, reader);
             TrecsDebugAssert.That(

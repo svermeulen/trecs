@@ -68,7 +68,7 @@ namespace Trecs.Internal
     /// reads structurally (the tag round-trips through Serialize/Deserialize).
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public readonly struct InputAllocation
+    internal readonly struct InputAllocation
     {
         public readonly IntPtr Ptr;
         public readonly int Size;

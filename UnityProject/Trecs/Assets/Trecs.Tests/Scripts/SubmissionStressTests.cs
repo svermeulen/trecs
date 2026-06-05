@@ -36,7 +36,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityIds[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(count, a.CountEntitiesWithTags(tags));
 
             // Remove half (scattered indices to stress swap-back)
@@ -48,7 +48,7 @@ namespace Trecs.Tests
             }
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             NAssert.AreEqual(count - removeCount, a.CountEntitiesWithTags(tags));
@@ -91,7 +91,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityIds[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(count, a.CountEntitiesWithTags(partitionA));
 
             // Move half to partition B
@@ -102,7 +102,7 @@ namespace Trecs.Tests
             }
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             NAssert.AreEqual(count - moveCount, a.CountEntitiesWithTags(partitionA));
@@ -153,7 +153,7 @@ namespace Trecs.Tests
             }
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(tags));
@@ -186,7 +186,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityIds[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Schedule mixed: remove 25%, move 25%, leave 50%
             int removeCount = count / 4;
@@ -210,7 +210,7 @@ namespace Trecs.Tests
             }
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             int expectedA = count - removeCount - moveCount + addCount;
@@ -243,7 +243,7 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityIds[i] = init.Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove ALL entities (worst case for swap-back chains without descending sort)
             for (int i = 0; i < count; i++)
@@ -252,7 +252,7 @@ namespace Trecs.Tests
             }
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(tags));
@@ -292,7 +292,7 @@ namespace Trecs.Tests
             refs.Dispose();
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(TestTags.Alpha));
@@ -337,7 +337,7 @@ namespace Trecs.Tests
             refs.Dispose();
 
             var sw = Stopwatch.StartNew();
-            a.Submit();
+            a.World.Submit();
             sw.Stop();
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(TestTags.Alpha));

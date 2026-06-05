@@ -127,16 +127,8 @@ namespace Trecs.Collections
                     for (int i = 0; i < count; i++)
                         tempKeys[i] = _data->ValuesInfo[i].Key;
 
-                    writer.BlitWriteRawBytes(
-                        "Keys",
-                        tempKeys,
-                        count * UnsafeUtility.SizeOf<TKey>()
-                    );
-                    writer.BlitWriteRawBytes(
-                        "Values",
-                        _data->Values.Ptr,
-                        count * UnsafeUtility.SizeOf<TValue>()
-                    );
+                    writer.BlitWriteArrayPtr("Keys", tempKeys, count);
+                    writer.BlitWriteArrayPtr("Values", _data->Values.Ptr, count);
 
                     UnsafeUtility.Free(tempKeys, Allocator.Temp);
                 }
@@ -164,16 +156,12 @@ namespace Trecs.Collections
                         Allocator.Temp,
                         NativeArrayOptions.UninitializedMemory
                     );
-                    reader.BlitReadRawBytes(
+                    reader.BlitReadArrayPtr(
                         "Keys",
-                        NativeArrayUnsafeUtility.GetUnsafePtr(tempKeys),
-                        count * UnsafeUtility.SizeOf<TKey>()
+                        (TKey*)NativeArrayUnsafeUtility.GetUnsafePtr(tempKeys),
+                        count
                     );
-                    reader.BlitReadRawBytes(
-                        "Values",
-                        _data->Values.Ptr,
-                        count * UnsafeUtility.SizeOf<TValue>()
-                    );
+                    reader.BlitReadArrayPtr("Values", _data->Values.Ptr, count);
 
                     var bucketsCapacity = (uint)_data->Buckets.Length;
                     var fmm = _data->FastModBucketsMultiplier;

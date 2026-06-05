@@ -7,7 +7,7 @@ using Trecs.Collections;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class SystemLoader
+    internal sealed class SystemLoader
     {
         readonly TrecsLog _log;
 
@@ -214,7 +214,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public sealed class LoadInfo
+        internal sealed class LoadInfo
         {
             public IReadOnlyList<SystemEntry> Systems;
 

@@ -165,7 +165,7 @@ public partial class VisualSmoothingSystem : ISystem
 Bidirectional cleanup — removing a fish also removes its target meal, and vice versa, preventing orphans:
 
 ```csharp
-public partial class RemoveCleanupHandler : IDisposable
+public partial class RemoveCleanupHandler
 {
     readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
@@ -180,6 +180,10 @@ public partial class RemoveCleanupHandler : IDisposable
         World.Events.EntitiesWithTags<FrenzyTags.Meal>()
             .OnRemoved(OnMealRemoved)
             .AddTo(_disposables);
+
+        // Dispose from OnShutdown so we're still subscribed for the final
+        // OnRemoved pass during world.Dispose(). See Entity Events → Handlers.
+        World.Events.OnShutdown(() => _disposables.Dispose()).AddTo(_disposables);
     }
 
     WorldAccessor World { get; }
@@ -197,8 +201,6 @@ public partial class RemoveCleanupHandler : IDisposable
         if (fish.Value.Exists(World))
             fish.Value.Remove(World);
     }
-
-    public void Dispose() => _disposables.Dispose();
 }
 ```
 

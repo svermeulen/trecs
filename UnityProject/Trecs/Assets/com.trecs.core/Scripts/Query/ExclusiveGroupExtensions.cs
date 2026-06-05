@@ -5,7 +5,7 @@ using Trecs.Collections;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static class ExclusiveGroupExtensions
+    internal static class ExclusiveGroupExtensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool FoundIn(this in GroupIndex group, GroupIndex[] groups)

@@ -443,7 +443,7 @@ namespace Trecs.Internal
             return _systemSortIndex[i];
         }
 
-        public void Initialize(
+        internal void Initialize(
             World world,
             SystemLoader.LoadInfo loadInfo,
             SystemEnableState enableState

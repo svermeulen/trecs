@@ -102,6 +102,17 @@ namespace Trecs
             _tracker?.MarkComponentSet(_trackingId, componentId, _group);
 #endif
 
+            // Same staleness/bounds guard as ComponentArray.GetValueAtIndexByRef —
+            // this path computes the destination pointer manually, so it must
+            // duplicate the check.
+            TrecsDebugAssert.That(
+                (uint)_indexInTransientBuffer < (uint)componentArray.Count,
+                "EntityInitializer.SetRaw: index {0} out of range [0, {1}). "
+                    + "If this initializer was kept across Submit, it is stale.",
+                _indexInTransientBuffer,
+                componentArray.Count
+            );
+
             int elementSize = componentArray.ElementSize;
             byte* destPtr =
                 (byte*)componentArray.GetUnsafePtr() + _indexInTransientBuffer * elementSize;

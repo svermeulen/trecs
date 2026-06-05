@@ -26,7 +26,7 @@ Or add the scoped registry to `Packages/manifest.json` manually:
     }
   ],
   "dependencies": {
-    "com.trecs.core": "0.2.0"
+    "com.trecs.core": "0.3.0"
   }
 }
 ```

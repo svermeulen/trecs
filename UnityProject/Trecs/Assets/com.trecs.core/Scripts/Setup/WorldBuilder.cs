@@ -12,7 +12,6 @@ namespace Trecs
     public sealed class WorldBuilder
     {
         readonly List<ISystem> _systems = new();
-        readonly List<IBlobStore> _blobStores = new();
         readonly List<SystemOrderConstraint> _systemOrderConstraints = new();
 
         internal readonly List<IInterpolatedPreviousSaver> _interpolatedPreviousSavers = new();
@@ -21,6 +20,7 @@ namespace Trecs
         internal ISystemEntryProvider _systemEntryProvider;
         readonly SerializerRegistry _serializerRegistry;
         readonly ComponentArraySerializerRegistry _componentArraySerializerRegistry = new();
+        readonly CustomWorldStateSectionRegistry _customWorldStateSections = new();
 
         bool _hasBuilt;
         BlobCacheSettings _blobCacheSettings;
@@ -161,35 +161,6 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Adds a blob store for loading shared blob data. Pass an instance of one of the
-        /// supplied store types — <see cref="BlobStoreInMemory"/>, or the Svkj-package
-        /// <c>BlobStoreFiles</c> / <c>BlobStoreAddressables</c>. The <see cref="IBlobStore"/>
-        /// contract is not intended for external implementation.
-        ///
-        /// If no blob store is added before <see cref="Build"/>, the builder falls back to a
-        /// <see cref="BlobStoreInMemory"/> with <see cref="BlobStoreInMemorySettings.Default"/>.
-        /// </summary>
-        public WorldBuilder AddBlobStore(IBlobStore store)
-        {
-            TrecsAssert.That(store != null, "store must not be null");
-            _blobStores.Add(store);
-            return this;
-        }
-
-        /// <summary>
-        /// Adds multiple blob stores for loading shared blob data. See <see cref="AddBlobStore"/>.
-        /// </summary>
-        public WorldBuilder AddBlobStores(IEnumerable<IBlobStore> stores)
-        {
-            TrecsAssert.That(stores != null, "stores must not be null");
-            foreach (var store in stores)
-            {
-                AddBlobStore(store);
-            }
-            return this;
-        }
-
-        /// <summary>
         /// Configures caching behavior for blob data.
         /// </summary>
         public WorldBuilder SetBlobCacheSettings(BlobCacheSettings settings)
@@ -285,6 +256,22 @@ namespace Trecs
             return this;
         }
 
+        /// <summary>
+        /// Registers an <see cref="ICustomWorldStateSection"/> appended to the
+        /// world-state stream under <paramref name="name"/>. Equivalent to
+        /// calling <c>world.CustomWorldStateSections.Register(name, section)</c>
+        /// post-build, but available up front for callers that pre-configure
+        /// everything via the builder.
+        /// </summary>
+        public WorldBuilder RegisterCustomWorldStateSection(
+            string name,
+            ICustomWorldStateSection section
+        )
+        {
+            _customWorldStateSections.Register(name, section);
+            return this;
+        }
+
 #if DEBUG && !TRECS_IS_PROFILING
         void Validate()
         {
@@ -339,7 +326,7 @@ namespace Trecs
             var settings = _settings ?? new WorldSettings();
 
             // One TrecsLog instance per World — every framework class caches this same
-            // reference. WorldAccessor.Log exposes it to user systems.
+            // reference. Framework-internal; not exposed on the public API.
             var log = new TrecsLog(settings);
 
             var worldInfo = new WorldInfo(log, _templates, _sets);
@@ -347,22 +334,32 @@ namespace Trecs
             var uniqueHeap = new UniqueHeap(log, _poolManager);
             var nativeBlobBoxPool = new NativeBlobBoxPool();
 
-            // If no blob stores were registered, fall back to an in-memory store with default
-            // settings so heap operations work out of the box. Callers that added at least one
-            // store (even a read-only one like BlobStoreAddressables) are assumed to have
-            // configured things intentionally, so we leave their list untouched.
-            if (_blobStores.Count == 0)
+            var blobCache = new BlobCache(log, _blobCacheSettings, nativeBlobBoxPool);
+#if DEBUG
+            // Content attestation (debug builds): lets the cache hash managed blobs so re-inserting
+            // different bytes under a previously-seen id — an impure builder re-materializing after
+            // eviction, or explicit-id reuse — asserts at the insert instead of silently desyncing.
+            // Native blobs hash their raw bytes without this; managed blobs need the registry, and
+            // types without a registered serializer are skipped (hash 0 = unattested).
+            var debugContentHashGenerator = new UniqueHashGenerator(_serializerRegistry);
+            var debugRegistry = _serializerRegistry;
+            blobCache.SetDebugManagedContentHasher(blob =>
             {
-                _blobStores.Add(new BlobStoreInMemory(BlobStoreInMemorySettings.Default));
-            }
-
-            var blobCache = new BlobCache(log, _blobStores, _blobCacheSettings, nativeBlobBoxPool);
-            var sharedHeap = new SharedHeap(log, blobCache);
-            var nativeSharedHeap = new NativeSharedHeap(log, blobCache);
+                if (!debugRegistry.HasSerializer(blob.GetType()))
+                {
+                    return 0;
+                }
+                // Generate reserves 0 for null, so a real hash is never 0 (the "unattested" marker).
+                return unchecked((ulong)debugContentHashGenerator.Generate(blob));
+            });
+#endif
+            var blobFactory = new BlobFactory(log, blobCache, _serializerRegistry);
+            var sharedHeap = new SharedHeap(log, blobCache, blobFactory);
+            var nativeSharedHeap = new NativeSharedHeap(log, blobCache, blobFactory);
             var nativeUniqueChunkStore = new NativeHeap(log);
             var inputNativeUniqueHeap = new InputNativeUniqueHeap(log);
-            var inputNativeSharedHeap = new InputNativeSharedHeap(log, blobCache);
-            var inputSharedHeap = new InputSharedHeap(log, blobCache);
+            var inputNativeSharedHeap = new InputNativeSharedHeap(log, blobCache, blobFactory);
+            var inputSharedHeap = new InputSharedHeap(log, blobCache, blobFactory);
             var inputUniqueHeap = new InputUniqueHeap(log, _poolManager);
 
             var accessorRegistry = new WorldAccessorRegistry(log);
@@ -419,6 +416,7 @@ namespace Trecs
                 inputNativeSharedHeap,
                 inputUniqueHeap,
                 inputNativeUniqueHeap,
+                blobFactory,
                 worldInfo
             );
 
@@ -452,12 +450,14 @@ namespace Trecs
                 sharedHeap: sharedHeap,
                 settings: settings,
                 blobCache: blobCache,
+                blobFactory: blobFactory,
                 nativeBlobBoxPool: nativeBlobBoxPool,
                 interpolatedPreviousSaverManager: interpolatedPreviousSaverManager,
                 componentStore: componentStore,
                 systems: _systems,
                 serializerRegistry: _serializerRegistry,
-                componentArraySerializerRegistry: _componentArraySerializerRegistry
+                componentArraySerializerRegistry: _componentArraySerializerRegistry,
+                customWorldStateSections: _customWorldStateSections
             );
             world.DebugName = _debugName;
 

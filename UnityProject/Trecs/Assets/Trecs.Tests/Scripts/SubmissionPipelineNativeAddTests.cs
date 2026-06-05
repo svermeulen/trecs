@@ -36,7 +36,7 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             // Native add new entity + native remove existing
             using var refs = a.ReserveEntityHandles(1, Allocator.Temp);
@@ -44,7 +44,7 @@ namespace Trecs.Tests
             init.Set(new TestInt { Value = 99 });
             init.Set(new TestVec());
             nativeEcs.RemoveEntity(existing.ToIndex(a));
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.IsFalse(existing.Exists(a));
@@ -66,7 +66,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove 3 existing, add 2 new (native)
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
@@ -80,7 +80,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = 100 + i });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             // 5 - 3 + 2 = 4
             NAssert.AreEqual(4, a.CountEntitiesWithTags(PartitionA));
@@ -107,7 +107,7 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
-            a.Submit();
+            a.World.Submit();
 
             // Move existing to PartitionB + native add new to PartitionA
             a.SetTag<TestPartitionB>(handle.ToIndex(a));
@@ -115,7 +115,7 @@ namespace Trecs.Tests
             var init = nativeEcs.AddEntity(PartitionA, sortKey: 0, refs[0]);
             init.Set(new TestInt { Value = 77 });
             init.Set(new TestVec());
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -138,7 +138,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Move 0 to PartitionB, remove 1, native add 2 new
             a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
@@ -150,7 +150,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = 100 + i });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             // PartitionA: 2, 3 (original) + 100, 101 (new) = 4
             // PartitionB: 0 (moved) = 1
@@ -181,7 +181,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = count - 1 - i });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             refs.Dispose();
 
@@ -221,7 +221,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = i });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             refs.Dispose();
 
@@ -261,7 +261,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove entity 1, native add 5 new with sort keys
             a.RemoveEntity(existing[1]);
@@ -272,7 +272,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = i * 10 });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             refs.Dispose();
 
@@ -303,7 +303,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = i });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(PartitionA));
 
@@ -338,7 +338,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.Submit();
+            a.World.Submit();
 
             // Remove every 3rd, native add 50 new
             for (int i = 0; i < 100; i += 3)
@@ -350,7 +350,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = 1000 + i });
                 init.Set(new TestVec());
             }
-            a.Submit();
+            a.World.Submit();
 
             int removedCount = (100 + 2) / 3; // 34
             NAssert.AreEqual(100 - removedCount + 50, a.CountEntitiesWithTags(PartitionA));

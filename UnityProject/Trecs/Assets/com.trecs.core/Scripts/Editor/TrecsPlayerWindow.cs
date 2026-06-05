@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,17 +13,15 @@ namespace Trecs.Internal
     /// <item>Recording header row — current recording name, state badge
     /// (LIVE/REC/PLAY), Speed dropdown, Actions ▾ menu.</item>
     /// <item>Transport row — Record button, ⏮ ◂ ▶ ▸ ⏭ navigation, Loop
-    /// button (enabled in Playback only). Slider with adaptive time ruler
-    /// underneath. Capacity banner when the recorder is paused against
-    /// its memory cap.</item>
+    /// button (enabled in Playback only). Timeline strip with adaptive time
+    /// ruler underneath — scrub/hover/marker behavior lives in
+    /// <see cref="TrecsTimelineView"/>. Capacity banner when the recorder
+    /// is paused against its memory cap.</item>
     /// </list>
-    /// The slider commits a JumpToFrame on pointer release; while dragging
-    /// the throttled commit fires at most every <c>ScrubThrottleSeconds</c>
-    /// so the world updates continuously without per-frame resim cost.
     /// Keyboard shortcuts (Space, Home/End, ←/→, Shift+arrows) drive the
     /// same actions when the window has focus.
     /// </summary>
-    public class TrecsPlayerWindow : EditorWindow
+    internal class TrecsPlayerWindow : EditorWindow
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>
@@ -179,26 +176,10 @@ namespace Trecs.Internal
         // icon isn't available on a given Unity version.
         static Texture2D _iconBookmark;
 
-        // Scrubber: slider with hover-cursor indicator + adaptive time ruler.
-        SliderInt _timelineSlider;
-        VisualElement _hoverIndicator;
-
-        // Overlay layered on top of the slider track that hosts per-anchor
-        // and per-snapshot markers. Rebuilt in RefreshScrubber from
-        // recorder.Anchors / recorder.Bookmarks. Anchors render as a faint
-        // tick (subtle — there can be many of them); snapshots render as a
-        // taller, brighter pin-style mark with the user's label tooltip.
-        // Markers are clickable (left-click jumps to their frame, right-
-        // click on a snapshot pops a Remove menu) so PickingMode is
-        // Position rather than Ignore — but we stop propagation in the
-        // marker's own pointer-down handler so a click never starts a
-        // scrub against the underlying slider track.
-        VisualElement _timelineMarkerLayer;
-
-        // Floating label shown next to the cursor while hovering the slider —
-        // displays the cursor's frame number and signed time offset from the
-        // current frame. Cleaner than a static text label below the timeline.
-        Label _hoverTooltipLabel;
+        // Timeline strip: slider scrubber with hover indicator + frame
+        // readout, adaptive time ruler, keyframe / bookmark marker overlay,
+        // and the scrub-drag state machine. See TrecsTimelineView.
+        TrecsTimelineView _timeline;
 
         // Subtle bottom-right stats line: snapshot count, frame span, byte
         // size. Tucked away so it doesn't dominate the UI but available for
@@ -214,41 +195,11 @@ namespace Trecs.Internal
 #if DEBUG
         Button _dumpDesyncDiffButton;
 #endif
-        VisualElement _timelineRuler;
 
-        // Scrub-drag state: while pointer is down on the slider, value changes
-        // commit a JumpToFrame at most every ScrubThrottleSeconds, with a
-        // final commit on PointerUp guaranteeing we land at the released frame.
-        bool _isScrubbing;
-        int _pendingScrubFrame;
-        int _lastCommittedScrubFrame;
-        double _lastScrubCommitTime;
-        const double ScrubThrottleSeconds = 0.15;
-
-        // Hover state: while pointer is over the slider but not pressed, this
-        // is the frame the cursor is hovering over (read from local pointer
-        // position). Cleared on PointerLeave.
-        int? _hoverFrame;
-
-        // Manual tooltip system. UIElements' built-in TooltipEvent dispatch
-        // is unreliable for buttons in this window (likely Unity 6 quirks
-        // with scroll containers / IMGUI integration), so we drive a small
-        // floating Label ourselves on PointerEnter/Leave. Fields live at the
-        // window level so the same label is reused for every tooltip target.
-        Label _tooltipLabel;
-        IVisualElementScheduledItem _tooltipShowTask;
-        const long TooltipDelayMs = 450;
-        const float DefaultTooltipMaxWidth = 320f;
-
-        // Per-target max-width override so the help button's "?" can show
-        // a much wider tooltip without affecting transport-button tooltips.
-        readonly Dictionary<VisualElement, float> _tooltipMaxWidths = new();
-
-        // Per-target tooltip text. Stored here rather than on
-        // element.tooltip because setting that property activates Unity's
-        // native tooltip flow, which double-fires alongside our manual
-        // floating-Label dispatch (two overlapping tooltips on hover).
-        readonly Dictionary<VisualElement, string> _tooltipTexts = new();
+        // Manual per-control tooltips — UIElements' built-in TooltipEvent
+        // dispatch is unreliable for buttons in this window; see
+        // TrecsManualTooltips for the full rationale.
+        TrecsManualTooltips _tooltips;
 
         // Speed dropdown: a single button labelled with the current
         // multiplier ("1×") that opens a GenericMenu of preset speeds.
@@ -257,8 +208,6 @@ namespace Trecs.Internal
         World _selectedWorld;
         WorldAccessor _selectedAccessor;
         readonly List<World> _dropdownWorlds = new();
-
-        bool _suppressControlEvents;
 
         [MenuItem("Window/Trecs/Player")]
         public static void ShowWindow()
@@ -358,6 +307,18 @@ namespace Trecs.Internal
 
         void CreateGUI()
         {
+            // UI collaborators are rebuilt with the rest of the visual tree
+            // on every CreateGUI (window open, domain reload).
+            _tooltips = new TrecsManualTooltips(rootVisualElement);
+            _timeline = new TrecsTimelineView(
+                rootVisualElement,
+                jumpToFrame: frame => GetController()?.JumpToFrame(frame),
+                removeBookmark: (frame, label) =>
+                    RemoveBookmarkAndRefresh(GetController()?.AutoRecorder, frame, label),
+                currentFrame: () => _selectedAccessor?.FixedFrame,
+                fixedDeltaTime: () => TryGetFixedDeltaTime(out var dt) ? dt : 0f
+            );
+
             var scroll = new ScrollView(ScrollViewMode.Vertical);
             scroll.style.flexGrow = 1;
             // Header/transport rows can grow wider than the window when it's
@@ -392,7 +353,7 @@ namespace Trecs.Internal
             root.Add(_transportPanel);
 
             // Bottom-right stats overlay. Sits on rootVisualElement (above
-            // the scroll content) so it stays anchored as the scroll grows
+            // the scroll content) so it stays fixed in place as the scroll grows
             // and doesn't fight transport-panel layout. Picking is off so
             // it never intercepts clicks on whatever's underneath.
             _bufferInfoLabel = new Label();
@@ -472,7 +433,7 @@ namespace Trecs.Internal
                 case KeyCode.LeftArrow:
                     if (evt.shiftKey)
                     {
-                        GetController()?.JumpToPreviousAnchor();
+                        GetController()?.JumpToPreviousKeyframe();
                     }
                     else
                     {
@@ -483,7 +444,7 @@ namespace Trecs.Internal
                 case KeyCode.RightArrow:
                     if (evt.shiftKey)
                     {
-                        GetController()?.JumpToNextAnchor();
+                        GetController()?.JumpToNextKeyframe();
                     }
                     else
                     {
@@ -543,30 +504,30 @@ namespace Trecs.Internal
             // UpdateRecordButton so it always describes the action that will
             // happen if you click *now*.
             _recordButton = MakeIconTransportButton(_iconRecord, "●", OnRecordButtonClicked);
-            ApplyTooltip(_recordButton, RecordButtonIdleTooltip);
+            _tooltips.Apply(_recordButton, RecordButtonIdleTooltip);
             row.Add(_recordButton);
 
             _jumpStartButton = MakeIconTransportButton(_iconJumpStart, "⏮", OnJumpStartClicked);
-            ApplyTooltip(_jumpStartButton, "Jump to start of buffer (Home)");
+            _tooltips.Apply(_jumpStartButton, "Jump to start of buffer (Home)");
             _stepBackButton = MakeIconTransportButton(_iconStepBack, "◂", OnStepBackClicked);
-            ApplyTooltip(
+            _tooltips.Apply(
                 _stepBackButton,
                 "Step back one frame (←)\nShift+← jumps to previous snapshot"
             );
             _playPauseButton = MakeIconTransportButton(_iconPlay, "▶", OnPlayPauseClicked);
             _playPauseIcon = _playPauseButton.Q<Image>();
-            ApplyTooltip(_playPauseButton, "Play / Pause (Space)");
+            _tooltips.Apply(_playPauseButton, "Play / Pause (Space)");
             _stepForwardButton = MakeIconTransportButton(
                 _iconStepForward,
                 "▸",
                 OnStepForwardClicked
             );
-            ApplyTooltip(
+            _tooltips.Apply(
                 _stepForwardButton,
                 "Step forward one frame (→)\nShift+→ jumps to next snapshot"
             );
             _jumpEndButton = MakeIconTransportButton(_iconJumpEnd, "⏭", OnJumpEndClicked);
-            ApplyTooltip(_jumpEndButton, "Go to live edge (End)");
+            _tooltips.Apply(_jumpEndButton, "Go to live edge (End)");
             row.Add(_jumpStartButton);
             row.Add(_stepBackButton);
             row.Add(_playPauseButton);
@@ -579,7 +540,7 @@ namespace Trecs.Internal
             // outside Playback (where it has no effect since the recorder
             // only consults LoopPlayback at the loaded recording's tail).
             _loopButton = MakeIconTransportButton(_iconLoop, "↻", OnLoopButtonClicked);
-            ApplyTooltip(_loopButton, LoopButtonDisabledTooltip);
+            _tooltips.Apply(_loopButton, LoopButtonDisabledTooltip);
             _loopButton.SetEnabled(false);
             row.Add(_loopButton);
 
@@ -593,7 +554,7 @@ namespace Trecs.Internal
                 "★",
                 OnBookmarkCaptureClicked
             );
-            ApplyTooltip(_bookmarkCaptureButton, BookmarkButtonDisabledTooltip);
+            _tooltips.Apply(_bookmarkCaptureButton, BookmarkButtonDisabledTooltip);
             _bookmarkCaptureButton.SetEnabled(false);
             // A small left margin separates the snapshot from the loop
             // button visually — these aren't both transport-direction
@@ -608,69 +569,9 @@ namespace Trecs.Internal
 
             panel.Add(row);
 
-            _timelineSlider = new SliderInt(0, 1) { value = 0, showInputField = true };
-            _timelineSlider.tooltip =
-                "Drag to scrub through the buffer. Click anywhere on the track "
-                + "to jump there. Type a frame in the input field on the right "
-                + "to jump exactly. Faint white ticks mark anchors (auto-saved "
-                + "recovery points); brighter yellow pins mark snapshots — "
-                + "click a marker to jump there, right-click a snapshot to "
-                + "remove it.";
-            _timelineSlider.style.marginTop = 6;
-            _timelineSlider.RegisterValueChangedCallback(OnTimelineValueChanged);
-            _timelineSlider.RegisterCallback<PointerDownEvent>(
-                OnTimelinePointerDown,
-                TrickleDown.TrickleDown
-            );
-            _timelineSlider.RegisterCallback<PointerUpEvent>(
-                OnTimelinePointerUp,
-                TrickleDown.TrickleDown
-            );
-            _timelineSlider.RegisterCallback<PointerCaptureOutEvent>(OnTimelinePointerCaptureOut);
-            _timelineSlider.RegisterCallback<PointerMoveEvent>(OnTimelinePointerMove);
-            _timelineSlider.RegisterCallback<PointerLeaveEvent>(OnTimelinePointerLeave);
-            panel.Add(_timelineSlider);
-
-            // Thin vertical hover-cursor line layered on top of the slider so
-            // there's an unmistakable visual cue of where a click would land.
-            // Positioned in OnTimelinePointerMove and hidden when the cursor
-            // leaves the track or scrubbing starts.
-            _hoverIndicator = new VisualElement();
-            _hoverIndicator.style.position = Position.Absolute;
-            _hoverIndicator.style.width = 1;
-            _hoverIndicator.style.top = 0;
-            _hoverIndicator.style.bottom = 0;
-            _hoverIndicator.style.backgroundColor = new Color(1f, 1f, 1f, 0.55f);
-            _hoverIndicator.pickingMode = PickingMode.Ignore;
-            _hoverIndicator.style.display = DisplayStyle.None;
-            _timelineSlider.Add(_hoverIndicator);
-
-            // Anchor + snapshot markers, layered on top of the slider track.
-            // The layer's pickingMode is Ignore so it doesn't intercept
-            // scrub interactions in empty space — only the individual
-            // markers (added in RefreshMarkerLayer) are pickable. Width
-            // gets set to the track-bounds range each refresh so percent-
-            // based marker positions stay aligned with the thumb travel
-            // (BaseSlider's value↔pixel mapping insets by half the thumb
-            // width on each side; matches TryGetSliderTrackBounds).
-            _timelineMarkerLayer = new VisualElement();
-            _timelineMarkerLayer.style.position = Position.Absolute;
-            _timelineMarkerLayer.style.top = 0;
-            _timelineMarkerLayer.style.bottom = 0;
-            _timelineMarkerLayer.pickingMode = PickingMode.Ignore;
-            _timelineSlider.Add(_timelineMarkerLayer);
-
-            // Adaptive time ruler directly under the slider — gives an
-            // at-a-glance sense of how long the buffer is. Tick interval
-            // auto-picks (0.5s, 1s, 5s, 30s, 1m, …) so labels stay readable
-            // as the buffer grows.
-            _timelineRuler = new VisualElement();
-            _timelineRuler.style.height = 12;
-            _timelineRuler.style.marginTop = 0;
-            _timelineRuler.style.marginBottom = 4;
-            _timelineRuler.style.position = Position.Relative;
-            _timelineRuler.pickingMode = PickingMode.Ignore;
-            panel.Add(_timelineRuler);
+            // Slider scrubber + hover readout + adaptive ruler + keyframe /
+            // bookmark markers — see TrecsTimelineView.
+            _timeline.BuildInto(panel);
 
             _capacityBanner = new Label();
             _capacityBanner.tooltip =
@@ -737,7 +638,7 @@ namespace Trecs.Internal
         // surrounding editor chrome — much cleaner than Unicode characters
         // (⏮ ◀ ▶ ⏭) which macOS renders as colored emoji-style boxes.
         // Falls back to plain text if the icon couldn't be loaded. Caller
-        // registers the tooltip via ApplyTooltip after construction.
+        // registers the tooltip via _tooltips.Apply after construction.
         static Button MakeIconTransportButton(Texture2D icon, string fallbackText, Action onClick)
         {
             var b = new Button(onClick);
@@ -768,136 +669,6 @@ namespace Trecs.Internal
                 b.text = fallbackText;
             }
             return b;
-        }
-
-        // Manual tooltip dispatch. UIElements' .tooltip + TooltipEvent
-        // pipeline doesn't fire reliably for our transport buttons (verified
-        // empirically: even an explicit TooltipEvent callback never sees
-        // events in this window). Instead we listen for PointerEnter/Leave
-        // ourselves, run a delay-and-show against rootVisualElement.schedule,
-        // and reposition a single floating Label.
-        //
-        // Important: we deliberately do NOT set element.tooltip — Unity's
-        // native tooltip path DOES fire for some elements (verified
-        // empirically too), and when both fire we get two overlapping
-        // tooltips on hover. The text lives in _tooltipTexts so dynamic
-        // updates (e.g. play/pause swap) just call ApplyTooltip again.
-        void ApplyTooltip(
-            VisualElement element,
-            string text,
-            float maxWidth = DefaultTooltipMaxWidth
-        )
-        {
-            _tooltipTexts[element] = text;
-            _tooltipMaxWidths[element] = maxWidth;
-            if (element.userData is string s && s == "manual-tooltip-attached")
-            {
-                return;
-            }
-            element.userData = "manual-tooltip-attached";
-            element.RegisterCallback<PointerEnterEvent>(_ => ScheduleTooltipShow(element));
-            element.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
-            element.RegisterCallback<PointerDownEvent>(_ => HideTooltip());
-            element.RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
-        }
-
-        void ScheduleTooltipShow(VisualElement target)
-        {
-            _tooltipShowTask?.Pause();
-            var captured = target;
-            _tooltipShowTask = rootVisualElement
-                .schedule.Execute(() => ShowTooltipNow(captured))
-                .StartingIn(TooltipDelayMs);
-        }
-
-        void ShowTooltipNow(VisualElement target)
-        {
-            if (target?.panel == null)
-            {
-                return;
-            }
-            if (!_tooltipTexts.TryGetValue(target, out var text) || string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-            EnsureTooltipLabel();
-            _tooltipLabel.text = text;
-            _tooltipLabel.style.maxWidth = _tooltipMaxWidths.TryGetValue(target, out var maxWidth)
-                ? maxWidth
-                : DefaultTooltipMaxWidth;
-            _tooltipLabel.style.display = DisplayStyle.Flex;
-            _tooltipLabel.BringToFront();
-
-            // Position just below the target. Convert worldBound into
-            // rootVisualElement-local coords. If we'd run off the right
-            // edge, clamp so the tooltip stays fully visible.
-            var rootBound = rootVisualElement.worldBound;
-            var bound = target.worldBound;
-            var localLeft = bound.x - rootBound.x;
-            var localTop = bound.y + bound.height + 4 - rootBound.y;
-            // Force a layout pass so we know the tooltip's own width before
-            // clamping. resolvedStyle.width is the laid-out value.
-            _tooltipLabel.style.left = localLeft;
-            _tooltipLabel.style.top = localTop;
-            _tooltipLabel
-                .schedule.Execute(() =>
-                {
-                    if (_tooltipLabel.style.display == DisplayStyle.None)
-                        return;
-                    var w = _tooltipLabel.resolvedStyle.width;
-                    var maxLeft = rootBound.width - w - 4;
-                    if (localLeft > maxLeft && maxLeft > 0)
-                    {
-                        _tooltipLabel.style.left = maxLeft;
-                    }
-                })
-                .ExecuteLater(0);
-        }
-
-        void HideTooltip()
-        {
-            _tooltipShowTask?.Pause();
-            _tooltipShowTask = null;
-            if (_tooltipLabel != null)
-            {
-                _tooltipLabel.style.display = DisplayStyle.None;
-            }
-        }
-
-        void EnsureTooltipLabel()
-        {
-            if (_tooltipLabel != null)
-                return;
-            _tooltipLabel = new Label();
-            _tooltipLabel.style.position = Position.Absolute;
-            _tooltipLabel.style.backgroundColor = new Color(0.12f, 0.12f, 0.12f, 0.97f);
-            _tooltipLabel.style.color = Color.white;
-            _tooltipLabel.style.fontSize = 11;
-            _tooltipLabel.style.paddingLeft = 6;
-            _tooltipLabel.style.paddingRight = 6;
-            _tooltipLabel.style.paddingTop = 3;
-            _tooltipLabel.style.paddingBottom = 3;
-            _tooltipLabel.style.borderTopLeftRadius = 3;
-            _tooltipLabel.style.borderTopRightRadius = 3;
-            _tooltipLabel.style.borderBottomLeftRadius = 3;
-            _tooltipLabel.style.borderBottomRightRadius = 3;
-            _tooltipLabel.style.borderTopWidth = 1;
-            _tooltipLabel.style.borderBottomWidth = 1;
-            _tooltipLabel.style.borderLeftWidth = 1;
-            _tooltipLabel.style.borderRightWidth = 1;
-            var border = new Color(0.4f, 0.4f, 0.4f);
-            _tooltipLabel.style.borderTopColor = border;
-            _tooltipLabel.style.borderBottomColor = border;
-            _tooltipLabel.style.borderLeftColor = border;
-            _tooltipLabel.style.borderRightColor = border;
-            _tooltipLabel.style.whiteSpace = WhiteSpace.Normal;
-            _tooltipLabel.style.maxWidth = DefaultTooltipMaxWidth;
-            _tooltipLabel.pickingMode = PickingMode.Ignore;
-            _tooltipLabel.style.display = DisplayStyle.None;
-            // Enabled for the help-button "?" tooltip so its <b>section
-            // headers</b> render. Harmless for plain-text button tooltips.
-            _tooltipLabel.enableRichText = true;
-            rootVisualElement.Add(_tooltipLabel);
         }
 
         static void EnsureTransportIcons()
@@ -941,19 +712,19 @@ namespace Trecs.Internal
         // The body lives in its own EditorWindow (TrecsReplayHelpPopup)
         // because the manual-tooltip plumbing is bounded by the editor
         // window's rectangle, and 70 lines of help just don't fit. Opens
-        // anchored just below the Actions ▾ button.
+        // just below the Actions ▾ button.
 
         void ShowHelp()
         {
-            // ShowAtMouse takes a screen-space anchor; aim it just under the
+            // ShowAtMouse takes a screen-space origin; aim it just under the
             // Actions button so the popup appears in a predictable place
             // (close to the menu the user just opened) instead of wherever
             // the cursor happened to be.
-            var anchor =
+            var origin =
                 _recordingActionsButton != null
                     ? _recordingActionsButton.worldBound
                     : rootVisualElement.worldBound;
-            var screenPos = new Vector2(position.x + anchor.x, position.y + anchor.yMax + 4f);
+            var screenPos = new Vector2(position.x + origin.x, position.y + origin.yMax + 4f);
             TrecsReplayHelpPopup.ShowAtMouse(screenPos, HelpBodyText);
         }
 
@@ -980,7 +751,7 @@ namespace Trecs.Internal
             + "  Space          Play / Pause\n"
             + "  Home / End     Jump to buffer start / live edge\n"
             + "  ← / →          Step back / forward one frame\n"
-            + "  Shift+← / →    Jump to previous / next anchor\n"
+            + "  Shift+← / →    Jump to previous / next keyframe\n"
             + "  R              Record (start / stop / fork — see above)\n"
             + "  L              Loop (PLAY only)\n"
             + "  B              Bookmark frame (recording only)\n\n"
@@ -1055,7 +826,7 @@ namespace Trecs.Internal
             _recordingNameLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
             _recordingNameLabel.style.opacity = 0.7f;
             _recordingNameLabel.style.marginRight = 4;
-            ApplyTooltip(
+            _tooltips.Apply(
                 _recordingNameLabel,
                 "Name of the on-disk file backing the in-memory recording. "
                     + "'(unsaved)' until you Save."
@@ -1097,7 +868,7 @@ namespace Trecs.Internal
             _speedButton = new Button(OnSpeedButtonClicked) { text = FormatSpeedLabel(1f) };
             _speedButton.style.minWidth = 44;
             _speedButton.style.marginRight = 4;
-            ApplyTooltip(
+            _tooltips.Apply(
                 _speedButton,
                 "Simulation speed. Click for presets (0.1×, 0.25×, 0.5×, 1×, 2×). "
                     + "Shown amber when not at real-time."
@@ -1135,7 +906,7 @@ namespace Trecs.Internal
             {
                 _recordingActionsButton.text = "▾";
             }
-            ApplyTooltip(_recordingActionsButton, "More actions");
+            _tooltips.Apply(_recordingActionsButton, "More actions");
             row.Add(_recordingActionsButton);
 
             // Settings, Help, and (in Playback) Trim live in the Actions ▾
@@ -1322,7 +1093,7 @@ namespace Trecs.Internal
             UpdateRecordButton(controller, mode);
             UpdateLoopButton(mode, recorder);
             SyncTimeScaleFromRunner();
-            RefreshScrubber(controller, recorder);
+            RefreshScrubber(recorder);
             RefreshBufferInfo(recorder);
             RefreshCapacityBanner(byCapacity, recorder);
             RefreshDesyncBanner(recorder);
@@ -1345,7 +1116,7 @@ namespace Trecs.Internal
                 ? "Recording paused — cap reached. Save / Fork / Reset / raise the cap "
                     + "before resuming."
                 : (paused ? "Play (Space)" : "Pause (Space)");
-            ApplyTooltip(_playPauseButton, playPauseTooltip);
+            _tooltips.Apply(_playPauseButton, playPauseTooltip);
             // Swap the glyph so the button reflects the action it'd take if
             // pressed: a play arrow when currently paused, two bars when
             // currently running. Falls back gracefully if icons couldn't load.
@@ -1378,34 +1149,10 @@ namespace Trecs.Internal
 #if DEBUG
             _dumpDesyncDiffButton.style.display = DisplayStyle.None;
 #endif
-            _hoverIndicator.style.display = DisplayStyle.None;
-            HideHoverTooltip();
-            _timelineRuler.Clear();
-            _timelineMarkerLayer?.Clear();
-            ResetTimelineSliderValues();
-            _timelineSlider.SetEnabled(false);
+            _timeline.Reset();
             SetTransportEnabled(false);
             UpdateBookmarkButton(recordingActive: false);
             SetTimeScaleEnabled(false);
-        }
-
-        // Snap the slider's range and value back to a clean "empty" state so
-        // the disabled control doesn't display stale frame numbers from the
-        // last active recording. Match the constructor's initial values
-        // (range 0..1, value 0) so the rendering is identical to first-show.
-        void ResetTimelineSliderValues()
-        {
-            _suppressControlEvents = true;
-            try
-            {
-                _timelineSlider.lowValue = 0;
-                _timelineSlider.highValue = 1;
-                _timelineSlider.SetValueWithoutNotify(0);
-            }
-            finally
-            {
-                _suppressControlEvents = false;
-            }
         }
 
         void UpdateBadge(
@@ -1478,7 +1225,7 @@ namespace Trecs.Internal
             if (controller == null)
             {
                 _recordButton.SetEnabled(false);
-                ApplyTooltip(_recordButton, RecordButtonNoControllerTooltip);
+                _tooltips.Apply(_recordButton, RecordButtonNoControllerTooltip);
                 UpdateRecordButtonActive(false);
                 return;
             }
@@ -1486,15 +1233,15 @@ namespace Trecs.Internal
             switch (mode)
             {
                 case GameStateMode.Recording:
-                    ApplyTooltip(_recordButton, RecordButtonRecordingTooltip);
+                    _tooltips.Apply(_recordButton, RecordButtonRecordingTooltip);
                     UpdateRecordButtonActive(true);
                     break;
                 case GameStateMode.Playback:
-                    ApplyTooltip(_recordButton, RecordButtonPlaybackTooltip);
+                    _tooltips.Apply(_recordButton, RecordButtonPlaybackTooltip);
                     UpdateRecordButtonActive(false);
                     break;
                 default:
-                    ApplyTooltip(_recordButton, RecordButtonIdleTooltip);
+                    _tooltips.Apply(_recordButton, RecordButtonIdleTooltip);
                     UpdateRecordButtonActive(false);
                     break;
             }
@@ -1527,7 +1274,7 @@ namespace Trecs.Internal
             if (!enabled)
             {
                 _loopButton.style.backgroundColor = StyleKeyword.Null;
-                ApplyTooltip(_loopButton, LoopButtonDisabledTooltip);
+                _tooltips.Apply(_loopButton, LoopButtonDisabledTooltip);
                 return;
             }
             UpdateLoopButtonActive(recorder?.LoopPlayback ?? false);
@@ -1538,48 +1285,34 @@ namespace Trecs.Internal
             _loopButton.style.backgroundColor = active
                 ? ActiveTransportButtonColor
                 : StyleKeyword.Null;
-            ApplyTooltip(_loopButton, active ? LoopButtonActiveTooltip : LoopButtonInactiveTooltip);
+            _tooltips.Apply(
+                _loopButton,
+                active ? LoopButtonActiveTooltip : LoopButtonInactiveTooltip
+            );
         }
 
-        void RefreshScrubber(TrecsRecordingSession controller, TrecsRewindBuffer recorder)
+        void RefreshScrubber(TrecsRewindBuffer recorder)
         {
             var recordingActive = recorder != null && recorder.IsRecording;
             SetTransportEnabled(recordingActive);
             UpdateBookmarkButton(recordingActive);
 
-            if (!recordingActive || recorder.Anchors.Count == 0)
+            if (!recordingActive || recorder.Keyframes.Count == 0)
             {
-                ResetTimelineSliderValues();
-                _timelineSlider.SetEnabled(false);
-                _hoverIndicator.style.display = DisplayStyle.None;
-                _timelineRuler.Clear();
-                _timelineMarkerLayer?.Clear();
+                _timeline.Reset();
                 return;
             }
-
-            _timelineSlider.SetEnabled(true);
 
             var startFrame = recorder.StartFrame;
             var currentFrame = _selectedAccessor.FixedFrame;
             var maxFrame = Math.Max(currentFrame, recorder.LatestCapturedFrame);
-
-            _suppressControlEvents = true;
-            try
-            {
-                _timelineSlider.lowValue = startFrame;
-                _timelineSlider.highValue = maxFrame;
-                if (!_isScrubbing)
-                {
-                    _timelineSlider.SetValueWithoutNotify(currentFrame);
-                }
-            }
-            finally
-            {
-                _suppressControlEvents = false;
-            }
-
-            RefreshTimelineRuler(startFrame, maxFrame);
-            RefreshMarkerLayer(controller, recorder, startFrame, maxFrame);
+            _timeline.Refresh(
+                startFrame,
+                maxFrame,
+                currentFrame,
+                recorder.Keyframes,
+                recorder.Bookmarks
+            );
         }
 
         void UpdateBookmarkButton(bool recordingActive)
@@ -1589,250 +1322,10 @@ namespace Trecs.Internal
                 return;
             }
             _bookmarkCaptureButton.SetEnabled(recordingActive);
-            ApplyTooltip(
+            _tooltips.Apply(
                 _bookmarkCaptureButton,
                 recordingActive ? BookmarkButtonEnabledTooltip : BookmarkButtonDisabledTooltip
             );
-        }
-
-        // Adaptive ruler under the slider: tick labels at "nice" time
-        // intervals (0.1s, 0.5s, 1s, 5s, 30s, 1m, …). Picks the smallest
-        // interval that keeps labels at least ~70 px apart so as the buffer
-        // grows the labels never overlap. Labels are positioned in percent
-        // so they reflow with track resizes.
-        void RefreshTimelineRuler(int startFrame, int maxFrame)
-        {
-            _timelineRuler.Clear();
-            if (!TryGetFixedDeltaTime(out var dt))
-            {
-                return;
-            }
-            if (!TryGetSliderTrackBounds(out var trackLeft, out var trackWidth) || trackWidth <= 0)
-            {
-                return;
-            }
-            // TryGetSliderTrackBounds already returns the thumb-centre
-            // range (DC inset by thumb half-width on each end), so the
-            // ruler aligns with the thumb's travel range without any
-            // further adjustment.
-            _timelineRuler.style.marginLeft = trackLeft;
-            _timelineRuler.style.width = trackWidth;
-
-            var spanFrames = maxFrame - startFrame;
-            if (spanFrames <= 0)
-            {
-                return;
-            }
-            var spanSeconds = spanFrames * dt;
-            var interval = ChooseRulerInterval(spanSeconds, trackWidth);
-
-            // Walk from 0 to spanSeconds in interval-sized steps. The +ε
-            // guards against floating-point miss at the end of the span.
-            for (var t = 0f; t <= spanSeconds + 0.0001f; t += interval)
-            {
-                var fraction = Mathf.Clamp01(t / spanSeconds);
-
-                var tickLine = new VisualElement();
-                tickLine.style.position = Position.Absolute;
-                tickLine.style.left = new Length(fraction * 100f, LengthUnit.Percent);
-                tickLine.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 0);
-                tickLine.style.top = 0;
-                tickLine.style.width = 1;
-                tickLine.style.height = 3;
-                tickLine.style.backgroundColor = new Color(1f, 1f, 1f, 0.4f);
-                tickLine.pickingMode = PickingMode.Ignore;
-                _timelineRuler.Add(tickLine);
-
-                var label = new Label(FormatRulerLabel(t));
-                label.style.position = Position.Absolute;
-                label.style.left = new Length(fraction * 100f, LengthUnit.Percent);
-                label.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 0);
-                label.style.top = 3;
-                label.style.fontSize = 9;
-                label.style.color = new Color(1f, 1f, 1f, 0.55f);
-                label.pickingMode = PickingMode.Ignore;
-                _timelineRuler.Add(label);
-            }
-        }
-
-        // Anchor / snapshot markers layered on top of the slider track.
-        // Anchors render as a faint half-height tick (background colour
-        // matches the ruler ticks for visual consistency) — there can be
-        // dozens of them so they have to stay subtle. Snapshots render
-        // taller, brighter, and with the user's label as a tooltip;
-        // they're the user's deliberate "remember this moment" pins so
-        // they earn the visual weight. Both are clickable (left-click
-        // jumps via TrecsRecordingSession.JumpToFrame); snapshots also
-        // get a right-click → Remove menu wired straight to
-        // TrecsRewindBuffer.RemoveBookmarkAtFrame.
-        void RefreshMarkerLayer(
-            TrecsRecordingSession controller,
-            TrecsRewindBuffer recorder,
-            int startFrame,
-            int maxFrame
-        )
-        {
-            if (_timelineMarkerLayer == null)
-            {
-                return;
-            }
-            _timelineMarkerLayer.Clear();
-            if (recorder == null || maxFrame <= startFrame)
-            {
-                return;
-            }
-            // Use the same thumb-centre range the slider's value↔pixel
-            // mapping uses, so a marker at frame F sits exactly under the
-            // thumb when the slider is at value F. Falls back to the
-            // marker layer's own width if the track bounds aren't
-            // resolved yet — degrades gracefully on the first layout
-            // pass before the slider has measured itself.
-            if (TryGetSliderTrackBounds(out var trackLeft, out var trackWidth) && trackWidth > 0)
-            {
-                _timelineMarkerLayer.style.left = trackLeft;
-                _timelineMarkerLayer.style.width = trackWidth;
-            }
-            var span = (float)(maxFrame - startFrame);
-            // Anchors first (rendered behind snapshots via DOM order, so
-            // a snapshot at the same frame visually wins). The first
-            // anchor (StartFrame) is always present and lines up with the
-            // slider's lowValue end; we still draw it so users can tell
-            // "yes there's a recovery point at the start".
-            for (var i = 0; i < recorder.Anchors.Count; i++)
-            {
-                var anchor = recorder.Anchors[i];
-                if (anchor.FixedFrame < startFrame || anchor.FixedFrame > maxFrame)
-                {
-                    continue;
-                }
-                var fraction = Mathf.Clamp01((anchor.FixedFrame - startFrame) / span);
-                _timelineMarkerLayer.Add(
-                    BuildAnchorMarker(controller, anchor.FixedFrame, fraction)
-                );
-            }
-            for (var i = 0; i < recorder.Bookmarks.Count; i++)
-            {
-                var bookmark = recorder.Bookmarks[i];
-                if (bookmark.FixedFrame < startFrame || bookmark.FixedFrame > maxFrame)
-                {
-                    continue;
-                }
-                var fraction = Mathf.Clamp01((bookmark.FixedFrame - startFrame) / span);
-                _timelineMarkerLayer.Add(
-                    BuildBookmarkMarker(controller, recorder, bookmark, fraction)
-                );
-            }
-        }
-
-        VisualElement BuildAnchorMarker(TrecsRecordingSession controller, int frame, float fraction)
-        {
-            // Subtle half-height tick that doesn't compete with the
-            // snapshot pins or the slider thumb. Width is 2px to give
-            // pointer interaction a usable hit-target without becoming
-            // visually heavy. Click jumps; right-click is intentionally
-            // not wired — anchors are managed by the recorder's cadence
-            // and capacity rules, not the user.
-            var marker = new VisualElement();
-            marker.style.position = Position.Absolute;
-            marker.style.left = new Length(fraction * 100f, LengthUnit.Percent);
-            marker.style.top = new Length(50f, LengthUnit.Percent);
-            // Centre the half-height tick on both axes — translate -50%
-            // horizontally so the marker visually sits ON the anchor's
-            // frame rather than starting from it, and -50% vertically so
-            // it straddles the slider track instead of dropping below it.
-            marker.style.translate = new Translate(
-                new Length(-50, LengthUnit.Percent),
-                new Length(-50, LengthUnit.Percent)
-            );
-            marker.style.width = 2;
-            marker.style.height = 8;
-            marker.style.backgroundColor = new Color(1f, 1f, 1f, 0.45f);
-            marker.tooltip = $"Anchor @ frame {frame}";
-            marker.RegisterCallback<MouseDownEvent>(evt =>
-            {
-                if (evt.button != 0)
-                {
-                    return;
-                }
-                controller?.JumpToFrame(frame);
-                // Stop propagation so the click doesn't also start a
-                // scrub on the underlying slider track.
-                evt.StopPropagation();
-            });
-            return marker;
-        }
-
-        VisualElement BuildBookmarkMarker(
-            TrecsRecordingSession controller,
-            TrecsRewindBuffer recorder,
-            WorldSnapshot bookmark,
-            float fraction
-        )
-        {
-            // Taller, brighter pin — yellow to match the "Favorite" star
-            // icon used on the capture button. The flag-shaped layout
-            // (vertical line + small label-tag at the top) reads as a
-            // pin even at the smallest slider widths. Label text comes
-            // from the user-supplied bookmark label, falling back to
-            // "(unlabelled)" so right-click → Remove still has something
-            // to identify in the menu.
-            var pinColor = new Color(1f, 0.85f, 0.2f, 0.95f);
-            var marker = new VisualElement();
-            marker.style.position = Position.Absolute;
-            marker.style.left = new Length(fraction * 100f, LengthUnit.Percent);
-            marker.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 0);
-            marker.style.top = 0;
-            marker.style.bottom = 0;
-            marker.style.width = 3;
-            marker.style.backgroundColor = pinColor;
-            // Capacity for hover-tooltip text; falls back to "(unlabelled)"
-            // when the bookmark was captured without a label.
-            var labelText = string.IsNullOrEmpty(bookmark.Label) ? "(unlabelled)" : bookmark.Label;
-            marker.tooltip = $"Bookmark: {labelText} @ frame {bookmark.FixedFrame}";
-            marker.RegisterCallback<MouseDownEvent>(evt =>
-            {
-                if (evt.button == 1)
-                {
-                    // Right-click: confirm-and-remove via a tiny context
-                    // menu. Single item rather than a generic
-                    // ContextualMenuPopulateEvent dispatch so the action
-                    // is unambiguous from the user's POV.
-                    var menu = new GenericMenu();
-                    menu.AddItem(
-                        new GUIContent(
-                            $"Remove bookmark '{labelText}' @ frame {bookmark.FixedFrame}"
-                        ),
-                        false,
-                        () => RemoveBookmarkAndRefresh(recorder, bookmark.FixedFrame, labelText)
-                    );
-                    menu.ShowAsContext();
-                    evt.StopPropagation();
-                    return;
-                }
-                if (evt.button != 0)
-                {
-                    return;
-                }
-                controller?.JumpToFrame(bookmark.FixedFrame);
-                evt.StopPropagation();
-            });
-
-            // Optional flag-tag at the top so a row of bookmarks reads
-            // as distinct pins even when they cluster. Just a small
-            // square overlay; we don't render the full label here (would
-            // collide with neighbours and the time ruler) — the tooltip
-            // carries the full text on hover.
-            var flag = new VisualElement();
-            flag.style.position = Position.Absolute;
-            flag.style.left = -2;
-            flag.style.top = -1;
-            flag.style.width = 7;
-            flag.style.height = 5;
-            flag.style.backgroundColor = pinColor;
-            flag.pickingMode = PickingMode.Ignore;
-            marker.Add(flag);
-
-            return marker;
         }
 
         void RemoveBookmarkAndRefresh(TrecsRewindBuffer recorder, int frame, string label)
@@ -1850,45 +1343,6 @@ namespace Trecs.Internal
             {
                 SetRecordingStatus($"No bookmark at frame {frame} to remove.");
             }
-        }
-
-        static float ChooseRulerInterval(float spanSeconds, float trackWidthPx)
-        {
-            // Aim for ~70 px between labels. Step through the candidates
-            // and return the smallest interval whose tick count fits.
-            // 1s is the floor — sub-second precision was visual noise.
-            var maxTicks = Mathf.Max(2f, trackWidthPx / 70f);
-            float[] candidates = { 1f, 2f, 5f, 10f, 15f, 30f, 60f, 120f, 300f, 600f };
-            foreach (var c in candidates)
-            {
-                if (spanSeconds / c <= maxTicks)
-                {
-                    return c;
-                }
-            }
-            return 1200f;
-        }
-
-        static string FormatRulerLabel(float seconds)
-        {
-            if (seconds < 0.5f)
-            {
-                return "0s";
-            }
-            if (seconds < 10f)
-            {
-                var rounded = Mathf.Round(seconds * 10f) / 10f;
-                return Mathf.Approximately(rounded, Mathf.Round(rounded))
-                    ? $"{rounded:F0}s"
-                    : $"{rounded:F1}s";
-            }
-            if (seconds < 60f)
-            {
-                return $"{Mathf.RoundToInt(seconds)}s";
-            }
-            var minutes = (int)(seconds / 60f);
-            var remSecs = Mathf.RoundToInt(seconds - minutes * 60f);
-            return remSecs == 0 ? $"{minutes}m" : $"{minutes}m{remSecs}s";
         }
 
         bool TryGetFixedDeltaTime(out float dt)
@@ -1914,15 +1368,15 @@ namespace Trecs.Internal
                 _bufferInfoLabel.text = "idle";
                 return;
             }
-            if (recorder.Anchors.Count == 0)
+            if (recorder.Keyframes.Count == 0)
             {
-                _bufferInfoLabel.text = "awaiting first anchor";
+                _bufferInfoLabel.text = "awaiting first keyframe";
                 return;
             }
             var span = recorder.LatestCapturedFrame - recorder.StartFrame;
             var seconds = TryGetFixedDeltaTime(out var dt) ? span * dt : 0f;
             _bufferInfoLabel.text =
-                $"{recorder.Anchors.Count} anchors · "
+                $"{recorder.Keyframes.Count} keyframes · "
                 + $"{span} frames ({FormatDuration(seconds)}) · "
                 + $"{FormatBytes(recorder.TotalBytes)}";
         }
@@ -1948,7 +1402,7 @@ namespace Trecs.Internal
             {
                 _capacityBanner.text =
                     "Recording paused — capacity reached "
-                    + $"({recorder.Anchors.Count} anchors, {FormatBytes(recorder.TotalBytes)}). "
+                    + $"({recorder.Keyframes.Count} keyframes, {FormatBytes(recorder.TotalBytes)}). "
                     + "Save, fork, reset, or raise the cap before resuming.";
                 _capacityBanner.style.display = DisplayStyle.Flex;
             }
@@ -2087,7 +1541,7 @@ namespace Trecs.Internal
             // Refuse to step past the recording's tail in Playback.
             // runner.StepFixedFrame() bypasses the pause-at-tail logic in
             // OnFixedFrameChange, so without this gate the next handler
-            // tick lands in the "frame > _lastAnchorFrame" branch — the
+            // tick lands in the "frame > _lastKeyframeFrame" branch — the
             // loaded-recording side silently flips to live capture, and
             // the scrubbed-back side advances into territory the buffer
             // doesn't cover. Force Record/Fork as the only path out.
@@ -2122,7 +1576,7 @@ namespace Trecs.Internal
         {
             var controller = GetController();
             var recorder = controller?.AutoRecorder;
-            if (controller == null || recorder == null || recorder.Anchors.Count == 0)
+            if (controller == null || recorder == null || recorder.Keyframes.Count == 0)
             {
                 return;
             }
@@ -2133,7 +1587,7 @@ namespace Trecs.Internal
         {
             var controller = GetController();
             var recorder = controller?.AutoRecorder;
-            if (controller == null || recorder == null || recorder.Anchors.Count == 0)
+            if (controller == null || recorder == null || recorder.Keyframes.Count == 0)
             {
                 return;
             }
@@ -2253,12 +1707,12 @@ namespace Trecs.Internal
         }
 
         // Adds the Trim Before / Trim After items into a parent menu under the
-        // "Trim" submenu path. Counts the anchors that would drop so the
+        // "Trim" submenu path. Counts the keyframes that would drop so the
         // labels reflect what each action will actually do; disables an
         // option when there's nothing on that side to drop.
         void AddTrimMenuItems(GenericMenu menu, TrecsRewindBuffer recorder)
         {
-            if (_selectedAccessor == null || recorder == null || recorder.Anchors.Count == 0)
+            if (_selectedAccessor == null || recorder == null || recorder.Keyframes.Count == 0)
             {
                 menu.AddDisabledItem(new GUIContent("Trim/Before current frame"));
                 menu.AddDisabledItem(new GUIContent("Trim/After current frame"));
@@ -2266,29 +1720,29 @@ namespace Trecs.Internal
             }
             var current = _selectedAccessor.FixedFrame;
             var strictlyBefore = 0;
-            var hasExactAnchor = false;
+            var hasExactKeyframe = false;
             var after = 0;
-            for (var i = 0; i < recorder.Anchors.Count; i++)
+            for (var i = 0; i < recorder.Keyframes.Count; i++)
             {
-                var f = recorder.Anchors[i].FixedFrame;
+                var f = recorder.Keyframes[i].FixedFrame;
                 if (f < current)
                     strictlyBefore++;
                 else if (f > current)
                     after++;
                 else
-                    hasExactAnchor = true;
+                    hasExactKeyframe = true;
             }
-            // TrimRecordingBefore preserves the closest anchor at-or-before
+            // TrimRecordingBefore preserves the closest keyframe at-or-before
             // `current` so JumpToFrame(current) still resolves. If `current` is
-            // itself an anchor frame, that's the anchor and all strictly-prior
-            // anchors drop. Otherwise the anchor is the last strictly-prior
-            // anchor, so one fewer drops.
-            var before = hasExactAnchor ? strictlyBefore : Math.Max(0, strictlyBefore - 1);
+            // itself a keyframe frame, that's the keyframe and all strictly-prior
+            // keyframes drop. Otherwise the keyframe is the last strictly-prior
+            // keyframe, so one fewer drops.
+            var before = hasExactKeyframe ? strictlyBefore : Math.Max(0, strictlyBefore - 1);
 
             var beforeLabel =
-                $"Trim/Before frame {current} (drops {before} anchor{(before == 1 ? "" : "s")})";
+                $"Trim/Before frame {current} (drops {before} keyframe{(before == 1 ? "" : "s")})";
             var afterLabel =
-                $"Trim/After frame {current} (drops {after} anchor{(after == 1 ? "" : "s")})";
+                $"Trim/After frame {current} (drops {after} keyframe{(after == 1 ? "" : "s")})";
             if (before > 0)
             {
                 menu.AddItem(
@@ -2388,7 +1842,7 @@ namespace Trecs.Internal
             // Skip the confirm if the buffer is trivially small (just hit
             // Play, no data to lose) — same threshold used by the old
             // "Reset auto-recording" advanced button.
-            var hasRealData = recorder != null && recorder.Anchors.Count > 4;
+            var hasRealData = recorder != null && recorder.Keyframes.Count > 4;
             if (hasRealData)
             {
                 var savedName = CurrentRecordingName;
@@ -2398,7 +1852,7 @@ namespace Trecs.Internal
                 if (
                     !EditorUtility.DisplayDialog(
                         "Start a new recording?",
-                        $"Discard {recorder.Anchors.Count} in-memory anchors "
+                        $"Discard {recorder.Keyframes.Count} in-memory keyframes "
                             + $"({FormatBytes(recorder.TotalBytes)})?"
                             + diskNote,
                         "Discard & start fresh",
@@ -2416,6 +1870,23 @@ namespace Trecs.Internal
             RefreshTick();
         }
 
+        // Routes the result of a shared TrecsRecordingActions flow to this
+        // window's surfaces: transient status text, plus an immediate tick
+        // so the header / transport reflect the new state without waiting
+        // for the next scheduled refresh.
+        void ApplyActionResult(in TrecsRecordingActions.Result result)
+        {
+            if (!result.Acted)
+            {
+                return;
+            }
+            SetRecordingStatus(result.Status);
+            if (result.Succeeded)
+            {
+                RefreshTick();
+            }
+        }
+
         void OnSaveClicked()
         {
             var controller = GetController();
@@ -2425,21 +1896,17 @@ namespace Trecs.Internal
                 return;
             }
             var name = CurrentRecordingName;
-            if (string.IsNullOrEmpty(name))
-            {
-                name = TrecsTextPromptWindow.Prompt(
-                    "Save recording",
-                    "Enter recording name:",
-                    SuggestRecordingName(),
-                    anchor: this
-                );
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    return;
-                }
-                name = name.Trim();
-            }
-            DoSaveRecording(controller, name);
+            // Already saved → write straight back to the same file. Unsaved
+            // → same prompt + overwrite-confirm flow as Save As.
+            ApplyActionResult(
+                string.IsNullOrEmpty(name)
+                    ? TrecsRecordingActions.SaveRecordingPrompted(
+                        controller,
+                        this,
+                        TrecsRecordingActions.SuggestRecordingName()
+                    )
+                    : TrecsRecordingActions.SaveRecording(controller, name)
+            );
         }
 
         void OnSaveAsClicked()
@@ -2451,55 +1918,12 @@ namespace Trecs.Internal
                 return;
             }
             var existing = CurrentRecordingName;
-            var suggested = string.IsNullOrEmpty(existing) ? SuggestRecordingName() : existing;
-            var name = TrecsTextPromptWindow.Prompt(
-                "Save recording as",
-                "Save as:",
-                suggested,
-                anchor: this
+            var suggested = string.IsNullOrEmpty(existing)
+                ? TrecsRecordingActions.SuggestRecordingName()
+                : existing;
+            ApplyActionResult(
+                TrecsRecordingActions.SaveRecordingPrompted(controller, this, suggested)
             );
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return;
-            }
-            var trimmed = name.Trim();
-            var path = TrecsRecordingSession.GetRecordingPath(trimmed);
-            if (File.Exists(path))
-            {
-                if (
-                    !EditorUtility.DisplayDialog(
-                        "Overwrite recording?",
-                        $"A recording named '{trimmed}' already exists. Overwrite it?",
-                        "Overwrite",
-                        "Cancel"
-                    )
-                )
-                {
-                    return;
-                }
-            }
-            DoSaveRecording(controller, trimmed);
-        }
-
-        void DoSaveRecording(TrecsRecordingSession controller, string name)
-        {
-            try
-            {
-                if (controller.SaveNamedRecording(name))
-                {
-                    // Save updates the recorder's backing path; the header
-                    // refreshes via LoadedRecordingChanged.
-                    SetRecordingStatus($"Saved '{name}'.");
-                }
-                else
-                {
-                    SetRecordingStatus("Save failed (no anchors to save?).");
-                }
-            }
-            catch (Exception e)
-            {
-                SetRecordingStatus($"Save failed: {e.Message}");
-            }
         }
 
         void OnRecordingActionsClicked()
@@ -2507,7 +1931,7 @@ namespace Trecs.Internal
             var controller = GetController();
             var recorder = controller?.AutoRecorder;
             var isRecording = recorder?.IsRecording ?? false;
-            var hasBuffer = isRecording && recorder.Anchors.Count > 0;
+            var hasBuffer = isRecording && recorder.Keyframes.Count > 0;
             var savedName = CurrentRecordingName;
             var hasSavedName = !string.IsNullOrEmpty(savedName);
             var inPlayback = controller != null && controller.CurrentMode == GameStateMode.Playback;
@@ -2655,134 +2079,29 @@ namespace Trecs.Internal
 
         void DoLoadRecording(string name)
         {
-            var controller = GetController();
-            if (controller == null)
-            {
-                SetRecordingStatus("No active world to load into.");
-                return;
-            }
-            try
-            {
-                if (controller.LoadNamedRecording(name))
-                {
-                    // LoadedRecordingChanged updates the header.
-                    SetRecordingStatus($"Loaded '{name}'.");
-                    RefreshTick();
-                }
-                else
-                {
-                    SetRecordingStatus("Load failed.");
-                }
-            }
-            catch (Exception e)
-            {
-                SetRecordingStatus($"Load failed: {e.Message}");
-            }
+            ApplyActionResult(TrecsRecordingActions.LoadRecording(GetController(), name));
         }
-
-        // Same EditorPrefs key used by TrecsSavesWindow so a "Don't ask
-        // again" dismissal there silences the Player too.
-        const string SuppressLoadSnapshotConfirmKey = "Trecs.Snapshots.SuppressLoadConfirm";
 
         void OnSaveSnapshotClicked()
         {
-            var library = TrecsEditorRecordingAutoAttach.GetSnapshotLibrary(_selectedWorld);
-            if (library == null)
-            {
-                SetRecordingStatus("No active world.");
-                return;
-            }
-            var name = TrecsTextPromptWindow.Prompt(
-                "Save snapshot",
-                "Snapshot name:",
-                SuggestSnapshotName(),
-                anchor: this
-            );
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return;
-            }
-            name = name.Trim();
-            if (File.Exists(TrecsSnapshotLibrary.GetSnapshotPath(name)))
-            {
-                if (
-                    !EditorUtility.DisplayDialog(
-                        "Overwrite snapshot?",
-                        $"A snapshot named '{name}' already exists. Overwrite?",
-                        "Overwrite",
-                        "Cancel"
-                    )
+            ApplyActionResult(
+                TrecsRecordingActions.SaveSnapshotPrompted(
+                    TrecsEditorRecordingAutoAttach.GetSnapshotLibrary(_selectedWorld),
+                    this
                 )
-                {
-                    return;
-                }
-            }
-            if (library.SaveSnapshot(name))
-            {
-                SetRecordingStatus($"Saved snapshot '{name}'.");
-            }
-            else
-            {
-                SetRecordingStatus($"Failed to save snapshot '{name}'.");
-            }
+            );
         }
 
         void DoLoadSnapshot(string name)
         {
-            var controller = GetController();
-            var library = TrecsEditorRecordingAutoAttach.GetSnapshotLibrary(_selectedWorld);
-            if (controller == null || library == null)
-            {
-                SetRecordingStatus("No active world to load into.");
-                return;
-            }
-            // Loading a snapshot stops the in-memory recording (see
-            // TrecsSnapshotLibrary.LoadSnapshot), so warn before
-            // discarding the buffer. EditorPrefs key matches the Snapshots
-            // window so "Don't ask again" carries between both surfaces.
-            if (
-                controller.AutoRecorder.IsRecording
-                && !EditorPrefs.GetBool(SuppressLoadSnapshotConfirmKey, false)
-            )
-            {
-                var choice = EditorUtility.DisplayDialogComplex(
-                    "Load snapshot?",
-                    "Loading a snapshot will discard the current in-memory "
-                        + "recording buffer (saved files on disk are not "
-                        + "affected) and start a fresh recording from the "
-                        + "snapshot's frame.",
-                    "Load",
-                    "Cancel",
-                    "Load and don't ask again"
-                );
-                if (choice == 1)
-                    return;
-                if (choice == 2)
-                    EditorPrefs.SetBool(SuppressLoadSnapshotConfirmKey, true);
-            }
-            try
-            {
-                if (library.LoadSnapshot(name))
-                {
-                    // LoadSnapshot stops the recorder and starts a fresh
-                    // recording from the snapshot frame; the recorder's
-                    // backing path is reset by Start() and the header
-                    // refreshes through LoadedRecordingChanged.
-                    SetRecordingStatus($"Loaded snapshot '{name}'.");
-                    RefreshTick();
-                }
-                else
-                {
-                    SetRecordingStatus($"Failed to load snapshot '{name}'.");
-                }
-            }
-            catch (Exception e)
-            {
-                SetRecordingStatus($"Load snapshot failed: {e.Message}");
-            }
+            ApplyActionResult(
+                TrecsRecordingActions.LoadSnapshot(
+                    GetController(),
+                    TrecsEditorRecordingAutoAttach.GetSnapshotLibrary(_selectedWorld),
+                    name
+                )
+            );
         }
-
-        static string SuggestSnapshotName() => $"snapshot-{DateTime.Now:yyyyMMdd-HHmmss}";
 
         void OnDeleteClicked()
         {
@@ -2792,41 +2111,8 @@ namespace Trecs.Internal
                 SetRecordingStatus("No saved file to delete (current recording is unsaved).");
                 return;
             }
-            if (
-                !EditorUtility.DisplayDialog(
-                    "Delete recording?",
-                    $"Delete saved recording '{name}'? This removes the file from disk; "
-                        + "the in-memory buffer is unchanged.",
-                    "Delete",
-                    "Cancel"
-                )
-            )
-            {
-                return;
-            }
-            var controller = GetController();
-            try
-            {
-                if (controller != null)
-                {
-                    // The controller clears the recorder's backing path
-                    // when it deletes the matching file; LoadedRecordingChanged
-                    // updates the header.
-                    controller.DeleteNamedRecording(name);
-                }
-                else
-                {
-                    DeleteFileIfExists(TrecsRecordingSession.GetRecordingPath(name));
-                }
-                SetRecordingStatus($"Deleted '{name}' from disk.");
-            }
-            catch (Exception e)
-            {
-                SetRecordingStatus($"Delete failed: {e.Message}");
-            }
+            ApplyActionResult(TrecsRecordingActions.DeleteRecording(GetController(), name));
         }
-
-        static string SuggestRecordingName() => $"recording-{DateTime.Now:yyyyMMdd-HHmmss}";
 
         void UpdateRecordingHeader()
         {
@@ -2878,308 +2164,7 @@ namespace Trecs.Internal
                 : new StyleColor(StyleKeyword.Null);
             // Surface the full name via the hover tooltip so the user can
             // still read it when the label gets ellipsised by the row.
-            ApplyTooltip(_recordingNameLabel, tooltip);
-        }
-
-        // ---- Scrubber callbacks ----
-
-        void OnTimelinePointerDown(PointerDownEvent evt)
-        {
-            // showInputField=true puts an IntegerField next to the slider track.
-            // Clicking inside that field would otherwise enter scrub mode and
-            // throttle-jump on every keystroke as the user types — bail out.
-            if (evt.target is VisualElement target && IsInsideIntegerField(target))
-            {
-                return;
-            }
-            _isScrubbing = true;
-            _pendingScrubFrame = _timelineSlider.value;
-            _lastCommittedScrubFrame = _selectedAccessor?.FixedFrame ?? _pendingScrubFrame;
-            _lastScrubCommitTime = EditorApplication.timeSinceStartup;
-            _hoverFrame = null;
-            _hoverIndicator.style.display = DisplayStyle.None;
-        }
-
-        static bool IsInsideIntegerField(VisualElement element)
-        {
-            for (var e = element; e != null; e = e.parent)
-            {
-                if (e is IntegerField)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        void OnTimelinePointerMove(PointerMoveEvent evt)
-        {
-            if (_isScrubbing || !_timelineSlider.enabledInHierarchy)
-            {
-                return;
-            }
-            // Use the slider's internal tracker rect (not the whole slider
-            // including label/input field) so the hover frame corresponds to
-            // the same x as the thumb would jump to on click.
-            if (!TryGetSliderTrackBounds(out var trackLeft, out var trackWidth))
-            {
-                return;
-            }
-            var localX = evt.localPosition.x;
-            var insideTrack = localX >= trackLeft && localX <= trackLeft + trackWidth;
-            if (insideTrack)
-            {
-                var fraction = (localX - trackLeft) / trackWidth;
-                var frame = Mathf.RoundToInt(
-                    Mathf.Lerp(_timelineSlider.lowValue, _timelineSlider.highValue, fraction)
-                );
-                _hoverFrame = frame;
-                _hoverIndicator.style.left = Mathf.Round(localX);
-                _hoverIndicator.style.display = DisplayStyle.Flex;
-                ShowHoverTooltip(localX, frame);
-            }
-            else
-            {
-                _hoverFrame = null;
-                _hoverIndicator.style.display = DisplayStyle.None;
-                HideHoverTooltip();
-            }
-        }
-
-        bool TryGetSliderTrackBounds(out float left, out float width)
-        {
-            // Unity's BaseSlider maps cursor X to value over the THUMB-CENTRE
-            // range — that's the drag-container inset by the thumb's half
-            // width on each side. (Confirmed empirically: clicking with the
-            // full drag-container as bounds makes the click land a few
-            // frames before the hover-displayed frame, with the gap growing
-            // as the cursor moves away from centre.) Match that exactly so
-            // hover, click, and the time-ruler all use the same coordinate
-            // space.
-            var dragContainer = _timelineSlider.Q(className: "unity-base-slider__drag-container");
-            var dragger = _timelineSlider.Q(className: "unity-base-slider__dragger");
-            if (
-                dragContainer != null
-                && dragContainer.layout.width > 0
-                && dragger != null
-                && dragger.layout.width > 0
-            )
-            {
-                var dcWorld = dragContainer.worldBound;
-                var sliderWorld = _timelineSlider.worldBound;
-                var thumbHalfWidth = dragger.layout.width / 2f;
-                left = dcWorld.x - sliderWorld.x + thumbHalfWidth;
-                width = Mathf.Max(0f, dcWorld.width - dragger.layout.width);
-                return true;
-            }
-            // Fallback: drag-container without thumb adjustment if the
-            // dragger isn't laid out yet.
-            if (dragContainer != null && dragContainer.layout.width > 0)
-            {
-                var dcWorld = dragContainer.worldBound;
-                var sliderWorld = _timelineSlider.worldBound;
-                left = dcWorld.x - sliderWorld.x;
-                width = dcWorld.width;
-                return true;
-            }
-            // Tracker fallback for early-layout cases.
-            var tracker = _timelineSlider.Q(className: "unity-base-slider__tracker");
-            if (tracker != null && tracker.layout.width > 0)
-            {
-                var trackerWorld = tracker.worldBound;
-                var sliderWorld = _timelineSlider.worldBound;
-                left = trackerWorld.x - sliderWorld.x;
-                width = trackerWorld.width;
-                return true;
-            }
-            // Final fallback: whole-slider span if nothing's laid out yet.
-            var w = _timelineSlider.resolvedStyle.width;
-            if (w > 0)
-            {
-                left = 0;
-                width = w;
-                return true;
-            }
-            left = 0;
-            width = 0;
-            return false;
-        }
-
-        void OnTimelinePointerLeave(PointerLeaveEvent evt)
-        {
-            _hoverFrame = null;
-            _hoverIndicator.style.display = DisplayStyle.None;
-            HideHoverTooltip();
-        }
-
-        // Floating hover tooltip pinned above the vertical hover indicator
-        // line. Shows the cursor's frame and a signed time offset relative
-        // to the current frame ("412 (+12s)") so users can pick a scrub
-        // target. Anchored to the indicator (not the cursor) so the tooltip
-        // stays in line with the visual marker as the user moves.
-        void ShowHoverTooltip(float trackLocalX, int hoverFrame)
-        {
-            if (_isScrubbing || _selectedAccessor == null)
-            {
-                HideHoverTooltip();
-                return;
-            }
-            EnsureHoverTooltipLabel();
-            var current = _selectedAccessor.FixedFrame;
-            _hoverTooltipLabel.text =
-                $"{hoverFrame} ({FormatRelativeFrameDelta(hoverFrame - current)})";
-            _hoverTooltipLabel.style.display = DisplayStyle.Flex;
-            _hoverTooltipLabel.BringToFront();
-            PositionHoverTooltip(trackLocalX);
-            // resolvedStyle width/height aren't valid on the very first
-            // show (no layout pass yet); reposition once layout settles so
-            // the centred + clamped placement is correct from frame two
-            // onward. Subsequent shows already have valid resolvedStyle so
-            // PositionHoverTooltip above places it correctly the same frame.
-            _hoverTooltipLabel
-                .schedule.Execute(() =>
-                {
-                    if (_hoverTooltipLabel.style.display == DisplayStyle.None)
-                        return;
-                    PositionHoverTooltip(trackLocalX);
-                })
-                .ExecuteLater(0);
-        }
-
-        void PositionHoverTooltip(float trackLocalX)
-        {
-            var rootBound = rootVisualElement.worldBound;
-            var sliderBound = _timelineSlider.worldBound;
-            var w = _hoverTooltipLabel.resolvedStyle.width;
-            var h = _hoverTooltipLabel.resolvedStyle.height;
-            // Indicator's root-local x = slider's root-local x + slider-local
-            // x of the indicator (which is trackLocalX). Centre the tooltip
-            // horizontally on it; clamp inside the window so the tooltip
-            // doesn't slide off near either end of the slider.
-            var indicatorRootX = sliderBound.x - rootBound.x + trackLocalX;
-            var x = Mathf.Clamp(
-                indicatorRootX - w / 2f,
-                4f,
-                Mathf.Max(4f, rootBound.width - w - 4f)
-            );
-            // Sit just above the slider's top edge.
-            var y = sliderBound.y - rootBound.y - h - 4f;
-            _hoverTooltipLabel.style.left = x;
-            _hoverTooltipLabel.style.top = y;
-        }
-
-        void HideHoverTooltip()
-        {
-            if (_hoverTooltipLabel != null)
-            {
-                _hoverTooltipLabel.style.display = DisplayStyle.None;
-            }
-        }
-
-        void EnsureHoverTooltipLabel()
-        {
-            if (_hoverTooltipLabel != null)
-                return;
-            _hoverTooltipLabel = new Label();
-            _hoverTooltipLabel.style.position = Position.Absolute;
-            _hoverTooltipLabel.style.backgroundColor = new Color(0.12f, 0.12f, 0.12f, 0.97f);
-            _hoverTooltipLabel.style.color = Color.white;
-            _hoverTooltipLabel.style.fontSize = 11;
-            _hoverTooltipLabel.style.paddingLeft = 6;
-            _hoverTooltipLabel.style.paddingRight = 6;
-            _hoverTooltipLabel.style.paddingTop = 2;
-            _hoverTooltipLabel.style.paddingBottom = 2;
-            _hoverTooltipLabel.style.borderTopLeftRadius = 3;
-            _hoverTooltipLabel.style.borderTopRightRadius = 3;
-            _hoverTooltipLabel.style.borderBottomLeftRadius = 3;
-            _hoverTooltipLabel.style.borderBottomRightRadius = 3;
-            _hoverTooltipLabel.pickingMode = PickingMode.Ignore;
-            _hoverTooltipLabel.style.display = DisplayStyle.None;
-            rootVisualElement.Add(_hoverTooltipLabel);
-        }
-
-        // Signed, human-readable description of a hover offset from the
-        // current frame — e.g. "+12s", "-1m30s". Sub-second offsets render
-        // as "0s" (seconds is the smallest unit). Falls back to a raw frame
-        // delta if the runner has no fixed-delta-time yet (i.e. play hasn't
-        // started).
-        string FormatRelativeFrameDelta(int deltaFrames)
-        {
-            if (deltaFrames == 0)
-            {
-                return "0s";
-            }
-            if (!TryGetFixedDeltaTime(out var dt))
-            {
-                return deltaFrames > 0 ? $"+{deltaFrames} frames" : $"{deltaFrames} frames";
-            }
-            var deltaSeconds = deltaFrames * dt;
-            var sign = deltaSeconds > 0 ? "+" : "-";
-            return sign + FormatRulerLabel(Mathf.Abs(deltaSeconds));
-        }
-
-        void OnTimelinePointerUp(PointerUpEvent evt)
-        {
-            FinalizeScrub();
-        }
-
-        void OnTimelinePointerCaptureOut(PointerCaptureOutEvent evt)
-        {
-            // Slider releases capture when drag ends. If somehow the up event
-            // didn't land (e.g. window lost focus), still commit on release.
-            FinalizeScrub();
-        }
-
-        void FinalizeScrub()
-        {
-            if (!_isScrubbing)
-            {
-                return;
-            }
-            _isScrubbing = false;
-            // Always commit the released frame even if a throttle just landed —
-            // we want to be exactly where the user released.
-            var target = _pendingScrubFrame;
-            if (target != _lastCommittedScrubFrame)
-            {
-                GetController()?.JumpToFrame(target);
-                _lastCommittedScrubFrame = target;
-            }
-        }
-
-        void OnTimelineValueChanged(ChangeEvent<int> evt)
-        {
-            if (_suppressControlEvents)
-            {
-                return;
-            }
-            _pendingScrubFrame = evt.newValue;
-            if (_isScrubbing)
-            {
-                MaybeCommitThrottledScrub();
-            }
-            else
-            {
-                // Slider changed via keyboard / input field — commit immediately.
-                GetController()?.JumpToFrame(evt.newValue);
-                _lastCommittedScrubFrame = evt.newValue;
-            }
-        }
-
-        void MaybeCommitThrottledScrub()
-        {
-            if (_pendingScrubFrame == _lastCommittedScrubFrame)
-            {
-                return;
-            }
-            var now = EditorApplication.timeSinceStartup;
-            if (now - _lastScrubCommitTime < ScrubThrottleSeconds)
-            {
-                return;
-            }
-            GetController()?.JumpToFrame(_pendingScrubFrame);
-            _lastCommittedScrubFrame = _pendingScrubFrame;
-            _lastScrubCommitTime = now;
+            _tooltips.Apply(_recordingNameLabel, tooltip);
         }
 
         // ---- Speed dropdown ----
@@ -3213,17 +2198,6 @@ namespace Trecs.Internal
         }
 
         // ---- Misc helpers ----
-
-        static void DeleteFileIfExists(string path)
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-                // Fallback path bypasses the controller, so notify the
-                // library event manually so other observers refresh.
-                TrecsRecordingSession.NotifySavesChanged();
-            }
-        }
 
         static bool IsInsideTextField(VisualElement element)
         {

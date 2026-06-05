@@ -34,12 +34,20 @@ namespace Trecs.Internal
             var actionsToFlush = new List<Action>(_bufferedActions);
             _bufferedActions.Clear();
 
-            foreach (var action in actionsToFlush)
+            try
             {
-                action();
+                foreach (var action in actionsToFlush)
+                {
+                    action();
+                }
             }
-
-            _isFlushing = false;
+            finally
+            {
+                // Reset even if an action throws — otherwise _isFlushing stays stuck
+                // true and every subsequent AddAction runs immediately instead of
+                // buffering, silently defeating the buffer for the object's lifetime.
+                _isFlushing = false;
+            }
         }
     }
 }

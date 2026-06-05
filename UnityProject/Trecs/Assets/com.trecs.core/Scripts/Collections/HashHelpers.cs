@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace Trecs.Internal
 {
-    public static class HashHelpers
+    internal static class HashHelpers
     {
         public static ulong GetFastModMultiplier(uint divisor) =>
             ulong.MaxValue / (ulong)divisor + 1UL;

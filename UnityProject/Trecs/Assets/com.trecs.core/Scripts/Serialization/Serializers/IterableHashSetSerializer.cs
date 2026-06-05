@@ -5,47 +5,97 @@ using Trecs.Internal;
 namespace Trecs.Serialization
 {
     /// <summary>
-    /// Serializer for <see cref="IterableHashSet{T}"/> — the deterministic,
-    /// dense-indexed hash-set used by Trecs. Writes the contents in their
-    /// internal dense order so the wire format is stable across runs.
+    /// Blit serializer for <see cref="IterableHashSet{T}"/>. Elements are always unmanaged,
+    /// so unlike the other collection serializers there is no Managed/Unmanaged split.
+    /// Writes the backing dictionary's internal structure (nodes + buckets) as raw memory —
+    /// the same shape as <see cref="IterableDictionarySerializerUnmanaged{TKey,TValue}"/>,
+    /// minus the dummy values array a hash set carries. This avoids the per-element
+    /// <c>ISerializationWriter.Write</c> path, which costs a serializer lookup plus generic
+    /// interface dispatches per item (IL2CPP-expensive — ~300ns/element measured on large
+    /// BlobId sets); the blit form is a handful of memcpys regardless of count.
     /// </summary>
     public sealed class IterableHashSetSerializer<T> : ISerializer<IterableHashSet<T>>
-        where T : struct, IEquatable<T>
+        where T : unmanaged, IEquatable<T>
     {
         public IterableHashSetSerializer() { }
 
-        public void Deserialize(ref IterableHashSet<T> dict, ISerializationReader reader)
+        public void Deserialize(ref IterableHashSet<T> set, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("Count");
-
-            if (dict == null)
+            if (set == null)
             {
-                dict = new IterableHashSet<T>(numItems);
+                set = new IterableHashSet<T>();
             }
             else
             {
-                TrecsDebugAssert.That(dict.IsEmpty);
-
-                dict.Clear();
-                dict.EnsureCapacity(numItems);
+                TrecsDebugAssert.That(set.IsEmpty);
             }
 
-            for (int i = 0; i < numItems; i++)
+            var dict = set.UnsafeInnerDictionary;
+
+            reader.BlitRead("FreeValueCellIndex", ref dict.UnsafeFreeValueCellIndex);
+
+            int bucketsCapacity = 0;
+            reader.BlitRead("BucketsCapacity", ref bucketsCapacity);
+            TrecsDebugAssert.That(bucketsCapacity >= 0);
+
+            var count = dict.UnsafeFreeValueCellIndex;
+            TrecsDebugAssert.That(count >= 0);
+
+            dict.UnsafeEnsureCapacityForDeserialization(count, bucketsCapacity);
+
+            unsafe
             {
-                var value = reader.Read<T>("Value");
-
-                dict.Add(value);
+                fixed (IterableDictionaryNode<T>* ptr = dict.UnsafeKeys)
+                {
+                    reader.BlitReadArrayPtr("ValuesInfo", ptr, count);
+                }
             }
+
+            // No "Values" section: the backing dictionary's values are empty placeholder
+            // structs, and their array contents are never read — only the nodes matter.
+
+            unsafe
+            {
+                fixed (int* ptr = dict.UnsafeBuckets)
+                {
+                    reader.BlitReadArrayPtr("Buckets", ptr, bucketsCapacity);
+                }
+            }
+
+            reader.BlitRead("Collisions", ref dict.UnsafeCollisions);
+            reader.BlitRead("FastModBucketsMultiplier", ref dict.UnsafeFastModBucketsMultiplier);
         }
 
         public void Serialize(in IterableHashSet<T> value, ISerializationWriter writer)
         {
-            writer.Write<int>("Count", value.Count);
+            var dict = value.UnsafeInnerDictionary;
 
-            foreach (var item in value)
+            var count = dict.UnsafeFreeValueCellIndex;
+            var bucketsCapacity = dict.UnsafeBucketsCapacity;
+
+            writer.BlitWrite("FreeValueCellIndex", count);
+            writer.BlitWrite("BucketsCapacity", bucketsCapacity);
+
+            var nodesBuffer = dict.UnsafeKeys;
+            unsafe
             {
-                writer.Write("Value", item);
+                fixed (IterableDictionaryNode<T>* ptr = nodesBuffer)
+                {
+                    writer.BlitWriteArrayPtr("ValuesInfo", ptr, count);
+                }
             }
+
+            var bucketsBuffer = dict.UnsafeBuckets;
+            unsafe
+            {
+                fixed (int* ptr = bucketsBuffer)
+                {
+                    writer.BlitWriteArrayPtr("Buckets", ptr, bucketsCapacity);
+                }
+            }
+
+            writer.BlitWrite("Collisions", dict.UnsafeCollisions);
+            writer.BlitWrite("FastModBucketsMultiplier", dict.UnsafeFastModBucketsMultiplier);
         }
     }
 }

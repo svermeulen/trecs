@@ -17,20 +17,20 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            var savedMetadata = snapshots.SaveSnapshot(version: 1, stream: stream);
+            var savedMetadata = snapshots.SaveSnapshotToStream(version: 1, stream: stream);
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Mutate after saving so we can verify the load reverts state
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 0 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
 
             stream.Position = 0;
@@ -55,22 +55,275 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
             // Toss in a native-unique allocation so the chunk-store path is exercised.
             var ptr = NativeUniquePtr.Alloc<int>(a, 42);
-            a.Submit();
+            a.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var s1 = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: s1);
+            snapshots.SaveSnapshotToStream(version: 1, stream: s1);
             using var s2 = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: s2);
+            snapshots.SaveSnapshotToStream(version: 1, stream: s2);
 
             CollectionAssert.AreEqual(
                 s1.ToArray(),
                 s2.ToArray(),
                 "Identical world state must produce identical snapshot bytes"
+            );
+
+            ptr.Dispose(a);
+        }
+
+        [Test]
+        public void Snapshot_RoundTripsViaSerializationData()
+        {
+            // Mirror of Snapshot_RoundTripsEntityState but through the zero-copy
+            // SerializationData save/load path used by the rewind/recording retain path.
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
+            a.World.Submit();
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+
+            var data = new SerializationData();
+            snapshots.SaveSnapshot(version: 1, target: data, includeTypeChecks: true);
+            var savedMetadata = snapshots.PeekMetadata(data);
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
+
+            // Mutate after saving so we can verify the load reverts state.
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 0 }).AssertComplete();
+            a.World.Submit();
+            NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
+
+            var loadedMetadata = snapshots.LoadSnapshot(data);
+
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
+            NAssert.AreEqual(savedMetadata.FixedFrame, loadedMetadata.FixedFrame);
+        }
+
+        [Test]
+        public void Snapshot_AfterBlobChurn_ReflectsNewBlobSet()
+        {
+            // Regression guard for PrepareMetadata's stamped-BlobIds rebuild-skip: heap blob
+            // membership changes between saves must invalidate the stamp (via the heaps'
+            // BlobMembershipVersion bumps), so consecutive saves reflect the live set rather
+            // than reusing the previous save's.
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
+            a.World.Submit();
+
+            var blobId1 = new BlobId(101);
+            NativeSharedAnchor.Register(a, blobId1, 7);
+            var p1 = NativeSharedPtr.Acquire<int>(a, blobId1);
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+
+            var d1 = new SerializationData();
+            snapshots.SaveSnapshot(version: 1, target: d1, includeTypeChecks: false);
+            var m1 = snapshots.PeekMetadata(d1);
+            NAssert.IsTrue(m1.BlobIds.Contains(blobId1));
+
+            // Membership grows while the previous save's stamp is still warm.
+            var blobId2 = new BlobId(202);
+            NativeSharedAnchor.Register(a, blobId2, 9);
+            var p2 = NativeSharedPtr.Acquire<int>(a, blobId2);
+
+            var d2 = new SerializationData();
+            snapshots.SaveSnapshot(version: 1, target: d2, includeTypeChecks: false);
+            var m2 = snapshots.PeekMetadata(d2);
+            NAssert.IsTrue(m2.BlobIds.Contains(blobId1));
+            NAssert.IsTrue(m2.BlobIds.Contains(blobId2));
+
+            // Membership shrinks again.
+            p2.Dispose(a);
+
+            var d3 = new SerializationData();
+            snapshots.SaveSnapshot(version: 1, target: d3, includeTypeChecks: false);
+            var m3 = snapshots.PeekMetadata(d3);
+            NAssert.IsTrue(m3.BlobIds.Contains(blobId1));
+            NAssert.IsFalse(m3.BlobIds.Contains(blobId2));
+
+            p1.Dispose(a);
+        }
+
+        [Test]
+        public void Snapshot_SaveAfterLoadIntoSameScratch_ProducesIdenticalBytes()
+        {
+            // The rollback loop's exact metadata flow: serialize and deserialize share one
+            // scratch metadata instance, so the load re-stamps it (post-load heaps hold exactly
+            // the snapshot's blobs) and the following save may skip the referenced-blob rebuild.
+            // The re-serialized bytes must still be identical to the original snapshot.
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
+            a.World.Submit();
+
+            var blobId1 = new BlobId(101);
+            NativeSharedAnchor.Register(a, blobId1, 7);
+            var p1 = NativeSharedPtr.Acquire<int>(a, blobId1);
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+            var scratch = new SnapshotSerializerScratch();
+
+            var d1 = new SerializationData();
+            snapshots.Serialize(
+                version: 1,
+                includeTypeChecks: false,
+                target: d1,
+                scratch: scratch,
+                opaqueBlobIdsOut: null,
+                requireOpaqueHandling: true
+            );
+
+            // Post-snapshot churn the load must revert (and whose membership bump the
+            // stamped set must survive being re-validated against).
+            var blobId2 = new BlobId(202);
+            NativeSharedAnchor.Register(a, blobId2, 9);
+            NativeSharedPtr.Acquire<int>(a, blobId2);
+
+            snapshots.Deserialize(d1, scratch.Metadata);
+
+            var d2 = new SerializationData();
+            snapshots.Serialize(
+                version: 1,
+                includeTypeChecks: false,
+                target: d2,
+                scratch: scratch,
+                opaqueBlobIdsOut: null,
+                requireOpaqueHandling: true
+            );
+
+            CollectionAssert.AreEqual(
+                ToContiguousBytes(d1),
+                ToContiguousBytes(d2),
+                "save-after-load must reproduce the loaded snapshot byte-for-byte"
+            );
+
+            p1.Dispose(a);
+        }
+
+        static byte[] ToContiguousBytes(SerializationData data)
+        {
+            using var ms = new MemoryStream();
+            data.WriteContiguousTo(ms);
+            return ms.ToArray();
+        }
+
+        [Test]
+        public void Snapshot_DeserializeListenerAcquiresBlob_NextSaveReflectsIt()
+        {
+            // The stamp-staleness hazard: DeserializeCompleted listeners run AFTER the heaps
+            // section loads, so a listener that mutates blob membership must leave the
+            // load-time stamp stale — the next save with the shared scratch has to rebuild
+            // its referenced-blob set rather than reuse the (now wrong) wire set. Guards the
+            // heaps-boundary version capture in WorldStateSerializer.
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
+            a.World.Submit();
+
+            var blobId1 = new BlobId(101);
+            NativeSharedAnchor.Register(a, blobId1, 7);
+            var p1 = NativeSharedPtr.Acquire<int>(a, blobId1);
+
+            var blobId2 = new BlobId(202);
+            NativeSharedAnchor.Register(a, blobId2, 9);
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+            var scratch = new SnapshotSerializerScratch();
+
+            var d1 = new SerializationData();
+            snapshots.Serialize(
+                version: 1,
+                includeTypeChecks: false,
+                target: d1,
+                scratch: scratch,
+                opaqueBlobIdsOut: null,
+                requireOpaqueHandling: true
+            );
+
+            // Listener acquires blob 2 after every load — post-heaps-section membership churn.
+            NativeSharedPtr<int> p2 = default;
+            using var sub = a.Events.OnDeserializeCompleted(() =>
+            {
+                p2 = NativeSharedPtr.Acquire<int>(a, blobId2);
+            });
+
+            snapshots.Deserialize(d1, scratch.Metadata);
+
+            var d2 = new SerializationData();
+            snapshots.Serialize(
+                version: 1,
+                includeTypeChecks: false,
+                target: d2,
+                scratch: scratch,
+                opaqueBlobIdsOut: null,
+                requireOpaqueHandling: true
+            );
+
+            var m2 = snapshots.PeekMetadata(d2);
+            NAssert.IsTrue(m2.BlobIds.Contains(blobId1));
+            NAssert.IsTrue(
+                m2.BlobIds.Contains(blobId2),
+                "save-after-load must include the blob the DeserializeCompleted listener "
+                    + "acquired — the load-time stamp must not survive post-load membership churn"
+            );
+
+            p2.Dispose(a);
+            p1.Dispose(a);
+        }
+
+        [Test]
+        public void Snapshot_SerializationDataChecksum_MatchesContiguousVerifyChecksum()
+        {
+            // Correctness-critical for desync detection: the retain-path checksum (computed
+            // in place over the two sections) MUST equal the checksum the contiguous verify
+            // path (ComputeChecksum) recomputes for identical state — otherwise every frame
+            // would false-positive as a desync.
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
+            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
+            var ptr = NativeUniquePtr.Alloc<int>(a, 42);
+            a.World.Submit();
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+
+            var data = new SerializationData();
+            snapshots.SaveSnapshot(version: 1, target: data, includeTypeChecks: true);
+            ulong dataChecksum = data.ComputeContiguousChecksum();
+
+            ulong verifyChecksum = snapshots.ComputeChecksum(version: 1, includeTypeChecks: true);
+
+            NAssert.AreEqual(
+                verifyChecksum,
+                dataChecksum,
+                "retain-path checksum must equal the contiguous verify-path checksum"
             );
 
             ptr.Dispose(a);
@@ -83,15 +336,15 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            var saved = snapshots.SaveSnapshot(version: 1, stream: stream);
+            var saved = snapshots.SaveSnapshotToStream(version: 1, stream: stream);
 
             stream.Position = 0;
             var peeked = snapshots.PeekMetadata(stream);
@@ -107,17 +360,17 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 13 }).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             var path = Path.Combine(Path.GetTempPath(), $"trecs_test_{Guid.NewGuid():N}.snap");
             try
             {
-                snapshots.SaveSnapshot(version: 1, filePath: path);
+                snapshots.SaveSnapshotToFile(version: 1, filePath: path);
                 NAssert.IsTrue(File.Exists(path));
 
                 a.Query()
@@ -164,16 +417,16 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
 
             // CustomMarker is not a Trecs component; we just round-trip an instance
-            // through SerializationBuffer to prove the registration path works.
+            // through the serializer to prove the registration path works.
             registry.RegisterSerializer(new CustomMarkerSerializer());
 
-            using var buffer = new SerializationBuffer(registry);
+            var helper = new SerializationHelper(registry);
+            var data = new SerializationData();
 
             var original = new CustomMarker { Tag = 0xCAFE, Counter = 7 };
-            buffer.WriteAll(original, version: 1, includeTypeChecks: true);
-            buffer.ResetMemoryPosition();
+            helper.WriteAll(data, original, version: 1, includeTypeChecks: true);
 
-            var roundTripped = buffer.ReadAll<CustomMarker>();
+            var roundTripped = helper.ReadAll<CustomMarker>(data);
 
             NAssert.AreEqual(original.Tag, roundTripped.Tag);
             NAssert.AreEqual(original.Counter, roundTripped.Counter);
@@ -186,10 +439,10 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            var saved = snapshots.SaveSnapshot(version: 42, stream: stream);
+            var saved = snapshots.SaveSnapshotToStream(version: 42, stream: stream);
 
             NAssert.AreEqual(42, saved.Version);
 
@@ -209,7 +462,7 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var empty = new MemoryStream();
             NAssert.Throws<SerializationException>(() => snapshots.LoadSnapshot(empty));
@@ -222,13 +475,14 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             NAssert.Throws<ArgumentNullException>(() =>
-                snapshots.SaveSnapshot(version: 1, stream: (Stream)null)
-            );
-            NAssert.Throws<ArgumentException>(() =>
-                snapshots.SaveSnapshot(version: 1, filePath: "")
+                snapshots.SaveSnapshot(
+                    version: 1,
+                    target: (SerializationData)null,
+                    includeTypeChecks: false
+                )
             );
             NAssert.Throws<ArgumentNullException>(() => snapshots.LoadSnapshot((Stream)null));
             NAssert.Throws<FileNotFoundException>(() =>
@@ -236,27 +490,6 @@ namespace Trecs.Tests
                     Path.Combine(Path.GetTempPath(), $"trecs_nonexistent_{Guid.NewGuid():N}.snap")
                 )
             );
-        }
-
-        [Test]
-        public void Snapshot_PostDispose_Throws_ObjectDisposedException()
-        {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var registry = new SerializerRegistry();
-            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
-            var worldStateSer = new WorldStateSerializer(env.World);
-            var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
-            snapshots.Dispose();
-
-            NAssert.Throws<ObjectDisposedException>(() =>
-                snapshots.SaveSnapshot(version: 1, stream: new MemoryStream())
-            );
-            NAssert.Throws<ObjectDisposedException>(() =>
-                snapshots.LoadSnapshot(new MemoryStream(new byte[] { 0 }))
-            );
-
-            // Idempotent Dispose.
-            snapshots.Dispose();
         }
 
         [Test]
@@ -270,23 +503,23 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var ptr = NativeUniquePtr.Alloc<int>(a, 42);
-            a.Submit();
+            a.World.Submit();
             var savedHandle = ptr.Handle;
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: stream);
+            snapshots.SaveSnapshotToStream(version: 1, stream: stream);
 
             // Mutate after save: dispose the original, allocate something else so the heap's
             // state is genuinely different at load time.
             ptr.Dispose(a);
-            a.Submit();
+            a.World.Submit();
             var sideEffect = NativeUniquePtr.Alloc<int>(a, 99);
-            a.Submit();
+            a.World.Submit();
             NAssert.AreEqual(99, sideEffect.Read(a).Value);
 
             // Load — should restore the original handle exactly.
@@ -308,19 +541,19 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var list = TrecsList.Alloc<int>(a);
-            a.Submit();
+            a.World.Submit();
             var savedHandle = list.Handle;
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: stream);
+            snapshots.SaveSnapshotToStream(version: 1, stream: stream);
 
             list.Dispose(a);
-            a.Submit();
+            a.World.Submit();
 
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);
@@ -350,20 +583,20 @@ namespace Trecs.Tests
             w.Add(11);
             w.Add(22);
             w.Add(33);
-            a.Submit();
+            a.World.Submit();
             var savedHandle = list.Handle;
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: stream);
+            snapshots.SaveSnapshotToStream(version: 1, stream: stream);
 
             // Mutate after save.
             list.Dispose(a);
-            a.Submit();
+            a.World.Submit();
 
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);
@@ -387,20 +620,20 @@ namespace Trecs.Tests
             w.Add(100, 1.5f);
             w.Add(200, 2.5f);
             w.Add(300, 3.5f);
-            a.Submit();
+            a.World.Submit();
             var savedHandle = dict.Handle;
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: stream);
+            snapshots.SaveSnapshotToStream(version: 1, stream: stream);
 
             // Mutate after save.
             dict.Dispose(a);
-            a.Submit();
+            a.World.Submit();
 
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);
@@ -438,19 +671,19 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var dict = TrecsDictionary.Alloc<int, float>(a);
-            a.Submit();
+            a.World.Submit();
             var savedHandle = dict.Handle;
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
 
             using var stream = new MemoryStream();
-            snapshots.SaveSnapshot(version: 1, stream: stream);
+            snapshots.SaveSnapshotToStream(version: 1, stream: stream);
 
             dict.Dispose(a);
-            a.Submit();
+            a.World.Submit();
 
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);

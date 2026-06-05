@@ -11,32 +11,37 @@ namespace Trecs.Tests
         public static void RegisterTestCollectionSerializers(SerializerRegistry registry)
         {
             // Collection serializers for testing
-            registry.RegisterSerializer<ListSerializer<string>>();
-            registry.RegisterSerializer<QueueSerializer<int>>();
+            registry.RegisterSerializer<ListSerializerManaged<string>>();
+            registry.RegisterSerializer<QueueSerializerManaged<string>>();
+            registry.RegisterSerializer<QueueSerializerUnmanaged<int>>();
 
             // Array serializers for malformed collection tests
-            registry.RegisterSerializer<BlitArraySerializer<int>>();
-            registry.RegisterSerializer<ArraySerializer<string>>();
+            registry.RegisterSerializer<ArraySerializerUnmanaged<int>>();
+            registry.RegisterSerializer<ArraySerializerManaged<string>>();
 
             // Nested collection serializers for malformed tests
-            registry.RegisterSerializer<ListSerializer<List<int>>>();
+            registry.RegisterSerializer<ListSerializerManaged<List<int>>>();
 
             // Test class serializer for null serialization tests.
             registry.RegisterSerializer(new TestClassSerializer());
 
             // List blit serializers for performance testing
-            registry.RegisterSerializer<ListBlitSerializer<int>>();
-            registry.RegisterSerializer<ListBlitSerializer<float>>();
-            registry.RegisterSerializer<ListBlitSerializer<Vector3>>();
-            registry.RegisterSerializer<ListBlitSerializer<int2>>();
-            registry.RegisterSerializer<ListBlitSerializer<byte>>();
+            registry.RegisterSerializer<ListSerializerUnmanaged<int>>();
+            registry.RegisterSerializer<ListSerializerUnmanaged<float>>();
+            registry.RegisterSerializer<ListSerializerUnmanaged<Vector3>>();
+            registry.RegisterSerializer<ListSerializerUnmanaged<int2>>();
+            registry.RegisterSerializer<ListSerializerUnmanaged<byte>>();
 
             // IterableDictionary serializers for blit performance testing
-            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, float>>();
-            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, int>>();
-            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, Vector3>>();
-            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int2, float3>>();
-            registry.RegisterSerializer<IterableDictionarySerializer<int, string>>();
+            registry.RegisterSerializer<IterableDictionarySerializerUnmanaged<int, float>>();
+            registry.RegisterSerializer<IterableDictionarySerializerUnmanaged<int, int>>();
+            registry.RegisterSerializer<IterableDictionarySerializerUnmanaged<int, Vector3>>();
+            registry.RegisterSerializer<IterableDictionarySerializerUnmanaged<int2, float3>>();
+            registry.RegisterSerializer<IterableDictionarySerializerManaged<int, string>>();
+
+            // IterableHashSet blit serializers
+            registry.RegisterSerializer<IterableHashSetSerializer<int>>();
+            registry.RegisterSerializer<IterableHashSetSerializer<int2>>();
 
             // UnsafeList serializers for round-trip tests.
             registry.RegisterSerializer<UnsafeListSerializer<float>>();

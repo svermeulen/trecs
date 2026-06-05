@@ -1,18 +1,26 @@
 using System;
 using System.IO;
+using Unity.Collections;
 
 namespace Trecs.Internal
 {
     /// <summary>
-    /// Shared raw-bytes serialization format for NativeBlobBox used by both BlobStoreFiles
-    /// and BlobStoreAddressables.
-    ///
+    /// Raw-bytes serialization format for a native (unmanaged) blob — the bytes behind a
+    /// <c>NativeSharedPtr&lt;T&gt;</c>. Used by the opaque-blob loaders (Addressables, file store)
+    /// and the derivable output-cache (<c>DiskMemoize</c>) to round-trip a native blob
+    /// through a byte stream with no managed <c>byte[]</c> intermediate. Both a pooled
+    /// <see cref="NativeBlobBox"/> and a raw <see cref="NativeBlobAllocation"/> (the taking-ownership
+    /// shape) can be written and read back.
+    /// <para>
     /// Format:
-    ///   int32 magic (NativeBlobMagic = 'NBLB')
+    /// <code>
+    ///   int32 magic  (NativeBlobMagic = 'NBLB')
     ///   int32 serializationVersion
     ///   int32 size
     ///   int32 alignment
     ///   [size] bytes
+    /// </code>
+    /// </para>
     /// </summary>
     internal static class NativeBlobFileFormat
     {
@@ -25,13 +33,34 @@ namespace Trecs.Internal
             NativeBlobBox box
         )
         {
+            WriteCore(writer, serializationVersion, box.Ptr, box.Size, box.Alignment);
+        }
+
+        /// <summary>Writes a raw <see cref="NativeBlobAllocation"/> (taking-ownership shape).</summary>
+        public static unsafe void WriteAllocation(
+            BinaryWriter writer,
+            int serializationVersion,
+            NativeBlobAllocation alloc
+        )
+        {
+            WriteCore(writer, serializationVersion, alloc.Ptr, alloc.AllocSize, alloc.Alignment);
+        }
+
+        static unsafe void WriteCore(
+            BinaryWriter writer,
+            int serializationVersion,
+            IntPtr ptr,
+            int size,
+            int alignment
+        )
+        {
             writer.Write(Magic);
             writer.Write(serializationVersion);
-            writer.Write(box.Size);
-            writer.Write(box.Alignment);
+            writer.Write(size);
+            writer.Write(alignment);
 
             // Write directly from native memory — no managed byte[] intermediate.
-            var span = new ReadOnlySpan<byte>(box.Ptr.ToPointer(), box.Size);
+            var span = new ReadOnlySpan<byte>(ptr.ToPointer(), size);
             writer.BaseStream.Write(span);
         }
 
@@ -44,10 +73,76 @@ namespace Trecs.Internal
             NativeBlobBoxPool pool
         )
         {
+            ReadHeader(
+                reader,
+                stream,
+                expectedSerializationVersion,
+                sourceDescription,
+                out int size,
+                out int alignment
+            );
+
+            NativeBlobBox box = null;
+            try
+            {
+                box = pool.RentUninitialized(size, alignment, innerType);
+                ReadBytesInto(stream, box.Ptr, size, sourceDescription);
+                return box;
+            }
+            catch
+            {
+                box?.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Reads a native blob into a freshly-allocated <see cref="Allocator.Persistent"/> buffer and
+        /// returns it as a <see cref="NativeBlobAllocation"/> — for the taking-ownership path, where
+        /// the cache (not a pool) takes ownership and frees it via <c>AllocatorManager</c>.
+        /// </summary>
+        public static unsafe NativeBlobAllocation ReadAllocation(
+            BinaryReader reader,
+            Stream stream,
+            int expectedSerializationVersion,
+            string sourceDescription
+        )
+        {
+            ReadHeader(
+                reader,
+                stream,
+                expectedSerializationVersion,
+                sourceDescription,
+                out int size,
+                out int alignment
+            );
+
+            var ptr = AllocatorManager.Allocate(Allocator.Persistent, size, alignment, items: 1);
+            try
+            {
+                ReadBytesInto(stream, (IntPtr)ptr, size, sourceDescription);
+                return new NativeBlobAllocation((IntPtr)ptr, size, alignment);
+            }
+            catch
+            {
+                AllocatorManager.Free(Allocator.Persistent, ptr, size, alignment, items: 1);
+                throw;
+            }
+        }
+
+        static void ReadHeader(
+            BinaryReader reader,
+            Stream stream,
+            int expectedSerializationVersion,
+            string sourceDescription,
+            out int size,
+            out int alignment
+        )
+        {
             int magic = reader.ReadInt32();
             TrecsDebugAssert.That(
                 magic == Magic,
-                "Invalid native blob {0}: bad magic {x} (expected {x})",
+                "Invalid native blob {0}: bad magic {1} (expected {2})",
                 sourceDescription,
                 magic,
                 Magic
@@ -62,8 +157,8 @@ namespace Trecs.Internal
                 expectedSerializationVersion
             );
 
-            int size = reader.ReadInt32();
-            int alignment = reader.ReadInt32();
+            size = reader.ReadInt32();
+            alignment = reader.ReadInt32();
 
             TrecsDebugAssert.That(
                 size > 0 && size <= MaxBlobSize,
@@ -86,36 +181,32 @@ namespace Trecs.Internal
                 size,
                 remaining
             );
+        }
 
-            NativeBlobBox box = null;
-            try
+        static unsafe void ReadBytesInto(
+            Stream stream,
+            IntPtr destination,
+            int size,
+            string sourceDescription
+        )
+        {
+            // Read directly into native memory — no managed byte[] intermediate. Stream.Read may
+            // return fewer bytes than requested, so loop until full.
+            var span = new Span<byte>(destination.ToPointer(), size);
+            int totalRead = 0;
+            while (totalRead < size)
             {
-                box = pool.RentUninitialized(size, alignment, innerType);
-
-                // Read directly into native memory — no managed byte[] intermediate.
-                // Stream.Read may return fewer bytes than requested, so loop until full.
-                var span = new Span<byte>(box.Ptr.ToPointer(), size);
-                int totalRead = 0;
-                while (totalRead < size)
+                int bytesRead = stream.Read(span.Slice(totalRead));
+                if (bytesRead == 0)
                 {
-                    int bytesRead = stream.Read(span.Slice(totalRead));
-                    if (bytesRead == 0)
-                    {
-                        throw TrecsDebugAssert.CreateException(
-                            "Short read on native blob {0}: expected {1} bytes, got {2}",
-                            sourceDescription,
-                            size,
-                            totalRead
-                        );
-                    }
-                    totalRead += bytesRead;
+                    throw TrecsDebugAssert.CreateException(
+                        "Short read on native blob {0}: expected {1} bytes, got {2}",
+                        sourceDescription,
+                        size,
+                        totalRead
+                    );
                 }
-                return box;
-            }
-            catch
-            {
-                box?.Dispose();
-                throw;
+                totalRead += bytesRead;
             }
         }
     }

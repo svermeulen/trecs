@@ -25,6 +25,7 @@ namespace Trecs
     {
         readonly TrecsLog _log;
         readonly BlobCache _store;
+        readonly BlobFactory _factory;
 
         readonly IterableDictionary<int, List<Entry>> _entriesByFrame = new();
         readonly Stack<List<Entry>> _listPool = new();
@@ -41,17 +42,26 @@ namespace Trecs
             public readonly BlobId BlobId;
             public readonly PtrHandle CacheHandle;
 
-            public Entry(BlobId blobId, PtrHandle cacheHandle)
+            // Non-null only for descriptor-acquired input blobs (InputNativeSharedPtr.Acquire<TDesc,T>).
+            // Recorded into the input stream so a fresh-process replay can re-register the blob's
+            // source and re-derive it; for plain by-reference allocations this is null. The box is
+            // shared with the BlobFactory descriptor journal (see GetJournaledDescriptor), so
+            // per-frame acquires of the same descriptor don't re-box.
+            public readonly object Descriptor;
+
+            public Entry(BlobId blobId, PtrHandle cacheHandle, object descriptor)
             {
                 BlobId = blobId;
                 CacheHandle = cacheHandle;
+                Descriptor = descriptor;
             }
         }
 
-        public InputNativeSharedHeap(TrecsLog log, BlobCache store)
+        internal InputNativeSharedHeap(TrecsLog log, BlobCache store, BlobFactory factory)
         {
             _log = log;
             _store = store;
+            _factory = factory;
             _resolverEntries = new NativeHashMap<BlobId, InputNativeSharedHeapEntry>(
                 16,
                 Allocator.Persistent
@@ -74,6 +84,20 @@ namespace Trecs
             {
                 TrecsDebugAssert.That(!_isDisposed);
                 return ref _resolver;
+            }
+        }
+
+        // Add every BlobId currently retained by a live input frame to <paramref name="output"/>.
+        // See InputSharedHeap.AddReferencedBlobIds — same role in a saved recording's blob root set.
+        internal void AddReferencedBlobIds(IterableHashSet<BlobId> output)
+        {
+            TrecsDebugAssert.That(!_isDisposed);
+            foreach (var (_, list) in _entriesByFrame)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    output.Add(list[i].BlobId);
+                }
             }
         }
 
@@ -106,7 +130,7 @@ namespace Trecs
             TrecsDebugAssert.That(!_isDisposed);
             TrecsDebugAssert.That(frame >= 0);
             var handle = _store.AllocNativeBlob<T>(blobId, in value);
-            TrackEntry(frame, handle.BlobId, handle.Handle);
+            TrackEntry(frame, handle.BlobId, handle.Handle, descriptor: null);
             AddToResolver<T>(handle.BlobId);
             _log.Trace(
                 "Allocated input native shared type={0} blobId={1} frame={2}",
@@ -117,17 +141,58 @@ namespace Trecs
             return new InputNativeSharedPtr<T>(handle.BlobId);
         }
 
+        // Interns the descriptor (registering its native source if first-seen) and acquires a
+        // frame-scoped handle. The blob materializes from the registered builder; the descriptor is
+        // tracked on the entry so Serialize can record it into the recording's input stream,
+        // letting a fresh-process replay re-derive the blob.
+        internal InputNativeSharedPtr<T> AcquireFromDescriptor<TDesc, T>(
+            int frame,
+            in TDesc descriptor
+        )
+            where T : unmanaged
+        {
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(frame >= 0);
+            // Input is not simulation state, so the registered source is ambient-tagged: invisible
+            // to the deterministic by-id resolve until the sim justifies the blob itself (interning
+            // the same descriptor, or converting the in-hand pointer via
+            // NativeSharedPtr.Acquire(world, inputPtr), both of which promote it). The intern still
+            // journals the recipe — snapshot emission filters by the heap-derived referenced set,
+            // so nothing leaks unless the sim actually comes to hold the blob.
+            var blobId = _factory.Intern(in descriptor, deterministicContext: false);
+            // Input-pipeline origin: makes the id eligible for the input-descriptor sweep once no
+            // live frame references it (and the sim never promoted it).
+            _factory.MarkInputDescriptor(blobId);
+            // Share the journal's boxed copy (an Intern postcondition) rather than boxing the
+            // struct descriptor again — keeps steady-state per-frame acquires allocation-free.
+            // Fetched before EnsureResident, which runs the registered builder (user code that
+            // could in principle reentrantly sweep the journal).
+            var journaledDescriptor = _factory.GetJournaledDescriptor(blobId);
+            _factory.EnsureResident(blobId);
+            var handle = _store.CreateHandle(blobId);
+            TrackEntry(frame, blobId, handle, journaledDescriptor);
+            AddToResolver<T>(blobId);
+            _log.Trace(
+                "Acquired input native shared from descriptor type={0} blobId={1} frame={2}",
+                typeof(T),
+                blobId,
+                frame
+            );
+            return new InputNativeSharedPtr<T>(blobId);
+        }
+
         internal bool TryAcquire<T>(int frame, BlobId blobId, out InputNativeSharedPtr<T> ptr)
             where T : unmanaged
         {
             TrecsDebugAssert.That(!_isDisposed);
-            if (!_store.ContainsNativeBlob<T>(blobId, updateAccessTime: true))
+            if (!_factory.ContainsNativeBlob<T>(blobId))
             {
                 ptr = default;
                 return false;
             }
+            _factory.EnsureResident(blobId);
             var handle = _store.CreateHandle(blobId);
-            TrackEntry(frame, blobId, handle);
+            TrackEntry(frame, blobId, handle, descriptor: null);
             AddToResolver<T>(blobId);
             ptr = new InputNativeSharedPtr<T>(blobId);
             return true;
@@ -136,16 +201,14 @@ namespace Trecs
         internal InputNativeSharedPtr<T> Acquire<T>(int frame, BlobId blobId)
             where T : unmanaged
         {
-            TrecsDebugAssert.That(!_isDisposed);
-            TrecsDebugAssert.That(
-                _store.ContainsNativeBlob<T>(blobId, updateAccessTime: false),
-                "Acquire: no native blob exists at BlobId {0}",
-                blobId
-            );
-            var handle = _store.CreateHandle(blobId);
-            TrackEntry(frame, blobId, handle);
-            AddToResolver<T>(blobId);
-            return new InputNativeSharedPtr<T>(blobId);
+            if (!TryAcquire<T>(frame, blobId, out var ptr))
+            {
+                throw TrecsDebugAssert.CreateException(
+                    "Acquire: no native blob exists at BlobId {0}",
+                    blobId
+                );
+            }
+            return ptr;
         }
 
         void AddToResolver<T>(BlobId blobId)
@@ -208,7 +271,7 @@ namespace Trecs
             _resolverEntries.Capacity = newCapacity;
         }
 
-        void TrackEntry(int frame, BlobId blobId, PtrHandle cacheHandle)
+        void TrackEntry(int frame, BlobId blobId, PtrHandle cacheHandle, object descriptor)
         {
             if (!_entriesByFrame.TryGetValue(frame, out var list))
             {
@@ -216,7 +279,7 @@ namespace Trecs
                 TrecsDebugAssert.That(list.Count == 0);
                 _entriesByFrame.Add(frame, list);
             }
-            list.Add(new Entry(blobId, cacheHandle));
+            list.Add(new Entry(blobId, cacheHandle, descriptor));
         }
 
         internal void ClearAtOrAfterFrame(int frame)
@@ -264,7 +327,8 @@ namespace Trecs
             {
                 for (int i = 0; i < list.Count; i++)
                 {
-                    _store.DisposeHandle(list[i].CacheHandle);
+                    // No per-entry RemoveFromResolver here — the resolver is bulk-cleared below.
+                    ReleaseEntry(list[i]);
                 }
                 list.Clear();
                 _listPool.Push(list);
@@ -287,14 +351,36 @@ namespace Trecs
             var list = _entriesByFrame.RemoveAndGet(frame);
             for (int i = 0; i < list.Count; i++)
             {
-                _store.DisposeHandle(list[i].CacheHandle);
+                ReleaseEntry(list[i]);
                 RemoveFromResolver(list[i].BlobId);
             }
             list.Clear();
             _listPool.Push(list);
         }
 
-        internal void Serialize(ISerializationWriter writer)
+        void ReleaseEntry(in Entry entry)
+        {
+            _store.DisposeHandle(entry.CacheHandle);
+            if (entry.Descriptor != null)
+            {
+                // Counts toward the input-descriptor sweep trigger — releases are what turn
+                // tracked descriptor ids into sweepable garbage.
+                _factory.NoteInputDescriptorEntryReleased();
+            }
+        }
+
+        /// <summary>
+        /// Writes (frame -> [(BlobId, kind, payload?), ...]) pairs, tagged per
+        /// <see cref="InputBlobKind"/>: descriptor-acquired blobs record their descriptor; opaque
+        /// (eager) blobs record their type and persist their native bytes to
+        /// <paramref name="opaqueBlobStore"/> (content-addressed; <paramref name="opaqueBaker"/> bakes
+        /// them); plain references write nothing extra. See <see cref="InputSharedHeap.Serialize"/>.
+        /// </summary>
+        internal void Serialize(
+            ISerializationWriter writer,
+            IOpaqueBlobStore opaqueBlobStore = null,
+            OpaqueBlobBaker opaqueBaker = null
+        )
         {
             TrecsDebugAssert.That(!_isDisposed);
 
@@ -305,12 +391,53 @@ namespace Trecs
                 writer.Write<int>("NumEntries", list.Count);
                 for (int i = 0; i < list.Count; i++)
                 {
-                    writer.Write<BlobId>("BlobId", list[i].BlobId);
+                    var entry = list[i];
+                    writer.Write<BlobId>("BlobId", entry.BlobId);
+
+                    if (entry.Descriptor != null)
+                    {
+                        writer.Write<byte>("Kind", (byte)InputBlobKind.Descriptor);
+                        writer.WriteObject("Descriptor", entry.Descriptor);
+                        continue;
+                    }
+
+                    var metadata = _store.GetBlobMetadata(entry.BlobId);
+                    if (!metadata.IsEager)
+                    {
+                        writer.Write<byte>("Kind", (byte)InputBlobKind.Reference);
+                        continue;
+                    }
+
+                    writer.Write<byte>("Kind", (byte)InputBlobKind.Opaque);
+                    writer.Write<TypeId>("TypeId", metadata.TypeId);
+                    if (opaqueBlobStore != null && !opaqueBlobStore.Contains(entry.BlobId))
+                    {
+                        TrecsAssert.That(
+                            opaqueBaker != null,
+                            "Persisting opaque input blob {0} requires an opaque-blob baker",
+                            entry.BlobId
+                        );
+                        var blobId = entry.BlobId;
+                        opaqueBlobStore.Write(
+                            blobId,
+                            stream =>
+                                opaqueBaker.SerializeResidentBlob(
+                                    _store,
+                                    blobId,
+                                    stream,
+                                    OpaqueBlobBaker.CurrentFormatVersion
+                                )
+                        );
+                    }
                 }
             }
         }
 
-        internal void Deserialize(ISerializationReader reader)
+        internal void Deserialize(
+            ISerializationReader reader,
+            IOpaqueBlobStore opaqueBlobStore = null,
+            OpaqueBlobBaker opaqueBaker = null
+        )
         {
             TrecsDebugAssert.That(!_isDisposed);
             ClearAll();
@@ -323,8 +450,33 @@ namespace Trecs
                 for (int k = 0; k < numEntries; k++)
                 {
                     var blobId = reader.Read<BlobId>("BlobId");
+                    var kind = (InputBlobKind)reader.Read<byte>("Kind");
+                    object descriptor = null;
+
+                    switch (kind)
+                    {
+                        case InputBlobKind.Descriptor:
+                            reader.ReadObject("Descriptor", ref descriptor);
+                            // Re-register the source before CreateHandle materializes it — on a fresh
+                            // process the descriptor blob isn't otherwise known (input blobs are absent
+                            // from snapshots, so the world-state load didn't register it).
+                            _factory.RestoreInputDescriptor(blobId, descriptor);
+                            break;
+                        case InputBlobKind.Opaque:
+                            RestoreOpaqueInputBlob(
+                                blobId,
+                                reader.Read<TypeId>("TypeId"),
+                                opaqueBlobStore,
+                                opaqueBaker
+                            );
+                            break;
+                        case InputBlobKind.Reference:
+                            break;
+                    }
+
+                    _factory.EnsureResident(blobId);
                     var handle = _store.CreateHandle(blobId);
-                    TrackEntry(frame, blobId, handle);
+                    TrackEntry(frame, blobId, handle, descriptor);
 
                     // Rebuild resolver entries from BlobCache
                     if (!_blobIdRefCount.ContainsKey(blobId))
@@ -356,6 +508,56 @@ namespace Trecs
                 }
             }
             _log.Debug("Deserialized {0} frames into InputNativeSharedHeap", _entriesByFrame.Count);
+        }
+
+        // Restores an opaque (eager) native input blob from the store before its handle is re-minted
+        // and its resolver entry rebuilt. No-op if already resident.
+        void RestoreOpaqueInputBlob(
+            BlobId id,
+            TypeId typeId,
+            IOpaqueBlobStore opaqueBlobStore,
+            OpaqueBlobBaker opaqueBaker
+        )
+        {
+            if (_store.IsResident(id))
+            {
+                return;
+            }
+            TrecsAssert.That(
+                opaqueBlobStore != null,
+                "Replaying opaque input blob {0} requires an IOpaqueBlobStore",
+                id
+            );
+            TrecsAssert.That(
+                opaqueBaker != null,
+                "Replaying opaque input blob {0} requires an opaque-blob baker",
+                id
+            );
+            TrecsAssert.That(
+                opaqueBlobStore.TryOpenRead(id, out var blobStream),
+                "IOpaqueBlobStore has no bytes for opaque input blob {0}",
+                id
+            );
+            TrecsAssert.That(
+                TypeId.TryToType(typeId, out var blobType),
+                "Could not resolve type id {0} for opaque input blob {1}",
+                typeId,
+                id
+            );
+            // One-shot restore: deserialize and seed the cache directly as an eager blob — the
+            // read-side mirror of the bake. No lazy source needed (the input log re-supplies it).
+            object blob;
+            using (blobStream)
+            {
+                blob = opaqueBaker.Deserialize(
+                    blobStream,
+                    blobType,
+                    isNative: true,
+                    OpaqueBlobBaker.CurrentFormatVersion,
+                    _store.NativeBlobBoxPool
+                );
+            }
+            _store.InsertEagerBlob(id, blob);
         }
 
         internal void Dispose()

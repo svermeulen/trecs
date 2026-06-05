@@ -1,5 +1,3 @@
-using System;
-
 namespace Trecs.Samples.ReactiveEvents
 {
     /// <summary>
@@ -14,10 +12,16 @@ namespace Trecs.Samples.ReactiveEvents
     ///    data is available in both callbacks — including <c>OnRemoved</c>,
     ///    since removed entities are parked at the end of the backing array
     ///    (past the active count) until submission finishes.
-    /// 3. <c>subscription.Dispose()</c> — unsubscribes; called from the
-    ///    composition root's disposables list.
+    /// 3. <c>subscription.Dispose()</c> — unsubscribes. We hand disposal to
+    ///    <c>World.Events.OnShutdown</c> rather than the composition root's
+    ///    disposables list: <c>OnShutdown</c> fires during <c>world.Dispose()</c>
+    ///    *after* the final <c>OnRemoved</c> cleanup pass (RemoveAllEntities),
+    ///    so the handler is still subscribed for that last batch. Disposing it
+    ///    earlier (before <c>world.Dispose()</c>) would silently skip that
+    ///    cleanup — harmless here, but a real leak when <c>OnRemoved</c> frees
+    ///    resources outside the world (e.g. destroying GameObjects).
     /// </summary>
-    public partial class GameStatsUpdater : IDisposable
+    public partial class GameStatsUpdater
     {
         readonly DisposeCollection _disposables = new();
 
@@ -30,6 +34,8 @@ namespace Trecs.Samples.ReactiveEvents
                 .OnAdded(OnBubbleAdded)
                 .OnRemoved(OnBubbleRemoved)
                 .AddTo(_disposables);
+
+            World.Events.OnShutdown(() => _disposables.Dispose()).AddTo(_disposables);
         }
 
         WorldAccessor World { get; }

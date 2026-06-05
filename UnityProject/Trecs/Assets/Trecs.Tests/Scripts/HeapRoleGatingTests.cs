@@ -32,9 +32,9 @@ namespace Trecs.Tests
             );
 
             NAssert.Throws<TrecsException>(() =>
-                SharedPtr.Alloc(
+                BlobTestUtil.AllocShared(
                     variableAccessor,
-                    BlobIdGenerator.FromKey(1),
+                    new BlobId(1),
                     new List<string> { "should-fail" }
                 )
             );
@@ -71,9 +71,9 @@ namespace Trecs.Tests
             );
 
             NAssert.Throws<TrecsException>(() =>
-                SharedPtr.Alloc(
+                BlobTestUtil.AllocShared(
                     inputAccessor,
-                    BlobIdGenerator.FromKey(2),
+                    new BlobId(2),
                     new List<string> { "input-must-frame-scope" }
                 )
             );
@@ -94,11 +94,9 @@ namespace Trecs.Tests
 
             NAssert.DoesNotThrow(() =>
             {
-                var ptr = InputSharedPtr.Alloc(
-                    inputAccessor,
-                    BlobIdGenerator.FromKey(3),
-                    new List<string> { "input-frame-scoped" }
-                );
+                // Content-addressed Alloc hashes (serializes) the value, so use a registry-
+                // serializable payload (string) — the role-gate is what this test exercises.
+                var ptr = InputSharedPtr.Alloc(inputAccessor, "input-frame-scoped");
                 NAssert.IsFalse(ptr.IsNull);
             });
         }
@@ -114,9 +112,9 @@ namespace Trecs.Tests
 
             NAssert.DoesNotThrow(() =>
             {
-                var ptr = SharedPtr.Alloc(
+                var ptr = BlobTestUtil.AllocShared(
                     unrestrictedAccessor,
-                    BlobIdGenerator.FromKey(4),
+                    new BlobId(4),
                     new List<string> { "unrestricted-ok" }
                 );
                 NAssert.IsFalse(ptr.IsNull);
@@ -135,9 +133,9 @@ namespace Trecs.Tests
 
             NAssert.DoesNotThrow(() =>
             {
-                var ptr = SharedPtr.Alloc(
+                var ptr = BlobTestUtil.AllocShared(
                     fixedAccessor,
-                    BlobIdGenerator.FromKey(5),
+                    new BlobId(5),
                     new List<string> { "fixed-ok" }
                 );
                 NAssert.IsFalse(ptr.IsNull);
@@ -165,9 +163,9 @@ namespace Trecs.Tests
                 "VariableRoleTest"
             );
 
-            var ptr = SharedPtr.Alloc(
+            var ptr = BlobTestUtil.AllocShared(
                 unrestricted,
-                BlobIdGenerator.FromKey(10),
+                new BlobId(10),
                 new List<string> { "src" }
             );
 
@@ -186,9 +184,9 @@ namespace Trecs.Tests
                 "VariableRoleTest"
             );
 
-            var ptr = SharedPtr.Alloc(
+            var ptr = BlobTestUtil.AllocShared(
                 unrestricted,
-                BlobIdGenerator.FromKey(11),
+                new BlobId(11),
                 new List<string> { "src" }
             );
 
@@ -209,7 +207,7 @@ namespace Trecs.Tests
                 "VariableRoleTest"
             );
 
-            var ptr = NativeSharedPtr.Alloc<int>(unrestricted, BlobIdGenerator.FromKey(12), 42);
+            var ptr = BlobTestUtil.AllocNativeShared<int>(unrestricted, new BlobId(12), 42);
 
             NAssert.Throws<TrecsException>(() => ptr.Clone(variableAccessor));
 
@@ -226,7 +224,7 @@ namespace Trecs.Tests
                 "VariableRoleTest"
             );
 
-            var ptr = NativeSharedPtr.Alloc<int>(unrestricted, BlobIdGenerator.FromKey(13), 42);
+            var ptr = BlobTestUtil.AllocNativeShared<int>(unrestricted, new BlobId(13), 42);
 
             NAssert.Throws<TrecsException>(() => ptr.Dispose(variableAccessor));
 

@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 
 namespace Trecs.Tests
 {
@@ -26,35 +25,17 @@ namespace Trecs.Tests
 
         /// <summary>
         /// Advances <paramref name="frames"/> fixed-update frames in lockstep.
-        /// Decouples from Unity's non-deterministic <c>Time.deltaTime</c> in EditMode
-        /// by pausing fixed update and explicitly stepping one frame per iteration.
-        /// The leading Tick+LateTick gives variable-update systems one cycle to
-        /// settle before the first stepped fixed frame.
+        /// Delegates to the shared <see cref="TestWorldStepper.StepFixedFrames"/> so
+        /// edit-mode and play-mode tests step identically.
         /// </summary>
         public void StepFixedFrames(int frames)
         {
-            var runner = World.GetSystemRunner();
-            runner.FixedIsPaused = true;
-
-            World.Tick();
-            World.LateTick();
-
-            for (int i = 0; i < frames; i++)
-            {
-                runner.StepFixedFrame();
-                World.Tick();
-                World.LateTick();
-            }
+            World.StepFixedFrames(frames);
         }
     }
 
     public static class EcsTestHelper
     {
-        public static BlobStoreInMemory CreateBlobStore()
-        {
-            return new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
-        }
-
         public static TestEnvironment CreateEnvironment(params Template[] templates)
         {
             return CreateEnvironment(new WorldSettings(), null, templates);
@@ -94,19 +75,12 @@ namespace Trecs.Tests
         {
             if (globalsTemplate == null)
             {
-                globalsTemplate = new Template(
-                    debugName: "TestGlobals",
-                    localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
-                    partitions: Array.Empty<TagSet>(),
-                    localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
-                    localTags: Array.Empty<Tag>()
-                );
+                globalsTemplate = TestTemplate
+                    .Named("TestGlobals")
+                    .Extending(TrecsTemplates.Globals.Template);
             }
 
-            var builder = new WorldBuilder()
-                .SetSettings(settings)
-                .AddTemplate(globalsTemplate)
-                .AddBlobStore(CreateBlobStore());
+            var builder = new WorldBuilder().SetSettings(settings).AddTemplate(globalsTemplate);
 
             foreach (var template in templates)
             {

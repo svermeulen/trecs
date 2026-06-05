@@ -73,29 +73,24 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Queue removal of all entities in a group. More efficient than individual
-        /// QueueRemoveOperation calls because it skips per-entity Contains checks
-        /// and amortizes the per-group slot lookup.
+        /// Mark a whole group for removal of its entire (post-add) contents. O(1)
+        /// and idempotent: it sets a per-group flag rather than enumerating the
+        /// group's current entities, so the live count is read at execute time —
+        /// after this submission's moves, per-entity removes, and adds have been
+        /// applied. The flag is consumed by the full-group-removal phase
+        /// (<see cref="ExecuteFullGroupRemovals"/>), which runs <em>after</em>
+        /// adds so an entity added into a bulk-removed group in the same submit
+        /// fires both OnAdded and OnRemoved. Any per-entity removes queued for the
+        /// same group still run in the normal remove phase; the full-group phase
+        /// then clears whatever survivors remain.
         /// </summary>
-        public void QueueRemoveAllInGroup(GroupIndex group, int entityCount)
+        public void QueueRemoveAllInGroup(GroupIndex group)
         {
-            if (entityCount == 0)
-                return;
-
-            var removedComponentsPerType = GetOrCreateRemoveList(group);
-
-            for (int i = 0; i < entityCount; i++)
+            ref var slot = ref _thisSubmissionInfo._fullGroupRemoval[group.Index];
+            if (!slot)
             {
-                var entityIndex = new EntityIndex(i, group);
-
-                if (_thisSubmissionInfo._entitiesRemoved.Contains(entityIndex))
-                    continue;
-
-                _thisSubmissionInfo._entitiesRemoved.Add(entityIndex);
-                _thisSubmissionInfo._removeCount++;
-                RevertMoveOperationIfPreviouslyQueued(entityIndex);
-
-                removedComponentsPerType.Add(i);
+                slot = true;
+                _thisSubmissionInfo._fullGroupRemovalCount++;
             }
         }
 
@@ -166,10 +161,12 @@ namespace Trecs.Internal
         /// here: its only in-pipeline consumer was the NatSwap Queue gate at
         /// <see cref="QueueNativeMoveOperations"/>, which now uses a
         /// merge-walk over <paramref name="sortedRemovals"/> instead.
-        /// _entitiesRemoved continues to track managed-side removes (queued
-        /// via <see cref="QueueRemoveOperation"/> / <see cref="QueueRemoveAllInGroup"/>)
-        /// for the cross-source dedup branch below and for mid-tick
-        /// <c>IsScheduledForRemove</c> callers.
+        /// _entitiesRemoved continues to track managed-side per-entity removes
+        /// (queued via <see cref="QueueRemoveOperation"/>) for the cross-source
+        /// dedup branch below and for mid-tick <c>IsScheduledForRemove</c>
+        /// callers. Whole-group removals (<see cref="QueueRemoveAllInGroup"/>)
+        /// are tracked separately via the per-group full-removal markers and do
+        /// not touch this set.
         /// </para>
         /// </summary>
         public void QueueNativeRemoveOperations(
@@ -364,6 +361,13 @@ namespace Trecs.Internal
             return _thisSubmissionInfo.AnyOperationQueued();
         }
 
+        // Swaps the double-buffered Info and applies this submission's moves +
+        // per-entity removes. Deliberately does NOT clear _lastSubmittedInfo:
+        // the full-group-removal markers it now also holds must survive past
+        // AddEntities so they execute after adds (see ExecuteFullGroupRemovals).
+        // The caller (EntitySubmitter.SingleSubmission) owns the try/finally that
+        // guarantees ClearLastSubmittedInfo runs once all three phases —
+        // moves+removes, adds, full-group removals — have been attempted.
         public void ExecuteRemoveAndSwappingOperations(
             Action<
                 IterableDictionary<GroupIndex, NativeList<MoveInfoEntry>>[],
@@ -376,28 +380,42 @@ namespace Trecs.Internal
         {
             (_thisSubmissionInfo, _lastSubmittedInfo) = (_lastSubmittedInfo, _thisSubmissionInfo);
 
-            try
+            if (_lastSubmittedInfo._entitiesMoved.Count > 0)
             {
-                if (_lastSubmittedInfo._entitiesMoved.Count > 0)
-                {
-                    moveEntities(
-                        _lastSubmittedInfo._currentSwapEntitiesOperations,
-                        _lastSubmittedInfo._entitiesMoved,
-                        ecsRoot
-                    );
-                }
-
-                if (_lastSubmittedInfo._removeCount > 0)
-                {
-                    removeEntities(_lastSubmittedInfo._currentRemoveEntitiesOperations, ecsRoot);
-                }
+                moveEntities(
+                    _lastSubmittedInfo._currentSwapEntitiesOperations,
+                    _lastSubmittedInfo._entitiesMoved,
+                    ecsRoot
+                );
             }
-            finally
+
+            if (_lastSubmittedInfo._removeCount > 0)
             {
-                using (TrecsProfiling.Start("Clear Submitted Info"))
-                {
-                    _lastSubmittedInfo.Clear();
-                }
+                removeEntities(_lastSubmittedInfo._currentRemoveEntitiesOperations, ecsRoot);
+            }
+        }
+
+        // Final phase of a SingleSubmission: execute any whole-group removals
+        // queued via QueueRemoveAllInGroup. Runs after AddEntities so entities
+        // added into a bulk-removed group this submit still fire OnAdded first.
+        // Callbacks fired here queue into the (already swapped) _thisSubmissionInfo
+        // and so are processed in the next cascade iteration.
+        public void ExecuteFullGroupRemovals(
+            Action<bool[], EntitySubmitter> fullGroupRemoveEntities,
+            EntitySubmitter ecsRoot
+        )
+        {
+            if (_lastSubmittedInfo._fullGroupRemovalCount > 0)
+            {
+                fullGroupRemoveEntities(_lastSubmittedInfo._fullGroupRemoval, ecsRoot);
+            }
+        }
+
+        public void ClearLastSubmittedInfo()
+        {
+            using (TrecsProfiling.Start("Clear Submitted Info"))
+            {
+                _lastSubmittedInfo.Clear();
             }
         }
 
@@ -455,10 +473,17 @@ namespace Trecs.Internal
 
             internal int _removeCount;
 
+            // Per-group "remove this group's entire contents" markers, indexed by
+            // GroupIndex.Index. Set O(1) by QueueRemoveAllInGroup; the live count
+            // is read at execute time. _fullGroupRemovalCount mirrors the number
+            // of set flags so AnyOperationQueued / Clear can early-out cheaply.
+            internal bool[] _fullGroupRemoval;
+            internal int _fullGroupRemovalCount;
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal bool AnyOperationQueued()
             {
-                return _entitiesMoved.Count > 0 || _removeCount > 0;
+                return _entitiesMoved.Count > 0 || _removeCount > 0 || _fullGroupRemovalCount > 0;
             }
 
             internal void Clear()
@@ -481,6 +506,12 @@ namespace Trecs.Internal
                     _currentRemoveEntitiesOperations[i]?.Clear();
                 }
 
+                if (_fullGroupRemovalCount > 0)
+                {
+                    Array.Clear(_fullGroupRemoval, 0, _fullGroupRemoval.Length);
+                    _fullGroupRemovalCount = 0;
+                }
+
                 _entitiesMoved.Recycle();
                 _entitiesRemoved.Recycle();
                 _removeCount = 0;
@@ -501,12 +532,14 @@ namespace Trecs.Internal
                 >[groupCount];
                 _moveListPool = new List<NativeList<MoveInfoEntry>>();
                 _currentRemoveEntitiesOperations = new List<int>[groupCount];
+                _fullGroupRemoval = new bool[groupCount];
+                _fullGroupRemovalCount = 0;
             }
         }
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct MoveInfo
+    internal struct MoveInfo
     {
         public int ToIndex;
 
@@ -518,21 +551,21 @@ namespace Trecs.Internal
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct MoveInfoEntry
+    internal struct MoveInfoEntry
     {
         public int EntityIndex;
         public MoveInfo Info;
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct RemovalEntry
+    internal struct RemovalEntry
     {
         public EntityIndex EntityIndex;
         public int AccessorId;
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct SwapEntry
+    internal struct SwapEntry
     {
         public EntityIndex EntityIndex;
         public GroupIndex ToGroup;
@@ -540,7 +573,7 @@ namespace Trecs.Internal
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct NativeTagOp
+    internal struct NativeTagOp
     {
         public int AccessorId;
         public EntityIndex EntityIndex;

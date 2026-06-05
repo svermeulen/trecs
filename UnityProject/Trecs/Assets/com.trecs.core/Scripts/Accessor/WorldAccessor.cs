@@ -331,6 +331,22 @@ namespace Trecs
         /// </summary>
         public WorldInfo WorldInfo => _worldInfo;
 
+        /// <summary>
+        /// Whether the owning <see cref="World"/> has been disposed. An accessor
+        /// must not be used after its world is disposed — this is a convenience
+        /// for long-lived non-system holders (debug tooling, event callbacks)
+        /// that may outlive the world.
+        /// </summary>
+        public bool WorldIsDisposed => _world.IsDisposed;
+
+        /// <summary>
+        /// The owning <see cref="World"/>'s optional human-readable name
+        /// (<see cref="World.DebugName"/>). Null unless assigned by the
+        /// application at setup. Distinct from <see cref="DebugName"/>, which
+        /// names this accessor.
+        /// </summary>
+        public string WorldDebugName => _world.DebugName;
+
         /// <summary>Whether there are any outstanding jobs that haven't completed yet.</summary>
         public bool HasOutstandingJobs => JobScheduler.HasOutstandingJobs;
 
@@ -498,21 +514,9 @@ namespace Trecs
             return JobScheduler.SyncMainThread(ResourceId.Component(TypeId<T>.Value), group);
         }
 
-        /// <summary>
-        /// Forces immediate processing of all deferred structural changes (adds, removes, moves).
-        /// Normally submission happens automatically between system phases; call this only when
-        /// you need entities to be visible before the next automatic submission point.
-        /// Cannot be called during system execution.
-        /// </summary>
-        public void Submit()
-        {
-            TrecsDebugAssert.That(
-                !_systemRunner.IsExecutingSystems,
-                "WorldAccessor accessor {0} cannot submit entities during system execution",
-                DebugName
-            );
-            _world.Submit();
-        }
+        // No Submit() here on purpose: submission is a host concern (it cannot run
+        // during system execution, which is when accessors are primarily in hand),
+        // so the manual entry point is World.Submit() only.
 
         /// <summary>
         /// Schedules moving the entity to the partition where the dimension containing
@@ -571,8 +575,7 @@ namespace Trecs
             foreach (var group in groups)
             {
                 AssertCanMakeStructuralChangesToGroup(group);
-                var count = CountEntitiesInGroup(group);
-                _structuralOps.RemoveAllEntitiesInGroup(group, count);
+                _structuralOps.RemoveAllEntitiesInGroup(group);
                 AccessRecorder?.OnEntityRemoved(_debugName, group);
             }
         }
@@ -594,6 +597,51 @@ namespace Trecs
             where T2 : struct, ITag
             where T3 : struct, ITag
             where T4 : struct, ITag => RemoveEntitiesWithTags(TagSet<T1, T2, T3, T4>.Value);
+
+        /// <summary>
+        /// Deferred removal of every entity currently in <paramref name="group"/>.
+        /// Like all structural changes this takes effect at the next submission and
+        /// fires <c>OnRemoved</c> for each removed entity. Uses the whole-group fast
+        /// path internally.
+        /// </summary>
+        public void RemoveAllEntitiesInGroup(GroupIndex group)
+        {
+            AssertCanMakeStructuralChangesToGroup(group);
+            _structuralOps.RemoveAllEntitiesInGroup(group);
+            AccessRecorder?.OnEntityRemoved(_debugName, group);
+        }
+
+        /// <summary>
+        /// Deferred removal of every non-global entity in the world. Takes effect at
+        /// the next submission, firing <c>OnRemoved</c> for each removed entity. The
+        /// global singleton entity is never removed — its lifetime is co-terminus
+        /// with the <see cref="World"/>. Requires an Unrestricted-role accessor
+        /// because it spans every template, including <c>[VariableUpdateOnly]</c>
+        /// ones that a Fixed- or Variable-role accessor could not modify on its own.
+        /// </summary>
+        public void RemoveAllEntities()
+        {
+            TrecsDebugAssert.That(
+                IsUnrestricted,
+                "RemoveAllEntities requires an Unrestricted-role accessor (it spans every "
+                    + "template, including VariableUpdateOnly ones). Accessor {0} has role {1}.",
+                _debugName,
+                _role
+            );
+
+            var globalGroup = _worldInfo.GlobalGroup;
+            var allGroups = _worldInfo.AllGroups;
+            for (int i = 0; i < allGroups.Count; i++)
+            {
+                var group = allGroups[i];
+                if (group == globalGroup)
+                {
+                    continue;
+                }
+                _structuralOps.RemoveAllEntitiesInGroup(group);
+                AccessRecorder?.OnEntityRemoved(_debugName, group);
+            }
+        }
 
         internal void RemoveEntity(EntityHandle entityHandle)
         {
@@ -691,11 +739,20 @@ namespace Trecs
             where T4 : struct, ITag =>
             AddEntity(TagSet<T1, T2, T3, T4>.Value, callerFile, callerLine);
 
+        /// <summary>
+        /// Returns the number of live entities in a single archetype group. Cheaper than
+        /// <see cref="CountAllEntities"/> when you only care about one group.
+        /// </summary>
         public int CountEntitiesInGroup(GroupIndex group)
         {
             return _entitiesDb.CountEntitiesInGroup(group);
         }
 
+        /// <summary>
+        /// Returns the total number of live entities across every archetype group in the world,
+        /// including the global (singleton) entity. Iterates all groups, so prefer
+        /// <see cref="CountEntitiesInGroup"/> when a single group's count is sufficient.
+        /// </summary>
         public int CountAllEntities()
         {
             int total = 0;
@@ -828,6 +885,11 @@ namespace Trecs
             return Component<T>(_worldInfo.GlobalEntityIndex);
         }
 
+        /// <summary>
+        /// Starts a fluent entity query against this world. Chain the returned
+        /// <see cref="QueryBuilder"/> (e.g. <c>WithTags</c>, aspect filters) to narrow the
+        /// result set, then enumerate the matching entities.
+        /// </summary>
         public QueryBuilder Query()
         {
             return new QueryBuilder(this);
@@ -883,7 +945,24 @@ namespace Trecs
                     : 0f;
             }
 
-            return _structuralOps.GetNativeWorldAccessor(Id, CanMutateSimulation, dt, et);
+            // Frame mirrors the phase-aware WorldAccessor.Frame: VariableFrame only
+            // crosses into a job scheduled from the variable phase. Fixed-phase and
+            // phase-less (Unrestricted) accessors get the deterministic FixedFrame so
+            // a job never reads the non-deterministic variable counter behind a Fixed
+            // accessor's back. FixedFrame is always exposed since it has no phase gate.
+            var frame =
+                phase == PhaseDefault.Variable
+                    ? _systemRunner.VariableFrame
+                    : _systemRunner.FixedFrame;
+
+            var tickInfo = new NativeWorldTickInfo(
+                deltaTime: dt,
+                elapsedTime: et,
+                frame: frame,
+                fixedFrame: _systemRunner.FixedFrame
+            );
+
+            return _structuralOps.GetNativeWorldAccessor(Id, CanMutateSimulation, tickInfo);
         }
 
         /// <summary>
@@ -1333,24 +1412,9 @@ namespace Trecs
             return _structuralOps.GetSet(setId);
         }
 
-        internal EntityHandleMap GetEntityHandleMap()
-        {
-            return _entitiesDb.GetEntityHandleMap();
-        }
-
         internal NativeEntityHandleBuffer GetEntityHandleBufferForJobScheduling(GroupIndex group)
         {
-            var handleMap = GetEntityHandleMap();
-            var groupList = handleMap._entityIndexToReferenceMap[group.Index];
-            if (!groupList.IsCreated)
-                return default;
-            unsafe
-            {
-                return new NativeEntityHandleBuffer(
-                    new NativeBuffer<int>(groupList.Ptr, groupList.Length),
-                    NativeBuffer<EntityHandleMapElement>.FromNativeList(handleMap._entityHandleMap)
-                );
-            }
+            return _entitiesDb._entityLocator.GetHandleBufferForJobScheduling(group);
         }
 
         internal NativeComponentLookupRead<T> CreateNativeComponentLookupRead<T>(
@@ -1490,6 +1554,17 @@ namespace Trecs
             return _systemEnableState.IsSystemEffectivelyEnabled(systemIndex);
         }
 
+        /// <summary>
+        /// Installs (or removes, if <c>null</c>) an <see cref="IAccessRecorder"/>
+        /// that the world hands to every accessor — current and future. Intended
+        /// for editor / debug tooling that wants per-system read/write and
+        /// add/remove/move maps. Pass <c>null</c> to detach.
+        /// </summary>
+        public void SetAccessRecorder(IAccessRecorder recorder)
+        {
+            _world.SetAccessRecorder(recorder);
+        }
+
         // ── Heap properties ─────────────────────────────────────────
         // Formerly on HeapAccessor; folded in so pointer types can take
         // WorldAccessor directly without an intermediate accessor class.
@@ -1501,12 +1576,32 @@ namespace Trecs
         internal SharedHeap SharedHeap => _heapAllocator.SharedHeap;
 
         /// <summary>
-        /// The world's shared <see cref="Trecs.BlobCache"/>. Most game code reaches the
-        /// cache through <see cref="SharedPtr{T}"/> / <see cref="NativeSharedPtr{T}"/>;
-        /// this accessor is for code that needs to talk to the cache directly — async
-        /// preload, non-ECS anchoring.
+        /// The world's shared <see cref="Trecs.BlobCache"/>. Framework-internal: game code
+        /// reaches the cache through the pointer types — <see cref="SharedPtr{T}"/> /
+        /// <see cref="NativeSharedPtr{T}"/> for refcounted references, or <see cref="SharedAnchor{T}"/>
+        /// (via its <see cref="WorldAccessor"/> overloads) for lower-level non-ECS anchoring —
+        /// none of which require naming the cache directly.
         /// </summary>
-        public BlobCache BlobCache => _heapAllocator.SharedHeap.BlobCache;
+        internal BlobCache BlobCache => _heapAllocator.SharedHeap.BlobCache;
+
+        // Per-world blob source / descriptor registration + materialization authority.
+        internal BlobFactory BlobFactory => _world.BlobFactory;
+
+        // Blob sources / descriptor builders are fixed setup state: they must be registered before
+        // the world starts ticking, so the same id→source mapping exists deterministically on every
+        // peer when simulation code later acquires it. (Descriptor interning and snapshot
+        // journal-restore add per-id sources at runtime through internal paths, which don't go
+        // through the public Register methods and so are unaffected.)
+        [Conditional("DEBUG")]
+        internal void AssertBlobRegistrationOpen()
+        {
+            TrecsDebugAssert.That(
+                !_world.IsBlobRegistrationSealed,
+                "Blob registration must happen during setup, before the world starts ticking. "
+                    + "Register sources / descriptor builders at world construction or Initialize, "
+                    + "not from a running system."
+            );
+        }
 
         internal NativeSharedHeap NativeSharedHeap => _heapAllocator.NativeSharedHeap;
 
@@ -1597,6 +1692,34 @@ namespace Trecs
             TrecsDebugAssert.That(
                 IsUnrestricted || IsInput,
                 "Attempted to use input-only functionality from a non-Input accessor {0}",
+                _debugName
+            );
+        }
+
+        // The mirror image of AssertCanMutateHeap: anchors (SharedAnchor / NativeSharedAnchor) are
+        // *ambient* holds — they pin cache bytes without entering the snapshotted ECS refcount, so
+        // snapshots and replay can never reproduce them. Allowing them from a Fixed-role
+        // (deterministic simulation) accessor would let sim code take a dependency replay cannot
+        // honor. Unrestricted (setup/editor), Variable (rendering, async loaders), and Input
+        // contexts are the intended ambient holders. Gates the entire WorldAccessor anchor surface
+        // — lifecycle (Acquire / TryAcquire / Alloc / Clone / Dispose) AND reads (Get / TryGet /
+        // CanGet / Cast / IsResident): reads are gated too because CanGet/TryGet/IsResident are
+        // residency/handle-liveness probes (non-deterministic state), and sim code has no
+        // legitimate anchor in hand in the first place — it cannot create one, so possessing one
+        // means data crossed a domain boundary outside the input stream. Register keeps its own
+        // registration-window seal instead (setup must register sources).
+        [Conditional("DEBUG")]
+        internal void AssertAmbientAnchorAccess()
+        {
+            AssertHeapMainThread();
+            TrecsDebugAssert.That(
+                !IsFixed,
+                "Cannot use SharedAnchor/NativeSharedAnchor from Fixed-role accessor {0}. Anchors "
+                    + "are ambient holds — invisible to snapshots and replay — so deterministic "
+                    + "simulation code must not hold, observe, create, or release them. From "
+                    + "simulation, use SharedPtr/NativeSharedPtr (a snapshotted ECS refcount), or "
+                    + "receive the data through the input stream and convert the in-hand payload "
+                    + "(SharedPtr.Acquire(world, inputPtr)).",
                 _debugName
             );
         }
@@ -1772,7 +1895,7 @@ namespace Trecs.Internal // Unsupported internal APIs
     public static class WorldAccessorBaseExtensions
     {
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ref NativeHeapResolver GetNativeHeapResolver(this WorldAccessor world)
+        internal static ref NativeHeapResolver GetNativeHeapResolver(this WorldAccessor world)
         {
             return ref world.NativeHeapResolver;
         }
@@ -1784,7 +1907,7 @@ namespace Trecs.Internal // Unsupported internal APIs
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntitySubmitter GetEntitySubmitter(this WorldAccessor world)
+        internal static EntitySubmitter GetEntitySubmitter(this WorldAccessor world)
         {
             return world.World.GetEntitySubmitter();
         }

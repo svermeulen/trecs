@@ -42,7 +42,12 @@ namespace Trecs.Samples.ReactiveEvents
                 }
             );
 
-            var observer = new GameStatsUpdater(world);
+            // GameStatsUpdater is a non-system observer that disposes its own
+            // subscriptions via World.Events.OnShutdown, so it deliberately does
+            // NOT go in the disposables list below — disposing it before
+            // world.Dispose() would unsubscribe it before the final OnRemoved
+            // cleanup pass runs. (The world's events keep it alive.)
+            new GameStatsUpdater(world);
 
             world.AddSystem(new TextDisplaySystem(StatusText));
 
@@ -51,7 +56,7 @@ namespace Trecs.Samples.ReactiveEvents
             initializables = new() { world.Initialize, sceneInitializer.Initialize };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { observer.Dispose, goManager.Dispose, world.Dispose };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
     }
 }

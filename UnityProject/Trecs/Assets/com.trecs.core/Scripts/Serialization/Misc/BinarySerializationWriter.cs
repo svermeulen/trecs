@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.IO;
 using System.Text;
 using Trecs.Internal;
 
@@ -11,21 +10,21 @@ namespace Trecs
     {
         static readonly TrecsLog _log = TrecsLog.Default;
 
-        // Initial capacity for the data buffer. Sized to keep small payloads
-        // (single-frame inputs, header probes) in a single allocation while
-        // still letting ArrayBufferWriter geometrically grow for large
-        // snapshots without a slow ramp from the default 256-byte start.
-        const int InitialDataBufferCapacity = 4 * 1024;
-
         readonly SerializerRegistry _serializerManager;
 
-        // Data section (post-header, post-bit-fields) is accumulated into an
-        // ArrayBufferWriter<byte> so Complete() can flush the bytes via a
-        // single span write into the outer stream. All per-call writes
-        // (strings, bytes, type ids) go directly into this buffer without
-        // a BinaryWriter/Stream intermediary.
-        readonly ArrayBufferWriter<byte> _dataBuffer;
+        // The writer serializes directly into the two buffers of a caller-supplied
+        // SerializationData: the data section (strings, bytes, type ids, blits) and — via
+        // _bitWriter — the packed bit-field section. _active points at the instance the current
+        // write targets (the one passed to Start) and is null when no write is in progress;
+        // Complete releases it so the writer owns no buffer and holds no reference to a now
+        // caller-owned (potentially retained) instance. The caller reads the finished payload
+        // back from the instance it passed to Start.
+        SerializationData _active;
         readonly BitWriter _bitWriter = new();
+
+        // The data section ArrayBufferWriter of the currently-active SerializationData. All
+        // per-call data writes go through here.
+        ArrayBufferWriter<byte> _dataBuffer => _active.DataWriter;
 #if TRECS_INTERNAL_CHECKS && DEBUG
         readonly SerializationMemoryTracker _memoryTracker = new();
 #endif
@@ -37,7 +36,6 @@ namespace Trecs
         public BinarySerializationWriter(SerializerRegistry serializerManager)
         {
             _serializerManager = serializerManager;
-            _dataBuffer = new ArrayBufferWriter<byte>(InitialDataBufferCapacity);
         }
 
         public long Flags
@@ -82,13 +80,26 @@ namespace Trecs
 #endif
         }
 
+        /// <summary>
+        /// Begin a write that serializes directly into <paramref name="target"/>, so the
+        /// finished payload IS <paramref name="target"/> rather than a copy of it. The target is
+        /// cleared first. Pair with <see cref="Complete"/>, after which the caller reads the
+        /// payload back from <paramref name="target"/> (e.g.
+        /// <see cref="SerializationData.WriteContiguousTo(System.IO.Stream)"/>,
+        /// <see cref="SerializationData.CopyContiguousTo"/>,
+        /// <see cref="SerializationData.ComputeContiguousChecksum"/>) and emits / retains it.
+        /// </summary>
         public void Start(
+            SerializationData target,
             int version,
             bool includeTypeChecks,
             long flags = 0,
             bool enableMemoryTracking = false
         )
         {
+            if (target == null)
+                throw new ArgumentNullException(nameof(target));
+
             using var _ = TrecsProfiling.Start("SerializationWriter.Start");
 
             TrecsDebugAssert.That(!_hasStarted);
@@ -106,8 +117,9 @@ namespace Trecs
             _flags = flags;
             _includeTypeChecks = includeTypeChecks;
             _version = version;
-            _dataBuffer.Clear();
-            _bitWriter.Reset();
+            _active = target;
+            _active.Clear();
+            _bitWriter.Start(_active.BitFieldsWriter);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.Reset(enableMemoryTracking);
@@ -281,83 +293,45 @@ namespace Trecs
             }
         }
 
-        public void Complete(Stream outputStream)
+        /// <summary>
+        /// Finalize the write: flush the trailing partial bit byte and stamp the header fields
+        /// onto the target <see cref="SerializationData"/>. Performs no copy — the payload was
+        /// written straight into the target. Afterward, read the finished payload back from the
+        /// <see cref="SerializationData"/> you passed to
+        /// <see cref="Start(SerializationData, int, bool, long, bool)"/> and emit / retain /
+        /// checksum it however you like (e.g.
+        /// <see cref="SerializationData.WriteContiguousTo(System.IO.Stream)"/>,
+        /// <see cref="SerializationData.CopyContiguousTo"/>,
+        /// <see cref="SerializationData.ComputeContiguousChecksum"/>).
+        /// </summary>
+        public void Complete()
         {
             TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
 
-            // Track header bytes
-#if TRECS_INTERNAL_CHECKS && DEBUG
-            long headerStartPos = outputStream.Position;
-#endif
-            SerializationHeaderUtil.WriteHeader(outputStream, _version, _flags, _includeTypeChecks);
-#if TRECS_INTERNAL_CHECKS && DEBUG
-            _memoryTracker.TrackHeaderBytes(
-                (int)(outputStream.Position - headerStartPos),
-                "Version/Flags"
-            );
-#endif
+            _bitWriter.Complete();
+            _active.Version = _version;
+            _active.Flags = _flags;
+            _active.IncludeTypeChecks = _includeTypeChecks;
+            _active.BitFieldBitCount = _bitWriter.BitCount;
 
-            _log.Trace("Writing bit fields starting at byte {0}", outputStream.Position);
+            // The header / bit-field-prefix / sentinel bytes are synthesized only when the
+            // contiguous form is emitted (they are not stored in the section buffers), so record
+            // their sizes here to keep the memory report's overhead accounting complete. The
+            // per-field data bytes are already tracked during Write*.
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long bitFieldStartPos = outputStream.Position;
-#endif
-            _bitWriter.Complete(outputStream);
-#if TRECS_INTERNAL_CHECKS && DEBUG
+            _memoryTracker.TrackHeaderBytes(SerializationHeaderUtil.Size, "Version/Flags");
             _memoryTracker.TrackHeaderBytes(
-                (int)(outputStream.Position - bitFieldStartPos),
+                sizeof(int) * 2 + _active.BitFieldBytes.Length,
                 "BitFields"
             );
+            _memoryTracker.TrackHeaderBytes(1, "Sentinel");
 #endif
-            _log.Trace("Completed writing bit fields at byte {0}", outputStream.Position);
 
-            outputStream.Write(_dataBuffer.WrittenSpan);
-            _log.Trace("Completed writing data buffer at byte {0}", outputStream.Position);
-
-#if TRECS_INTERNAL_CHECKS && DEBUG
-            long sentinelStartPos = outputStream.Position;
-#endif
-            outputStream.WriteByte(SerializationConstants.EndOfPayloadMarker);
-#if TRECS_INTERNAL_CHECKS && DEBUG
-            _memoryTracker.TrackHeaderBytes(
-                (int)(outputStream.Position - sentinelStartPos),
-                "Sentinel"
-            );
-#endif
-            _log.Trace("Wrote sentinel value at byte {0}", outputStream.Position);
-        }
-
-        public int ComputeOutputSize()
-        {
-            TrecsDebugAssert.That(_hasStarted);
-            return SerializationHeaderUtil.Size
-                + _bitWriter.ComputeOutputSize()
-                + _dataBuffer.WrittenCount
-                + 1;
-        }
-
-        public void CompleteTo(byte[] buffer)
-        {
-            TrecsDebugAssert.That(_hasStarted);
-            _hasStarted = false;
-
-            int offset = 0;
-            SerializationHeaderUtil.WriteHeader(
-                new Span<byte>(buffer, 0, SerializationHeaderUtil.Size),
-                _version,
-                _flags,
-                _includeTypeChecks
-            );
-            offset += SerializationHeaderUtil.Size;
-
-            _bitWriter.CompleteTo(buffer, ref offset);
-
-            _dataBuffer.WrittenSpan.CopyTo(
-                new Span<byte>(buffer, offset, _dataBuffer.WrittenCount)
-            );
-            offset += _dataBuffer.WrittenCount;
-
-            buffer[offset] = SerializationConstants.EndOfPayloadMarker;
+            // Release the target: the writer owns no buffer and must hold no reference to a now
+            // caller-owned (potentially retained) instance that a later ResetForErrorRecovery
+            // could clear out from under the caller.
+            _active = null;
         }
 
         public void ResetForErrorRecovery()
@@ -366,7 +340,9 @@ namespace Trecs
             _flags = 0;
             _version = 0;
             _includeTypeChecks = false;
-            _dataBuffer.Clear();
+            // Clears both the data and bit-field sections of the active instance (the owned
+            // default, or a caller's target which it will then discard/despawn).
+            _active?.Clear();
             _bitWriter.ResetForErrorRecovery();
         }
 

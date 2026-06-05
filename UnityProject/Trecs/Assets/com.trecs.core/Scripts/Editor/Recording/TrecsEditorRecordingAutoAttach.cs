@@ -31,11 +31,6 @@ namespace Trecs.Internal
             public TrecsRewindBuffer Recorder;
             public TrecsRecordingSession Session;
             public TrecsSnapshotLibrary SnapshotLibrary;
-
-            // SnapshotSerializer is IDisposable; we own the instance here so
-            // we have to dispose it on detach. WorldStateSerializer is not
-            // IDisposable so it doesn't need tracking.
-            public SnapshotSerializer Snapshots;
         }
 
         /// <summary>
@@ -95,7 +90,6 @@ namespace Trecs.Internal
             {
                 attached.Session.Dispose();
                 attached.Recorder.Dispose();
-                attached.Snapshots.Dispose();
             }
             _attached.Clear();
         }
@@ -112,17 +106,18 @@ namespace Trecs.Internal
             SnapshotSerializer snapshots = null;
             TrecsRewindBuffer recorder = null;
             TrecsRecordingSession session = null;
+            OpaqueBlobPersistence opaqueBlobs = null;
             try
             {
-                var pool = new SnapshotPayloadPool();
-                snapshots = new SnapshotSerializer(stateSerializer, registry, world, pool);
+                snapshots = new SnapshotSerializer(world, registry, stateSerializer);
+                opaqueBlobs = new OpaqueBlobPersistence(registry, world.GetBlobCache());
                 recorder = new TrecsRewindBuffer(
                     world,
                     stateSerializer,
                     registry,
                     new TrecsRewindBufferSettings(),
                     snapshots,
-                    pool
+                    opaqueBlobs
                 );
                 // Constructor fires TrecsRecordingSessionRegistry.ControllerRegistered,
                 // which TrecsGameStateActivator listens to so that auto-record-on-open
@@ -144,24 +139,18 @@ namespace Trecs.Internal
                     recorder?.Dispose();
                 }
                 catch { }
-                try
-                {
-                    snapshots?.Dispose();
-                }
-                catch { }
                 _log.Error("Failed to auto-attach Trecs Player to world {0}: {1}", world, e);
                 return;
             }
             // SnapshotLibrary depends on a fully-constructed session (it
             // calls Stop/Start on it during LoadSnapshot), so construct it
             // last. Stateless apart from its dependency refs.
-            var snapshotLibrary = new TrecsSnapshotLibrary(world, snapshots, session);
+            var snapshotLibrary = new TrecsSnapshotLibrary(world, snapshots, opaqueBlobs, session);
             _attached[world] = new AttachedSet
             {
                 Recorder = recorder,
                 Session = session,
                 SnapshotLibrary = snapshotLibrary,
-                Snapshots = snapshots,
             };
             _log.Trace("Auto-attached Trecs Player to world {0}", world);
         }
@@ -175,7 +164,6 @@ namespace Trecs.Internal
             _attached.Remove(world);
             attached.Session.Dispose();
             attached.Recorder.Dispose();
-            attached.Snapshots.Dispose();
             _log.Trace("Auto-detached Trecs Player from world {0}", world);
         }
     }

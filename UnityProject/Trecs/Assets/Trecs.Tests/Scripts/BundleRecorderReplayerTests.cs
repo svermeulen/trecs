@@ -44,17 +44,16 @@ namespace Trecs.Tests
             // immediate Stop (no intervening fixed updates).
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var pool = new SnapshotPayloadPool();
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
             var settings = new BundleRecorderSettings
             {
                 Version = Version,
-                AnchorIntervalSeconds = 1000f,
+                KeyframeIntervalSeconds = 1000f,
             };
             using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
             recorder.Start();
@@ -88,22 +87,21 @@ namespace Trecs.Tests
         {
             // Start → Stop with zero stepped frames produces a bundle whose
             // start frame == end frame, with one initial snapshot and zero
-            // anchors / snapshots. The Checksums dict still contains the
+            // keyframes / snapshots. The Checksums dict still contains the
             // start-frame entry (recorded by Start so playback can verify
             // post-LoadInitialState matches).
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var pool = new SnapshotPayloadPool();
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
             var settings = new BundleRecorderSettings
             {
                 Version = Version,
-                AnchorIntervalSeconds = 1000f,
+                KeyframeIntervalSeconds = 1000f,
             };
             using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
 
@@ -118,68 +116,71 @@ namespace Trecs.Tests
             );
             NAssert.AreEqual(startFrame, bundle.Header.StartFixedFrame);
             NAssert.Greater(bundle.InitialSnapshot.Length, 0);
-            NAssert.AreEqual(0, bundle.Anchors.Count, "Should have no anchors");
+            NAssert.AreEqual(0, bundle.Keyframes.Count, "Should have no keyframes");
             NAssert.AreEqual(0, bundle.Bookmarks.Count, "Should have no bookmarks");
         }
 
         [Test]
-        public void Recorder_CapturesAnchorsAtConfiguredCadence()
+        public void Recorder_CapturesKeyframesAtConfiguredCadence()
         {
-            // BundleRecorder anchors fire when (frame - lastAnchorFrame) *
-            // fixedDeltaTime >= AnchorIntervalSeconds. Default fixedDeltaTime
+            // BundleRecorder keyframes fire when (frame - lastKeyframeFrame) *
+            // fixedDeltaTime >= KeyframeIntervalSeconds. Default fixedDeltaTime
             // is 1/60s, so an interval of 3 frames * (1/60) = 0.05s should
-            // yield ~3 anchors over 10 stepped frames.
+            // yield ~3 keyframes over 10 stepped frames.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var pool = new SnapshotPayloadPool();
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
             var settings = new BundleRecorderSettings
             {
                 Version = Version,
-                AnchorIntervalSeconds = 3f / 60f, // every 3 fixed frames
+                KeyframeIntervalSeconds = 3f / 60f, // every 3 fixed frames
             };
             using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
             recorder.Start();
 
-            // Unlike TrecsRewindBuffer there is no forced first anchor — the
-            // first cadence-driven anchor lands once the elapsed time crosses
+            // Unlike TrecsRewindBuffer there is no forced first keyframe — the
+            // first cadence-driven keyframe lands once the elapsed time crosses
             // the interval.
-            NAssert.AreEqual(0, recorder.Anchors.Count, "No anchors before any frames have ticked");
+            NAssert.AreEqual(
+                0,
+                recorder.Keyframes.Count,
+                "No keyframes before any frames have ticked"
+            );
 
             env.StepFixedFrames(10);
 
-            // Cadence: anchors at frames startFrame+3, +6, +9 → at least 3.
+            // Cadence: keyframes at frames startFrame+3, +6, +9 → at least 3.
             NAssert.GreaterOrEqual(
-                recorder.Anchors.Count,
+                recorder.Keyframes.Count,
                 3,
-                "Anchor cadence should produce multiple anchors over 10 frames at 3-frame cadence"
+                "Keyframe cadence should produce multiple keyframes over 10 frames at 3-frame cadence"
             );
 
-            // Anchors should be strictly increasing in frame.
-            for (int i = 1; i < recorder.Anchors.Count; i++)
+            // Keyframes should be strictly increasing in frame.
+            for (int i = 1; i < recorder.Keyframes.Count; i++)
             {
                 NAssert.Less(
-                    recorder.Anchors[i - 1].FixedFrame,
-                    recorder.Anchors[i].FixedFrame,
-                    $"Anchor[{i - 1}].FixedFrame should be < Anchor[{i}].FixedFrame"
+                    recorder.Keyframes[i - 1].FixedFrame,
+                    recorder.Keyframes[i].FixedFrame,
+                    $"Keyframe[{i - 1}].FixedFrame should be < Keyframe[{i}].FixedFrame"
                 );
             }
 
-            // Adjacent anchors should be spaced by at least the configured
+            // Adjacent keyframes should be spaced by at least the configured
             // cadence (in frames).
             const int minFrameGap = 3;
-            for (int i = 1; i < recorder.Anchors.Count; i++)
+            for (int i = 1; i < recorder.Keyframes.Count; i++)
             {
-                var gap = recorder.Anchors[i].FixedFrame - recorder.Anchors[i - 1].FixedFrame;
+                var gap = recorder.Keyframes[i].FixedFrame - recorder.Keyframes[i - 1].FixedFrame;
                 NAssert.GreaterOrEqual(
                     gap,
                     minFrameGap,
-                    $"Anchor gap at index {i} should be >= {minFrameGap} frames"
+                    $"Keyframe gap at index {i} should be >= {minFrameGap} frames"
                 );
             }
         }
@@ -191,15 +192,13 @@ namespace Trecs.Tests
             // hard error — there's nothing to restore the world from.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var pool = new SnapshotPayloadPool();
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
             using var replayer = new BundleReplayer(env.World, registry, snapshots);
-            replayer.Initialize();
 
             // Empty payload → reject. ReadOnlyMemory<byte> is a struct with no
             // null state; default-valued (== Empty) and explicit Array.Empty
@@ -209,7 +208,7 @@ namespace Trecs.Tests
                 Header = MakeHeader(startFrame: 0, endFrame: 10),
                 InputQueue = Array.Empty<byte>(),
                 Checksums = new IterableDictionary<int, ulong>(),
-                Anchors = Array.Empty<WorldSnapshot>(),
+                Keyframes = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
             NAssert.Throws<InvalidOperationException>(() => replayer.Start(defaultBundle));
@@ -220,7 +219,7 @@ namespace Trecs.Tests
                 InitialSnapshot = Array.Empty<byte>(),
                 InputQueue = Array.Empty<byte>(),
                 Checksums = new IterableDictionary<int, ulong>(),
-                Anchors = Array.Empty<WorldSnapshot>(),
+                Keyframes = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
             NAssert.Throws<InvalidOperationException>(() => replayer.Start(emptyBundle));
@@ -257,17 +256,16 @@ namespace Trecs.Tests
                 TestTemplates.SimpleAlpha
             );
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            env.Accessor.Submit();
+            env.Accessor.World.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var pool = new SnapshotPayloadPool();
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
+            var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
             var settings = new BundleRecorderSettings
             {
                 Version = Version,
-                AnchorIntervalSeconds = 1000f,
+                KeyframeIntervalSeconds = 1000f,
             };
 
             // Produce a valid bundle via the recorder so InitialSnapshot is
@@ -301,12 +299,11 @@ namespace Trecs.Tests
                 InitialSnapshot = goodBundle.InitialSnapshot,
                 InputQueue = goodBundle.InputQueue,
                 Checksums = poisonedChecksums,
-                Anchors = goodBundle.Anchors,
+                Keyframes = goodBundle.Keyframes,
                 Bookmarks = goodBundle.Bookmarks,
             };
 
             using var replayer = new BundleReplayer(env.World, registry, snapshots);
-            replayer.Initialize();
 
             // Snapshot input-phase enabled state before the failed Start so
             // we can assert SetInputSystemsEnabled(false) didn't leak. The
@@ -410,17 +407,11 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var pool = new SnapshotPayloadPool();
-                using var snapshots = new SnapshotSerializer(
-                    worldStateSer,
-                    registry,
-                    env.World,
-                    pool
-                );
+                var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
                 var settings = new BundleRecorderSettings
                 {
                     Version = Version,
-                    AnchorIntervalSeconds = 1000f,
+                    KeyframeIntervalSeconds = 1000f,
                     // Recorder's own cadence is irrelevant — we manually
                     // capture every other frame below.
                 };
@@ -454,7 +445,7 @@ namespace Trecs.Tests
                     bundle.Checksums[kv.Key] = kv.Value;
                 }
 
-                using var bundleSer = new RecordingBundleSerializer(registry);
+                var bundleSer = new RecordingBundleSerializer(registry);
                 using var stream = new MemoryStream();
                 bundleSer.Save(bundle, stream);
                 bundleBytes = stream.ToArray();
@@ -474,16 +465,9 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var pool = new SnapshotPayloadPool();
-                using var snapshots = new SnapshotSerializer(
-                    worldStateSer,
-                    registry,
-                    env.World,
-                    pool
-                );
-                using var bundleSer = new RecordingBundleSerializer(registry);
+                var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+                var bundleSer = new RecordingBundleSerializer(registry);
                 using var replayer = new BundleReplayer(env.World, registry, snapshots);
-                replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
                 var bundle = bundleSer.Load(stream);
@@ -554,17 +538,11 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var pool = new SnapshotPayloadPool();
-                using var snapshots = new SnapshotSerializer(
-                    worldStateSer,
-                    registry,
-                    env.World,
-                    pool
-                );
+                var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
                 var settings = new BundleRecorderSettings
                 {
                     Version = Version,
-                    AnchorIntervalSeconds = 1000f,
+                    KeyframeIntervalSeconds = 1000f,
                 };
                 using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
@@ -586,7 +564,7 @@ namespace Trecs.Tests
                     bundle.Checksums[kv.Key] = kv.Value;
                 }
 
-                using var bundleSer = new RecordingBundleSerializer(registry);
+                var bundleSer = new RecordingBundleSerializer(registry);
                 using var stream = new MemoryStream();
                 bundleSer.Save(bundle, stream);
                 bundleBytes = stream.ToArray();
@@ -605,16 +583,9 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var pool = new SnapshotPayloadPool();
-                using var snapshots = new SnapshotSerializer(
-                    worldStateSer,
-                    registry,
-                    env.World,
-                    pool
-                );
-                using var bundleSer = new RecordingBundleSerializer(registry);
+                var snapshots = new SnapshotSerializer(env.World, registry, worldStateSer);
+                var bundleSer = new RecordingBundleSerializer(registry);
                 using var replayer = new BundleReplayer(env.World, registry, snapshots);
-                replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
                 var bundle = bundleSer.Load(stream);
@@ -639,7 +610,7 @@ namespace Trecs.Tests
                 {
                     env.Accessor.Component<TestInt>(ei).Write.Value = 999999;
                 }
-                env.Accessor.Submit();
+                env.Accessor.World.Submit();
 
                 env.StepFixedFrames(1);
                 replayer.Tick();
@@ -704,7 +675,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat { Value = i * 0.25f })
                     .AssertComplete();
             }
-            a.Submit();
+            a.World.Submit();
         }
     }
 }

@@ -31,7 +31,7 @@ namespace Trecs.Samples.DynamicCollections
             // Unlike unmanaged data, for managed data we need a custom
             // serializer in order to use it in a UniquePtr
             // (unmanaged data can be directly blitted)
-            .RegisterSerializer<QueueSerializer<float3>>();
+            .RegisterSerializer<QueueSerializerUnmanaged<float3>>();
 
             switch (collectionType)
             {

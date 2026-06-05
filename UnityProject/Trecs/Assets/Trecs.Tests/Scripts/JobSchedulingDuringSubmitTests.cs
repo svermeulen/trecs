@@ -25,7 +25,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
 
-            NAssert.Throws<TrecsException>(() => a.Submit());
+            NAssert.Throws<TrecsException>(() => a.World.Submit());
             sub.Dispose();
         }
 
@@ -37,7 +37,7 @@ namespace Trecs.Tests
             var scheduler = env.World.GetSystemRunner().JobScheduler;
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
@@ -51,7 +51,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, group));
 
-            NAssert.Throws<TrecsException>(() => a.Submit());
+            NAssert.Throws<TrecsException>(() => a.World.Submit());
             sub.Dispose();
         }
 
@@ -66,7 +66,7 @@ namespace Trecs.Tests
             var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             a.AddEntity(partitionA).AssertComplete();
-            a.Submit();
+            a.World.Submit();
 
             var sub = a
                 .Events.EntitiesWithTags(partitionB)
@@ -80,7 +80,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
 
-            NAssert.Throws<TrecsException>(() => a.Submit());
+            NAssert.Throws<TrecsException>(() => a.World.Submit());
             sub.Dispose();
         }
 
@@ -106,7 +106,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
 
-            NAssert.Throws<TrecsException>(() => a.Submit());
+            NAssert.Throws<TrecsException>(() => a.World.Submit());
             sub.Dispose();
         }
 
@@ -132,7 +132,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
 
-            NAssert.Throws<TrecsException>(() => a.Submit());
+            NAssert.Throws<TrecsException>(() => a.World.Submit());
             sub.Dispose();
         }
 
@@ -163,7 +163,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
 
-            NAssert.DoesNotThrow(() => a.Submit());
+            NAssert.DoesNotThrow(() => a.World.Submit());
             NAssert.IsTrue(callbackFired);
 
             scheduler.CompleteAllOutstanding();

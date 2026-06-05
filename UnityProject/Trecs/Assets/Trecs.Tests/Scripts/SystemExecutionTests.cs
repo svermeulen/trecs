@@ -123,24 +123,11 @@ namespace Trecs.Tests
     [TestFixture]
     public class SystemExecutionTests
     {
-        TestEnvironment CreateEnvWithSystems(params ISystem[] systems)
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(TestTemplates.SimpleAlpha)
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
-
-            var world = builder.Build();
-
-            foreach (var system in systems)
-            {
-                world.AddSystem(system);
-            }
-
-            world.Initialize();
-            return new TestEnvironment(world);
-        }
+        TestEnvironment CreateEnvWithSystems(params ISystem[] systems) =>
+            EcsTestHelper.CreateEnvironment(
+                configure: b => b.AddSystems(systems),
+                TestTemplates.SimpleAlpha
+            );
 
         [SetUp]
         public void SetUp()
