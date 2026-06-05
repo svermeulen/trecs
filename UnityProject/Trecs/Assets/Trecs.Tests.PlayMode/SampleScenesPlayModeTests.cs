@@ -102,6 +102,9 @@ namespace Trecs.Tests.PlayMode
                 SubsetApproach = subsetApproach,
                 IterationStyle = (IterationStyle)0,
                 Deterministic = deterministic,
+                // Slow CI machines can't run the benchmark at realtime, and the
+                // resulting catch-up warning would fail NoUnexpectedReceived below
+                WarnOnFixedUpdateFallingBehind = false,
             };
 
             try
