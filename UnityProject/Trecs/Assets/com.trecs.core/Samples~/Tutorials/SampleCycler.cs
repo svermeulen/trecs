@@ -211,7 +211,6 @@ namespace Trecs.Samples
 
         // Lazy-initialized styles to avoid allocation in OnGUI hot path
         GUIStyle _titleStyle;
-        GUIStyle _hintStyle;
 
         GUIStyle TitleStyle
         {
@@ -231,19 +230,6 @@ namespace Trecs.Samples
                     _titleStyle.normal.textColor = Color.white;
                 }
                 return _titleStyle;
-            }
-        }
-
-        GUIStyle HintStyle
-        {
-            get
-            {
-                if (_hintStyle == null)
-                {
-                    _hintStyle = new GUIStyle(GUI.skin.label) { fontSize = 13 };
-                    _hintStyle.normal.textColor = new Color(1, 1, 1, 0.5f);
-                }
-                return _hintStyle;
             }
         }
 
