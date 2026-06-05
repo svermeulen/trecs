@@ -45,6 +45,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 SubsetApproach = approach,
                 IterationStyle = current.IterationStyle,
                 Deterministic = current.Deterministic,
+                WarnOnFixedUpdateFallingBehind =
+                    FrenzyCompositionRoot.ActiveConfig?.WarnOnFixedUpdateFallingBehind ?? true,
             };
 
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);

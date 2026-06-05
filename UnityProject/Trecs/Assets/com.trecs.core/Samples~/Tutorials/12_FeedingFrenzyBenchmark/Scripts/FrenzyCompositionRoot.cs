@@ -19,6 +19,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public static FrenzyConfigSettings ConfigOverride;
 
+        // The config the last Construct resolved (inspector Config or ConfigOverride).
+        // Lets SubsetApproachDynamicSwitcher preserve settings that aren't mirrored
+        // in the FrenzyConfig component (e.g. WarnOnFixedUpdateFallingBehind) when
+        // it rebuilds ConfigOverride for a scene reload.
+        public static FrenzyConfigSettings ActiveConfig { get; private set; }
+
         // All we do here is call constructors and set up dependencies
         // between classes.  No initialization logic otherwise
         public override void Construct(
@@ -39,6 +45,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             {
                 config = ConfigOverride;
             }
+
+            ActiveConfig = config;
 
             var fishCountPresets = ComputePresetFishCounts(
                 Settings.Common.MinPresetFishCount,
