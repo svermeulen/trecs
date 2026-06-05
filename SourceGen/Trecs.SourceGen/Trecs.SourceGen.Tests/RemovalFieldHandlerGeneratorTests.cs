@@ -123,11 +123,7 @@ public class RemovalFieldHandlerGeneratorTests
 
         var run = GeneratorTestHarness.Run(new RemovalFieldHandlerGenerator(), source);
 
-        Assert.That(
-            run.GenDiagnostics.Any(d => d.Id == "TRECS134"),
-            Is.True,
-            run.Format()
-        );
+        Assert.That(run.GenDiagnostics.Any(d => d.Id == "TRECS134"), Is.True, run.Format());
     }
 
     [Test]
@@ -146,10 +142,6 @@ public class RemovalFieldHandlerGeneratorTests
 
         var run = GeneratorTestHarness.Run(new RemovalFieldHandlerGenerator(), source);
 
-        Assert.That(
-            run.GenDiagnostics.Any(d => d.Id == "TRECS135"),
-            Is.True,
-            run.Format()
-        );
+        Assert.That(run.GenDiagnostics.Any(d => d.Id == "TRECS135"), Is.True, run.Format());
     }
 }

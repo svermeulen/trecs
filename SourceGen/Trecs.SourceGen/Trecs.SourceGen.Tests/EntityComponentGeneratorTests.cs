@@ -181,12 +181,8 @@ public class EntityComponentGeneratorTests
     {
         // A same-size reorder *inside* a nested struct field changes the parent's
         // layout, so it must change the parent component's hash too.
-        var a =
-            "public Inner V; "
-            + "public struct Inner { public int A; public float B; }";
-        var b =
-            "public Inner V; "
-            + "public struct Inner { public float B; public int A; }";
+        var a = "public Inner V; " + "public struct Inner { public int A; public float B; }";
+        var b = "public Inner V; " + "public struct Inner { public float B; public int A; }";
         Assert.That(LayoutHashFor(a), Is.Not.EqualTo(LayoutHashFor(b)));
     }
 }

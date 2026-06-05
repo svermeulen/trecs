@@ -519,11 +519,7 @@ namespace Trecs.SourceGen.Template
 
         // Ambient cache-pin handle types: never valid inside any component (TRECS137) —
         // their PtrHandle is a live BlobCache handle that does not survive serialization.
-        private static readonly string[] AnchorTypeNames =
-        {
-            "NativeSharedAnchor",
-            "SharedAnchor",
-        };
+        private static readonly string[] AnchorTypeNames = { "NativeSharedAnchor", "SharedAnchor" };
 
         private static bool ValidateInputComponentFieldType(
             IFieldSymbol componentField,
@@ -661,7 +657,8 @@ namespace Trecs.SourceGen.Template
                 if (named.Name == anchorName && named.TypeArguments.Length == 1)
                 {
                     var fieldLoc = componentField.Locations.FirstOrDefault();
-                    var location = fieldLoc != null ? LocationInfo.From(fieldLoc) : fallbackLocation;
+                    var location =
+                        fieldLoc != null ? LocationInfo.From(fieldLoc) : fallbackLocation;
                     reportDiagnostic(
                         DiagnosticInfo.Create(
                             DiagnosticDescriptors.ComponentHasAnchorField,
