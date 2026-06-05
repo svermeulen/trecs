@@ -1,9 +1,11 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
 using System;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using UnityEngine;
-using UnityEngine.SceneManagement;
+#endif
 
 namespace Trecs.Samples
 {
