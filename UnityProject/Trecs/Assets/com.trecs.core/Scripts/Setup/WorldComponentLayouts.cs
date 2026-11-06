@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trecs.Collections;
@@ -64,10 +63,6 @@ namespace Trecs.Internal
         UnsafeHashMap<long, int> _typeIdToCi;
         bool _isDisposed;
 
-        // Cached UnsafeUtility.SizeOf<T>() per Type. Instance-scoped so the entries
-        // are released alongside the world rather than living forever in a static.
-        readonly Dictionary<Type, int> _sizeCache = new();
-
         public NativeArray<NativeTemplateLayoutHeader> Headers => _headers;
         public NativeArray<NativeComponentLayoutEntry> Entries => _entries;
         public NativeArray<byte> DefaultBytes => _defaultBytes;
@@ -96,7 +91,7 @@ namespace Trecs.Internal
                 totalEntries += decls.Count;
                 for (int ci = 0; ci < decls.Count; ci++)
                 {
-                    totalDefaultBytes += GetUnmanagedSize(decls[ci].ComponentType);
+                    totalDefaultBytes += UnsafeUtility.SizeOf(decls[ci].ComponentType);
                 }
             }
 
@@ -133,8 +128,8 @@ namespace Trecs.Internal
                     for (int ci = 0; ci < decls.Count; ci++)
                     {
                         var decl = decls[ci];
-                        int size = GetUnmanagedSize(decl.ComponentType);
-                        int typeIdValue = TypeIdForComponent(decl.ComponentType).Value;
+                        int size = UnsafeUtility.SizeOf(decl.ComponentType);
+                        int typeIdValue = TypeId.FromType(decl.ComponentType).Value;
                         _entries[entryCursor++] = new NativeComponentLayoutEntry
                         {
                             TypeIdValue = typeIdValue,
@@ -174,39 +169,6 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long MakeKey(int groupIndex, int typeIdValue) =>
             ((long)groupIndex << 32) | (uint)typeIdValue;
-
-        // Resolve TypeId for a component type via the registered ComponentTypeId<T>.Value path.
-        // Uses reflection — only called at world build time, never on the hot path.
-        static TypeId TypeIdForComponent(Type t)
-        {
-            var typeIdGeneric = typeof(TypeId<>).MakeGenericType(t);
-            var valueProp = typeIdGeneric.GetProperty(
-                "Value",
-                BindingFlags.Public | BindingFlags.Static
-            );
-            return (TypeId)valueProp.GetValue(null);
-        }
-
-        // UnsafeUtility.SizeOf<T>() via reflection — every component is `where T : unmanaged`
-        // so this is exact. Cached to avoid repeating reflection across same-template groups.
-        int GetUnmanagedSize(Type t)
-        {
-            if (_sizeCache.TryGetValue(t, out var cached))
-            {
-                return cached;
-            }
-            var method = typeof(UnsafeUtility).GetMethod(
-                nameof(UnsafeUtility.SizeOf),
-                1,
-                BindingFlags.Public | BindingFlags.Static,
-                null,
-                Type.EmptyTypes,
-                null
-            );
-            int size = (int)method.MakeGenericMethod(t).Invoke(null, null);
-            _sizeCache[t] = size;
-            return size;
-        }
 
         // Writes the component's default bytes (boxed user-provided default, or zero-fill
         // if no default is set) to dest. Returns true iff the resulting bytes are all zero.

@@ -149,7 +149,9 @@ namespace Trecs.Internal
             ReadOnlyList<GroupIndex> groups
         )
             where T : unmanaged, IEntityComponent =>
-            world.CreateNativeComponentLookupWriteForJob<T>(world.GetLookupEntriesForJob<T>(groups));
+            world.CreateNativeComponentLookupWriteForJob<T>(
+                world.GetLookupEntriesForJob<T>(groups)
+            );
 
         // ── NativeFactory helpers (buffer extraction from lookups) ──
 

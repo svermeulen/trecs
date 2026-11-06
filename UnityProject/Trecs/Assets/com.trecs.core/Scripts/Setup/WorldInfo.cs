@@ -279,10 +279,10 @@ namespace Trecs
         // The map thus accepts the same set of TagSets the managed resolver does, so
         // the Burst-path AddEntity can resolve any TagSet a caller could legally pass.
         //
-        // Cost is O(|groups| × 2^|tags-per-group|) resolver calls at world init.
-        // Realistic Trecs templates have ≤6 tags per group, putting this well under
-        // a millisecond in practice. The cap above asserts to catch pathological cases
-        // before they blow up init time.
+        // The resolver picks group G for a subset exactly when every group holding the
+        // subset also holds all of G's tags and has G's template. A subset's holders are
+        // the AND of per-tag group bitsets, built up mask by mask from the mask without
+        // its lowest bit, so cost is O(|groups| × 2^|tags-per-group| × |groups|/64).
         void BuildTagSetIdToGroupNative()
         {
             _tagSetIdToGroupNative = new NativeHashMap<int, GroupIndex>(
@@ -297,7 +297,26 @@ namespace Trecs
             }
 
             // Pass 2: partial subsets that uniquely resolve to a single group.
-            var scratch = new List<Tag>(MaxTagsPerGroupForFastPath);
+            int words = (_groupInfos.Length + 63) >> 6;
+            var tagHolders = new Dictionary<Tag, ulong[]>();
+            foreach (var info in _groupInfos)
+            {
+                foreach (var tag in info.TagSet.Tags)
+                {
+                    if (!tagHolders.TryGetValue(tag, out var bits))
+                    {
+                        bits = new ulong[words];
+                        tagHolders.Add(tag, bits);
+                    }
+                    SetBit(bits, info.GroupIndex);
+                }
+            }
+
+            var templateGroups = new Dictionary<RefKey<Template>, ulong[]>();
+            var tagBits = new ulong[MaxTagsPerGroupForFastPath][];
+            var holders = Array.Empty<ulong>();
+            var allowed = new ulong[words];
+            var subsetIds = Array.Empty<int>();
             foreach (var (fullTagSet, group) in _tagSetToIndex)
             {
                 var tags = fullTagSet.Tags;
@@ -313,36 +332,89 @@ namespace Trecs
                     MaxTagsPerGroupForFastPath
                 );
 
-                // Skip mask=0 (empty set) and mask=(1<<n)-1 (full set, already added).
                 int fullMask = (1 << n) - 1;
+                if (holders.Length < (fullMask + 1) * words)
+                {
+                    holders = new ulong[(fullMask + 1) * words];
+                }
+                if (subsetIds.Length <= fullMask)
+                {
+                    subsetIds = new int[fullMask + 1];
+                }
+                subsetIds[0] = TypeIdSet.Null.Id;
+                for (int i = 0; i < n; i++)
+                {
+                    tagBits[i] = tagHolders[tags[i]];
+                }
+
+                // Mask 0, the empty subset, is held by every group.
+                for (int w = 0; w < words; w++)
+                {
+                    holders[w] = ~0UL;
+                }
+                for (int mask = 1; mask <= fullMask; mask++)
+                {
+                    int lowest = 0;
+                    while ((mask & (1 << lowest)) == 0)
+                    {
+                        lowest++;
+                    }
+                    int from = (mask & (mask - 1)) * words;
+                    int to = mask * words;
+                    var bits = tagBits[lowest];
+                    for (int w = 0; w < words; w++)
+                    {
+                        holders[to + w] = holders[from + w] & bits[w];
+                    }
+
+                    // TagSet.FromTags adds in tag order, so the highest tag goes in last. Computed rather than
+                    // built: a subset no caller ever builds stays out of the TypeIdSet registry.
+                    int highest = n - 1;
+                    while ((mask & (1 << highest)) == 0)
+                    {
+                        highest--;
+                    }
+                    subsetIds[mask] = TypeIdSetRegistry.CombineId(
+                        subsetIds[mask & ~(1 << highest)],
+                        new TypeId(tags[highest].Value)
+                    );
+                }
+
+                var template = _groupInfos[group.Index].ResolvedTemplate.Template;
+                if (!templateGroups.TryGetValue(template, out var sameTemplate))
+                {
+                    sameTemplate = new ulong[words];
+                    foreach (var other in _templateGroupsMap[template])
+                    {
+                        SetBit(sameTemplate, other);
+                    }
+                    templateGroups.Add(template, sameTemplate);
+                }
+                for (int w = 0; w < words; w++)
+                {
+                    allowed[w] = holders[fullMask * words + w] & sameTemplate[w];
+                }
+
+                // Skip mask=0 (empty set) and mask=fullMask (full set, already added).
                 for (int mask = 1; mask < fullMask; mask++)
                 {
-                    scratch.Clear();
-                    for (int i = 0; i < n; i++)
+                    bool isUnique = true;
+                    for (int w = 0; w < words && isUnique; w++)
                     {
-                        if ((mask & (1 << i)) != 0)
-                            scratch.Add(tags[i]);
+                        isUnique = (holders[mask * words + w] & ~allowed[w]) == 0;
                     }
-                    var subset = TagSet.FromTags(scratch);
-
-                    // Already in the map (some other group's exact match, or a subset
-                    // already claimed in an earlier group's iteration).
-                    if (_tagSetIdToGroupNative.ContainsKey(subset.Id))
+                    if (!isUnique)
+                    {
                         continue;
-
-                    // Try* form avoids the throw-and-unwind cost on the "ambiguous"
-                    // and "no match" paths, which are the common case as we sweep
-                    // 2^n subsets per group.
-                    if (
-                        _queryEngine.TryGetSingleGroupWithTags(subset, out var resolved)
-                        && resolved == group
-                    )
-                    {
-                        _tagSetIdToGroupNative.Add(subset.Id, group);
                     }
+
+                    _tagSetIdToGroupNative.TryAdd(subsetIds[mask], group);
                 }
             }
         }
+
+        static void SetBit(ulong[] bits, GroupIndex group) =>
+            bits[group.Index >> 6] |= 1UL << (group.Index & 63);
 
         /// <summary>
         /// Resolves a <see cref="TagSet"/> to the sequential <see cref="GroupIndex"/>

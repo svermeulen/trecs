@@ -89,8 +89,8 @@ namespace Trecs.Tests
 
             lookup.Dispose();
 
-            NAssert.Throws<System.ObjectDisposedException>(
-                () => AtomicSafetyHandle.CheckExistsAndThrow(lookup.SafetyHandle)
+            NAssert.Throws<System.ObjectDisposedException>(() =>
+                AtomicSafetyHandle.CheckExistsAndThrow(lookup.SafetyHandle)
             );
         }
 

@@ -40,15 +40,18 @@ namespace Trecs.Internal
             );
         }
 
+        // Id of the set setId with member added, member not yet in it. Null.Id stands for the empty set. Pure: registers nothing.
+        public static int CombineId(int setId, TypeId member)
+        {
+            int id = setId ^ member.Value;
+            return id == 0 ? 1 : id;
+        }
+
         public static TypeIdSet FromSingle(TypeId member)
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
-            int id = member.Value;
-            if (id == 0)
-            {
-                id = 1;
-            }
+            int id = CombineId(TypeIdSet.Null.Id, member);
 
             if (_entries.TryGetValue(id, out var existing))
             {
@@ -77,11 +80,7 @@ namespace Trecs.Internal
                 }
             }
 
-            int newId = existing.Id ^ member.Value;
-            if (newId == 0)
-            {
-                newId = 1;
-            }
+            int newId = CombineId(existing.Id, member);
 
             if (_entries.TryGetValue(newId, out var existingNewEntry))
             {
