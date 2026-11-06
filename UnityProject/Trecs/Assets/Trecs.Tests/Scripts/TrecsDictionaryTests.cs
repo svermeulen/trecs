@@ -315,6 +315,26 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void AutoGrow_WhenFull_KeepsAllKeysFindable()
+        {
+            var cs = CreateChunkStore();
+            var dict = TrecsDictionary.Alloc<int, float>(cs, 1);
+            var w = dict.Write(cs);
+
+            w.Add(0, 0.5f);
+            w.Add(1, 1.5f);
+
+            var read = dict.Read(cs.Resolver);
+            NAssert.IsTrue(read.TryGetValue(0, out var v0));
+            NAssert.AreEqual(0.5f, v0);
+            NAssert.IsTrue(read.TryGetValue(1, out var v1));
+            NAssert.AreEqual(1.5f, v1);
+
+            dict.Dispose(cs);
+            cs.Dispose();
+        }
+
+        [Test]
         public void AutoGrow_PastInitialCapacity()
         {
             var cs = CreateChunkStore();

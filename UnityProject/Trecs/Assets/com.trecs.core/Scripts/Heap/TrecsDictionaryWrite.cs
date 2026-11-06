@@ -440,7 +440,7 @@ namespace Trecs
             if (valueIndex == -1)
             {
                 // No chain at this bucket — fast path
-                AppendEntry(key, hash, -1);
+                AppendEntry(key, hash, -1, ref bucketIndex);
             }
             else
             {
@@ -458,7 +458,7 @@ namespace Trecs
                 } while (currentValueIndex != -1);
 
                 _header->Collisions++;
-                AppendEntry(key, hash, valueIndex);
+                AppendEntry(key, hash, valueIndex, ref bucketIndex);
             }
 
             indexSet = _header->Count - 1;
@@ -477,7 +477,8 @@ namespace Trecs
             return true;
         }
 
-        void AppendEntry(TKey key, int hash, int previous)
+        // Grow rebuilds buckets: then re-points bucketIndex and previous at the new table.
+        void AppendEntry(TKey key, int hash, int previous, ref int bucketIndex)
         {
             var count = _header->Count;
             if (count == _header->EntryCapacity)
@@ -490,12 +491,7 @@ namespace Trecs
                 );
                 var newBuckets = HashHelpers.GetPrime(newCap);
                 Grow(newCap, newBuckets);
-                // After grow, the bucket structure is rebuilt — previous pointer is
-                // no longer valid. The caller (AddValue) will re-set the bucket head
-                // after this returns, but we need to fixup previous for the newly
-                // appended entry. Since Grow rebuilds all chains, we set previous to
-                // whatever the bucket currently points at.
-                int bucketIndex = TrecsDictionary.Reduce(
+                bucketIndex = TrecsDictionary.Reduce(
                     (uint)hash,
                     (uint)_header->BucketCount,
                     _header->FastModMultiplier
