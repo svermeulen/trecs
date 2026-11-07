@@ -12,6 +12,7 @@
 *.csproj.meta
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
