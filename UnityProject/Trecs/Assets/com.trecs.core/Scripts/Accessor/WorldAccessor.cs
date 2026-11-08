@@ -346,7 +346,10 @@ namespace Trecs
         public EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
 
         /// <summary>
-        /// Accumulated wall-clock time delivered by the variable-update phase.
+        /// Accumulated wall-clock time delivered by the variable-update phase:
+        /// the sum of <see cref="VariableDeltaTime"/>, so scaled by the runner's
+        /// time scale and Unity's <c>Time.timeScale</c>. Pausing fixed update,
+        /// restoring a snapshot or fast-forwarding never moves it.
         /// Only readable from Variable or Unrestricted accessors — Fixed-phase
         /// code should use <see cref="FixedElapsedTime"/>.
         /// </summary>
@@ -389,7 +392,8 @@ namespace Trecs
 
         /// <summary>
         /// Accumulated fixed-step time the simulation has consumed (<c>FixedFrame</c> ×
-        /// <see cref="FixedDeltaTime"/>). Deterministic across record/replay.
+        /// <see cref="FixedDeltaTime"/>). Advances only by fixed steps, so it is
+        /// deterministic across record/replay.
         /// </summary>
         public float FixedElapsedTime
         {
@@ -397,6 +401,36 @@ namespace Trecs
             {
                 AssertTimeAccessAllowedInFixedPhaseIfInFixedPhase(nameof(FixedElapsedTime));
                 return _systemRunner.FixedElapsedTime;
+            }
+        }
+
+        /// <summary>
+        /// The point on the fixed timeline that this frame shows, as
+        /// <see cref="Interpolated{T}"/> values do: between the previous and the
+        /// newest fixed state. Advances by <see cref="VariableDeltaTime"/> while
+        /// fixed update runs and holds at the newest fixed state while it is
+        /// paused. Jumps at a snapshot restore, a fast-forward, and when fixed
+        /// update falls behind and drops time. Use it for presentation timed
+        /// from fixed-step events. Only readable from Variable or Unrestricted
+        /// accessors.
+        /// </summary>
+        public float InterpolatedFixedElapsedTime
+        {
+            get
+            {
+                AssertCanAccessVariableData();
+                return _systemRunner.InterpolatedFixedElapsedTime;
+            }
+        }
+
+        // InterpolatedFixedElapsedTime minus FixedElapsedTime, exact at any
+        // elapsed time.
+        internal float InterpolationOffset
+        {
+            get
+            {
+                AssertCanAccessVariableData();
+                return _systemRunner.InterpolationOffset;
             }
         }
 
@@ -409,6 +443,7 @@ namespace Trecs
         /// <summary>
         /// Number of variable-update frames the host has driven. NOT deterministic
         /// across record/replay — host frame rate is independent of the simulation.
+        /// A snapshot restore does not reset it.
         /// Only readable from Variable or Unrestricted accessors.
         /// </summary>
         public int VariableFrame

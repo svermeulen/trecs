@@ -22,13 +22,14 @@ namespace Trecs
 
         /// <summary>
         /// Maximum wall-clock time (in seconds) that can be spent on fixed updates
-        /// in a single frame. When exceeded, the simulation skips forward to prevent
-        /// the spiral of death (where falling behind causes ever-increasing catch-up work).
-        /// Note that skipping forward means fixed update ticks are dropped, which breaks
-        /// determinism and may cause desyncs with recordings or networked peers.
+        /// in a single frame. When exceeded, the frame drops the fixed updates it has not
+        /// run yet, to prevent the spiral of death (where falling behind causes
+        /// ever-increasing catch-up work). The simulation then runs slower than real time.
+        /// It stays deterministic: <see cref="WorldAccessor.FixedElapsedTime"/> advances
+        /// only by fixed steps, and <see cref="WorldAccessor.VariableElapsedTime"/> is not moved.
         /// Defaults to 1/3s, matching Unity's <c>Time.maximumDeltaTime</c>.
-        /// Set to null for unlimited updates (e.g. deterministic replay), but note
-        /// this risks the spiral of death if fixed updates are too expensive.
+        /// Set to null to never drop: every due fixed update runs, which risks the
+        /// spiral of death if fixed updates are too expensive.
         /// </summary>
         public float? MaxSecondsForFixedUpdatePerFrame { get; init; } =
             DefaultMaxSecondsForFixedUpdatePerFrame;
@@ -40,7 +41,7 @@ namespace Trecs
 
         /// <summary>
         /// When true, logs a warning if fixed updates fall behind and the simulation
-        /// has to skip forward (when <see cref="MaxSecondsForFixedUpdatePerFrame"/> is set)
+        /// drops time (when <see cref="MaxSecondsForFixedUpdatePerFrame"/> is set)
         /// or is at risk of entering the spiral of death (when it is null).
         /// </summary>
         public bool WarnOnFixedUpdateFallingBehind { get; init; } = true;

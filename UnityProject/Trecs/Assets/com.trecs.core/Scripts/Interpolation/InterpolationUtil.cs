@@ -1,5 +1,3 @@
-using Trecs.Internal;
-
 namespace Trecs
 {
     /// <summary>
@@ -10,39 +8,21 @@ namespace Trecs
     {
         public static float CalculatePercentThroughFixedFrame(WorldAccessor world)
         {
-            var fixedCurrentTime = world.FixedElapsedTime;
-            var fixedPreviousTime = fixedCurrentTime - world.FixedDeltaTime;
-
-            if (fixedCurrentTime <= 0 || fixedPreviousTime < 0)
+            if (world.FixedFrame == 0)
             {
                 return 0f;
             }
 
-            var endOfFrameTime = world.VariableElapsedTime + world.VariableDeltaTime;
+            var offset = world.InterpolationOffset;
 
-            if (fixedCurrentTime <= fixedPreviousTime)
+            // Clamp instead of extrapolating: callers assume [0,1], and extrapolation
+            // would break the debugging workflow of pausing only fixed update
+            if (offset >= 0)
             {
-                throw TrecsDebugAssert.CreateException(
-                    "Unexpected state when calculating percent through fixed frame. fixedCurrentTime: {0}, fixedPreviousTime: {1}",
-                    fixedCurrentTime,
-                    fixedPreviousTime
-                );
-            }
-
-            TrecsDebugAssert.That(fixedCurrentTime > 0);
-            TrecsDebugAssert.That(fixedPreviousTime >= 0f);
-            TrecsDebugAssert.That(fixedCurrentTime > fixedPreviousTime);
-
-            if (fixedCurrentTime < endOfFrameTime)
-            {
-                // Clamp instead of extrapolating: callers assume [0,1], and extrapolation
-                // would break the debugging workflow of pausing only fixed update
                 return 0.999f;
             }
 
-            var percent =
-                (endOfFrameTime - fixedPreviousTime) / (fixedCurrentTime - fixedPreviousTime);
-            return percent;
+            return 1f + offset / world.FixedDeltaTime;
         }
     }
 }

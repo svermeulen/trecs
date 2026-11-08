@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **`InterpolatedFixedElapsedTime`.** The point on the fixed timeline that the current frame shows, the time at which `Interpolated<T>` values are blended. For presentation timed from fixed-step events. `InterpolationUtil.CalculatePercentThroughFixedFrame` now reads its offset from the newest fixed state, so it stays exact in long sessions.
+
+### Changed
+
+- **`VariableElapsedTime` and `VariableFrame` are never reset.** Unpausing fixed update, restoring a snapshot and fast-forwarding no longer move them. Before, they jumped to the fixed time and to frame 0.
+- **Fast-forward and single step count frames.** They no longer move variable time to make room for the steps, so a fast-forward reaches its target at any time scale.
+
+### Fixed
+
+- **A frame that falls behind no longer desyncs replays.** When fixed update exceeded `MaxSecondsForFixedUpdatePerFrame`, the runner added the time it had not run to `FixedElapsedTime`. That value goes into snapshots and checksums, so a recording made during a hitch failed its replay with no other difference. The frame now drops that time instead.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

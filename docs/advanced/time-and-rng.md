@@ -12,11 +12,20 @@ Access time values via the `World` accessor (available in systems):
 | `FixedDeltaTime` | Fixed timestep (default 1/60s) |
 | `VariableDeltaTime` | Actual frame delta time |
 | `ElapsedTime` | Total elapsed time for the current phase |
-| `FixedElapsedTime` | Total fixed update time |
-| `VariableElapsedTime` | Total variable update time |
+| `FixedElapsedTime` | Total fixed update time: advances only by fixed steps |
+| `VariableElapsedTime` | Total variable update time: never reset |
+| `InterpolatedFixedElapsedTime` | Point on the fixed timeline that the current frame shows (variable phase only) |
 | `Frame` | Frame counter for the current phase |
 | `FixedFrame` | Fixed update frame counter |
-| `VariableFrame` | Variable update frame counter |
+| `VariableFrame` | Variable update frame counter: never reset |
+
+### Three clocks
+
+- **`FixedElapsedTime`** is simulation state. It is saved in snapshots and checksums, and grows only when a fixed step runs. Use it in fixed-update systems.
+- **`VariableElapsedTime`** is the presentation clock: the sum of `VariableDeltaTime`, scaled by the runner's `TimeScale` and Unity's `Time.timeScale`. Pausing fixed update, restoring a snapshot or fast-forwarding never moves it. Use it for effects with no simulation timestamp: shader time, idle motion, UI pulses.
+- **`InterpolatedFixedElapsedTime`** is where on the fixed timeline the current frame sits, the time at which `Interpolated<T>` values are blended. It lies between the previous and the newest fixed state. It holds at the newest state while fixed update is paused, and jumps at a snapshot restore, a fast-forward, or when fixed update falls behind. Use it for presentation timed from a fixed-step event, so that it stays in phase with interpolated positions: `progress = (world.InterpolatedFixedElapsedTime - startFrame * world.FixedDeltaTime) / duration`.
+
+When fixed update falls behind real time and a frame spends more than `WorldSettings.MaxSecondsForFixedUpdatePerFrame` on it, the frame drops the steps it has not run. The simulation then runs slower than real time, and stays deterministic.
 
 ### Phase-aware DeltaTime
 

@@ -47,6 +47,11 @@ namespace Trecs.Internal
         internal int _currentFixedFrameCount;
         internal float _elapsedFixedTime;
         float _elapsedVariableTime;
+
+        // InterpolatedFixedElapsedTime minus FixedElapsedTime. In
+        // [-FixedTimeStep, 0) after a catch-up; 0 shows the newest fixed
+        // state. Presentation state: not serialized.
+        float _interpolationOffset;
         float? _variableDeltaTime;
         int _variableFrameCount;
         bool _isExecutingSystems;
@@ -70,22 +75,11 @@ namespace Trecs.Internal
         // External fast-forward request: set by callers via the public
         // FastForwardTargetFrame property, consumed at the start of the next
         // variable tick when the catch-up loop kicks off (see Tick()).
-        // Frame-typed (not time-typed) because _elapsedFixedTime can drift
-        // away from _currentFixedFrameCount * FixedTimeStep when
-        // MaxSecondsPerFixedUpdate forces a skip-forward; a time-typed target
-        // then maps to the wrong frame.
         int? _pendingFastForwardRequest;
 
-        // While a fast-forward request is being serviced the catch-up loop
-        // needs two adjustments: (1) bypass MaxSecondsPerFixedUpdate so we
-        // actually run all the fixed frames the caller asked for, and (2)
-        // stop at exactly the target frame instead of overshooting by ≥1.
-        // The variable-time-based loop bound otherwise overshoots because
-        // endOfFrameTime is _elapsedVariableTime + a delta, so we'd run one
-        // extra frame past target — which then fires FixedFrameChangeEvent
-        // for a frame > target, causing downstream listeners (debug
-        // recorder) to mistake it for user-driven progress. Mirroring the
-        // request frame here lets us cleanly bound the loop.
+        // Frame a fast-forward in progress runs to, past MaxSecondsPerFixedUpdate.
+        // Stops exactly there: FixedFrameChangeEvent listeners (debug recorder)
+        // would read one frame more as user-driven progress.
         int? _fastForwardCatchupTargetFrame;
         float _timeScale = 1f;
 
@@ -147,7 +141,10 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Note that this is different from unity's Time.timeScale
-        /// Changing either one will affect the variable delta time
+        /// Changing either one will affect the variable delta time, and thus
+        /// how fast VariableElapsedTime and InterpolatedFixedElapsedTime advance.
+        /// A negative scale runs VariableElapsedTime backwards; fixed update
+        /// never runs backwards, it holds at the previous fixed state.
         /// </summary>
         public float TimeScale
         {
@@ -168,12 +165,6 @@ namespace Trecs.Internal
         /// <see cref="FixedFrame"/> reaches this value, then auto-pause.
         /// Requires <see cref="FixedIsPaused"/> to be false at the start of
         /// that tick. No-op if the target is at or below the current frame.
-        ///
-        /// Frame-typed (not time-typed): when MaxSecondsPerFixedUpdate forces
-        /// a skip-forward, _elapsedFixedTime can drift away from
-        /// FixedFrame * FixedTimeStep. A time-based target then computes the
-        /// wrong number of frames to advance and lands a few frames short of
-        /// the user's intent.
         /// </summary>
         public int? FastForwardTargetFrame
         {
@@ -317,6 +308,29 @@ namespace Trecs.Internal
             {
                 TrecsDebugAssert.That(!_hasDisposed);
                 return _fixedElapsedTimeChangeEvent;
+            }
+        }
+
+        public float InterpolatedFixedElapsedTime
+        {
+            get
+            {
+                TrecsDebugAssert.That(!_hasDisposed);
+                return _elapsedFixedTime + _interpolationOffset;
+            }
+        }
+
+        internal float InterpolationOffset
+        {
+            get
+            {
+                TrecsDebugAssert.That(!_hasDisposed);
+                return _interpolationOffset;
+            }
+            set
+            {
+                TrecsDebugAssert.That(!_hasDisposed);
+                _interpolationOffset = value;
             }
         }
 
@@ -522,18 +536,15 @@ namespace Trecs.Internal
                 return;
             }
 
-            float endOfFrameTime;
-            int? stepTargetFrame = null;
+            // Single step and fast-forward run to a frame. Otherwise the loop
+            // runs until the newest fixed state is past the frame's
+            // InterpolatedFixedElapsedTime, so interpolation has both ends.
+            int? targetFrame = _fastForwardCatchupTargetFrame;
 
             if (_stepFixedFrame)
             {
                 _stepFixedFrame = false;
-                stepTargetFrame = _currentFixedFrameCount + 1;
-                endOfFrameTime = _elapsedFixedTime + _settings.FixedTimeStep;
-            }
-            else
-            {
-                endOfFrameTime = _elapsedVariableTime + _variableDeltaTime.Value;
+                targetFrame = _currentFixedFrameCount + 1;
             }
 
             var numUpdates = 0;
@@ -549,9 +560,11 @@ namespace Trecs.Internal
             // requested; only a request made by a step of this loop stops it.
             var wasPauseRequested = _desiredFixedIsPaused;
 
-            // Keep running until the physics time exceeds the current time
-            // so we can interpolate to get the current time
-            while (_elapsedFixedTime <= endOfFrameTime)
+            while (
+                targetFrame.HasValue
+                    ? _currentFixedFrameCount < targetFrame.Value
+                    : _interpolationOffset >= 0
+            )
             {
                 // A pause requested mid-loop (a recording's tail, a desync)
                 // stops at the step that asked, not at the end of the frame.
@@ -559,26 +572,8 @@ namespace Trecs.Internal
                 {
                     break;
                 }
-                // Stop FF catch-up exactly at target — the variable-time
-                // bound above would otherwise let one extra iteration
-                // through, firing FixedFrameChangeEvent for a frame past
-                // the target frame.
                 if (
-                    _fastForwardCatchupTargetFrame.HasValue
-                    && _currentFixedFrameCount >= _fastForwardCatchupTargetFrame.Value
-                )
-                {
-                    break;
-                }
-                // Same reason for single-step: the `<=` bound would otherwise
-                // let a second tick through once _elapsedFixedTime hits the
-                // exact boundary.
-                if (stepTargetFrame.HasValue && _currentFixedFrameCount >= stepTargetFrame.Value)
-                {
-                    break;
-                }
-                if (
-                    !_fastForwardCatchupTargetFrame.HasValue
+                    !targetFrame.HasValue
                     && _maxSecondsPerFixedUpdate.HasValue
                     && _fixedUpdateStopwatch.Elapsed.TotalSeconds >= _maxSecondsPerFixedUpdate
                 )
@@ -660,6 +655,10 @@ namespace Trecs.Internal
 
                 _elapsedFixedTime += fixedTimeStep;
                 _fixedElapsedTimeChangeEvent.Invoke(_elapsedFixedTime);
+                if (!targetFrame.HasValue)
+                {
+                    _interpolationOffset -= fixedTimeStep;
+                }
                 numUpdates += 1;
 
                 // This event is used to serialize/deserialize entire state
@@ -676,19 +675,19 @@ namespace Trecs.Internal
                 _isExecutingSystems = true;
             }
 
-            if (skipForward)
+            if (skipForward && _settings.WarnOnFixedUpdateFallingBehind)
             {
-                var fallBehindTime = endOfFrameTime - _elapsedFixedTime;
-                _elapsedFixedTime += fallBehindTime + 0.01f;
-                _fixedElapsedTimeChangeEvent.Invoke(_elapsedFixedTime);
+                _log.Warning(
+                    "Fixed update is falling behind variable update!  Dropping {0} seconds to catch up",
+                    _interpolationOffset
+                );
+            }
 
-                if (_settings.WarnOnFixedUpdateFallingBehind)
-                {
-                    _log.Warning(
-                        "Fixed update is falling behind variable update!  Skipping forward by {0} seconds to catch up",
-                        fallBehindTime + 0.01f
-                    );
-                }
+            // Time the loop did not run is dropped, never added to fixed time:
+            // fixed time is sim state. The frame shows the newest fixed state.
+            if (targetFrame.HasValue || _interpolationOffset > 0)
+            {
+                _interpolationOffset = 0;
             }
 
             // The target covers exactly one catch-up: clear whether the loop
@@ -710,7 +709,7 @@ namespace Trecs.Internal
                 if (_settings.WarnOnFixedUpdateFallingBehind)
                 {
                     _log.Warning(
-                        "Fixed update has started falling behind render update! ({0} frames behind) This could enter the dreaded physics timestep spiral of death.  To fix this - provide a value for MaxSecondsPerFixedUpdate in trecs setting.  Note that if you do this that it may get out of sync with recordings or online environments",
+                        "Fixed update has started falling behind render update! ({0} frames behind) This could enter the dreaded physics timestep spiral of death.  To fix this - provide a value for MaxSecondsPerFixedUpdate in trecs setting.  Note that the simulation then runs slower than real time while it falls behind",
                         numUpdates
                     );
                 }
@@ -824,18 +823,16 @@ namespace Trecs.Internal
                 _variableDeltaTimeChangeEvent.Invoke(_variableDeltaTime.Value);
             }
 
-            if (_fixedIsPaused != _desiredFixedIsPaused)
-            {
-                _fixedIsPaused = _desiredFixedIsPaused;
+            _fixedIsPaused = _desiredFixedIsPaused;
 
-                if (!_fixedIsPaused)
-                {
-                    // When unpausing fixed update, reset variable time back
-                    // Could also have fixed time catch up, but this seems
-                    // less safe
-                    _elapsedVariableTime = _elapsedFixedTime;
-                }
-            }
+            // Paused, the frame shows the newest fixed state. A negative time
+            // scale holds at the previous state: nothing runs backwards.
+            _interpolationOffset = _fixedIsPaused
+                ? 0
+                : Mathf.Max(
+                    _interpolationOffset + _variableDeltaTime.Value,
+                    -_settings.FixedTimeStep
+                );
 
             // Do this after updating _variableFrameCount and _variableDeltaTime
             // since they are accessed sometimes in these handlers
@@ -861,18 +858,6 @@ namespace Trecs.Internal
                 else
                 {
                     _fastForwardCatchupTargetFrame = targetFrame;
-                    // Bump variable time so the catch-up loop's
-                    // `_elapsedFixedTime <= endOfFrameTime` bound permits all
-                    // (targetFrame - currentFrame) iterations. Subtract one
-                    // Time.deltaTime so endOfFrameTime (= _elapsedVariableTime
-                    // + _variableDeltaTime) lands at the desired final
-                    // elapsed-fixed-time without overshooting.
-                    var framesToAdvance = targetFrame - _currentFixedFrameCount;
-                    _elapsedVariableTime =
-                        _elapsedFixedTime
-                        + framesToAdvance * _settings.FixedTimeStep
-                        - Time.deltaTime;
-                    _elapsedVariableTimeChangeEvent.Invoke(_elapsedVariableTime);
                 }
             }
 
@@ -962,15 +947,12 @@ namespace Trecs.Internal
         {
             TrecsDebugAssert.That(!_hasDisposed);
 
-            _variableFrameCount = 0;
-            // This is necessary because fixed update is always catching up to whatever this is
-            _elapsedVariableTime = _elapsedFixedTime;
+            // The frame shows the restored state. Variable time and frame run on.
+            _interpolationOffset = 0;
 
             // Note that deserialization updates the State so need to trigger those callbacks too
             _fixedCurrentFrameChangeEvent.Invoke(_currentFixedFrameCount);
             _fixedElapsedTimeChangeEvent.Invoke(_elapsedFixedTime);
-            _variableFrameCountChangeEvent.Invoke(_variableFrameCount);
-            _elapsedVariableTimeChangeEvent.Invoke(_elapsedVariableTime);
         }
 
         class SystemRuntimeInfo
